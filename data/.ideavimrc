@@ -1,0 +1,465 @@
+"""""""""""""""""""""""""""""""" Config """"""""""""""""""""""""""""""""
+let mapleader=" "
+let maplocalleader="\\"
+
+set clipboard=unnamed,unnamedplus
+set incsearch
+set ignorecase
+set hlsearch
+set visualbell
+
+set number
+set relativenumber
+" set scrolloff=4
+" set sidescrolloff=8
+set undolevels=1024
+set nowrap
+
+set ideajoin
+set idearefactormode=keep
+
+" set backspace=indent,eol,start
+" set formatoptions=tcqj
+" set listchars=tab:>\ ,trail:-,nbsp:+
+" set shortmess=filnxtToOF
+
+set timeoutlen=10000
+set notimeout
+
+"""""""""""""""""""""""""""""""" Plugin """"""""""""""""""""""""""""""""
+set surround
+set commentary
+set matchit
+
+set multiple-cursors
+set easymotion
+let g:EasyMotion_do_mapping = 0
+let g:EasyMotion_smartcase = 1
+
+set functiontextobj
+set quickscope
+set peekaboo
+let g:peekaboo_compact=0
+
+set which-key
+let g:WhichKey_SortOrder = "by_key_prefix_last"
+let g:WhichKey_SortCaseSensitive = "false"
+let g:WhichKey_FontFamily = "CaskaydiaMono NFM"
+let g:WhichKey_KeyColor	= "black"
+let g:WhichKey_PrefixColor	= "blue"
+let g:WhichKey_CommandColor	= "purple"
+let g:WhichKey_ShowVimActions = "false"
+let g:WhichKey_ShowTypedSequence = "true"
+let g:WhichKey_DefaultDelay = 200
+
+"""""""""""""""""""""""""""""""" Keymap """"""""""""""""""""""""""""""""
+
+"""" Idea Shortcut key overlay """"
+sethandler <C-A> a:vim
+sethandler <C-B> a:vim
+sethandler <C-C> a:vim
+sethandler <C-D> a:vim
+sethandler <C-E> a:vim
+sethandler <C-F> a:vim
+sethandler <C-G> a:vim
+sethandler <C-H> a:vim
+sethandler <C-I> a:vim
+sethandler <C-J> a:vim
+sethandler <C-K> a:vim
+sethandler <C-L> a:vim
+sethandler <C-M> a:vim
+sethandler <C-O> a:vim
+sethandler <C-P> a:vim
+sethandler <C-Q> a:vim
+sethandler <C-R> a:vim
+sethandler <C-S> a:vim
+sethandler <C-T> a:vim
+sethandler <C-U> a:vim
+sethandler <C-V> a:vim
+sethandler <C-W> a:vim
+sethandler <C-X> a:vim
+sethandler <C-Y> a:vim
+sethandler <C-Z> a:vim
+sethandler <A-J> a:vim
+sethandler <A-K> a:vim
+sethandler <A-N> a:ide
+sethandler <A-P> a:ide
+
+"""" goto """"
+nmap gd <Action>(GotoDeclaration)
+nmap gs <Action>(GotoSuperMethod)
+nmap gI <Action>(GotoImplementation)
+nmap gy <Action>(GotoTypeDeclaration)
+nmap gK <Action>(ParameterInfo)
+nmap gD <Action>(GotoDeclaration)
+imap <C-p> <C-o><Action>(ParameterInfo)
+imap <C-k> <C-o><Action>(ParameterInfo)
+map gh ^
+map gl $
+
+"""" Comment """"
+nmap gco o<c-o>gcc
+nmap gcO O<c-o>gcc
+
+"""" Buffer """"
+nmap <S-h> <Action>(PreviousTab)
+nmap <S-l> <Action>(NextTab)
+nmap [b <Action>(PreviousTab)
+nmap ]b <Action>(NextTab)
+nnoremap [B :tabm -1<cr>
+nnoremap ]B :tabm +1<cr>
+
+nmap <leader>bd <Action>(CloseContent)
+nmap <leader>bo <Action>(CloseAllEditorsButActive)
+nmap <leader>bl <Action>(CloseAllToTheLeft)
+nmap <leader>bp <Action>(PinActiveTabToggle)
+nmap <leader>bP <Action>(CloseAllUnpinnedEditors)
+nmap <leader>br <Action>(CloseAllToTheRight)
+nnoremap <leader>bb <C-^>
+nnoremap <leader>` <C-^>
+
+nmap <leader>be <Action>(ActivateProjectToolWindow)
+nmap <leader>. <Action>(NewScratchBuffer)
+nmap <leader>, <Action>(Switcher)
+
+"""" Windows """"
+nmap <C-h> <C-w>h
+nmap <C-j> <C-w>j
+nmap <C-k> <C-w>k
+nmap <C-l> <C-w>l
+
+nmap <C-Up> <Action>(IncrementWindowHeight)
+nmap <C-Down> <Action>(DecrementWindowHeight)
+nmap <C-Left> <Action>(DecrementWindowWidth)
+nmap <C-Right> <Action>(IncrementWindowWidth)
+
+nmap <leader>wd <Action>(CloseContent)
+nmap <leader>wm <Action>(MaximizeEditorInSplit)
+nmap <leader>- <c-w>s
+nmap <leader><bar> <c-w>v
+
+"""" UI """"
+nmap <leader>ur :<C-u>nohlsearch<cr>
+nmap <leader>ug <Action>(EditorToggleShowIndentLines)
+nmap <leader>uw :setlocal wrap!<cr>
+nmap <leader>uL :set relativenumber!<cr>
+nmap <leader>ul :set number!<cr>
+nmap <leader>uh <Action>(ToggleInlayHintsGloballyAction)
+nmap <leader>uC <Action>(QuickChangeScheme)
+nmap <leader>us :setlocal spell!<CR>
+
+"""" Projects """"
+nmap <leader>pd :action CloseProject<CR>
+nmap <leader>pn :action NextProjectWindow<CR>
+nmap <leader>pp :action PreviousProjectWindow<CR>
+nmap <leader>pr :action $LRU<CR>
+nmap <leader>pq <Action>(Exit)
+nmap <leader>qq <Action>(Exit)
+
+"""" File/Find """"
+nmap <leader>fb <Action>(Switcher)
+nmap <leader>ff <Action>(GotoFile)
+nmap <leader>fr <Action>(RecentFiles)
+nmap <leader>fn <Action>(NewFile)
+nmap <leader>ft <Action>(ActivateTerminalToolWindow)
+nmap <leader>fe <Action>(ActivateProjectToolWindow)
+nmap <leader>fE <Action>(SelectInProjectView)
+nmap <leader>fi :action RevealIn<CR>
+nmap <leader>fm :action RecentChangedFiles<CR>
+nmap <leader><Space> <Action>(GotoFile)
+nmap <leader>/ <Action>(FindInPath)
+nmap <leader>e <Action>(FileStructurePopup)
+nmap <leader>E <Action>(SelectInProjectView)
+nmap <C-/> <Action>(ActivateTerminalToolWindow)
+
+"""" Search """"
+nmap <leader>sr <Action>(StructuralSearchPlugin.StructuralReplaceAction)
+vmap <leader>sr <Action>(StructuralSearchPlugin.StructuralReplaceAction)
+nmap <leader>sb <Action>(Switcher)
+nmap <leader>sd <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>sg <Action>(FindInPath)
+nmap <leader>sj <Action>(RecentLocations)
+nmap <leader>sm <Action>(Bookmarks.Goto)
+nmap <leader>ss <Action>(GotoSymbol)
+nmap <leader>sT <Action>(ActivateTODOToolWindow)
+
+nmap <leader>sc :history<cr>
+nmap <leader>sC <Action>(GotoAction)
+nmap <leader>sh <Action>(HelpTopics)
+nmap <leader>sw <Action>(FindWordAtCaret)
+vmap <leader>sw <Action>(FindWordAtCaret)
+
+"""" Code """"
+nmap <leader>ca <Action>(ShowIntentionActions)
+nmap <leader>cr <Action>(RenameElement)
+nmap <leader>cR <Action>(RenameFile)
+nmap <leader>cc :echo 'There is no equivalent mapping for Lsp Info.'<cr>
+nmap <leader>cA <Action>(ShowIntentionActions)
+nmap <leader>cf <Action>(Format)
+vmap <leader>cf <Action>(Format)
+vmap <leader>cc :action Scala.SendSelectionToConsole<CR>
+vmap <leader>cs :action Custom.SendToTerminal<CR>
+vmap <leader>cm :action Custom.Minify<CR> gv
+vmap <leader>ci :action Custom.LinesToSqlWhereIn<CR> gv
+vmap <leader>cv :action Custom.CsvToSqlValues<CR> gv
+vmap <leader>cf :action Custom.SwitchFileSeparator<CR> gv
+vmap <leader>c, :action osmedile.intellij.stringmanip.swap.SwapAction<CR> gv
+vmap <leader>ce :action osmedile.intellij.stringmanip.RemoveEmptyLinesAction<CR> gv
+
+"""" LSP """"
+nmap gr <Action>(FindUsages)
+nmap ]] <Action>(GotoNextError)
+nmap [[ <Action>(GotoPreviousError)
+
+"""" Refactor """"
+nmap <leader>rb <Action>(ExtractMethod)
+vmap <leader>rf :action ExtractMethod<cr>
+nmap <leader>ri <Action>(Inline)
+vmap <leader>ri :action Inline<cr>
+nmap <leader>rs <Action>(RefactoringMenu)
+vmap <leader>rs :action RefactoringMenu<cr>
+nmap <leader>rx <Action>(IntroduceVariable)
+vmap <leader>rx :action IntroduceVariable<cr>
+
+"""" Debug """"
+nmap <leader>da <Action>(ChooseRunConfiguration)
+nmap <leader>db <Action>(ToggleLineBreakpoint)
+nmap <leader>dB <Action>(AddConditionalBreakpoint)
+nmap <leader>dc <Action>(Resume)
+nmap <leader>dC <Action>(ForceRunToCursor)
+nmap <leader>di <Action>(StepInto)
+nmap <leader>dl <Action>(Debug)
+nmap <leader>do <Action>(StepOut)
+nmap <leader>dO <Action>(StepOver)
+nmap <leader>dp <Action>(Pause)
+nmap <leader>dt <Action>(Stop)
+nmap <leader>de <Action>(EvaluateExpression)
+vmap <leader>de <Action>(EvaluateExpression)
+nmap <leader>du <Action>(ActivateDebugToolWindow)
+nmap <leader>dd <Action>(Debug)
+
+"""" Test """"
+nmap <leader>tl <Action>(Run)
+nmap <leader>tr <Action>(RunClass)
+nmap <leader>ts <Action>(ShowTestSummary)
+nmap <leader>tS <Action>(Stop)
+nmap <leader>tt <Action>(RunClass)
+nmap <leader>tT <Action>(RunAllTests)
+nmap <leader>td <Action>(ChooseDebugConfiguration)
+nmap <leader>tw <Action>(ToggleTestWatch)
+
+"""" Git """"
+nmap <leader>gb <Action>(Annotate)
+nmap <leader>gg <Action>(ActivateCommitToolWindow)
+nmap <leader>gG <Action>(ActivateCommitToolWindow)
+nmap <leader>gf <Action>(Vcs.ShowTabbedFileHistory)
+nmap <leader>gl <Action>(Vcs.Show.Log)
+nmap <leader>gm :action Git.MainMenu<CR>
+nmap <leader>gu :action Vcs.UpdateProject<CR>
+nmap <leader>gp :action Vcs.Push<CR>
+nmap <leader>gc <Action>(Vcs.Show.Log)
+nmap <leader>gs <Action>(Vcs.Show.Log)
+
+"""" Motion & Editor """"
+nmap <A-j> <Action>(MoveLineDown)
+imap <A-j> <Esc><Action>(MoveLineDown)i
+nmap <A-k> <Action>(MoveLineUp)
+imap <A-k> <Esc><Action>(MoveLineUp)i
+
+nmap ]d <Action>(GotoNextError)
+nmap [d <Action>(GotoPreviousError)
+nmap <c-w>d <Action>(ShowErrorDescription)
+
+xmap <bs> <Action>(EditorUnSelectWord)
+nmap <c-space> <Action>(EditorSelectWord)
+xmap <c-space> <Action>(EditorSelectWord)
+
+nmap <a-n> <Action>(GotoNextElementUnderCaretUsage)
+nmap <a-p> <Action>(GotoPrevElementUnderCaretUsage)
+
+nnoremap Y y$
+inoremap <C-u> <C-g>u<C-u>
+inoremap <C-w> <C-g>u<C-w>
+nnoremap Q @@
+
+"""" Todo """"
+nmap [t ?TODO<cr>
+nmap ]t /TODO<cr>
+nmap <leader>st oTODO<esc>gcc
+
+"""" EasyMotion """"
+nmap s <Plug>(easymotion-s)
+
+"""" Multiple-Cursors """"
+nmap <C-n> <Plug>NextWholeOccurrence
+xmap <C-n> <Plug>NextWholeOccurrence
+nmap g<C-n> <Plug>NextOccurrence
+xmap g<C-n> <Plug>NextOccurrence
+xmap <C-x> <Plug>SkipOccurrence
+xmap <C-p> <Plug>RemoveOccurrence
+
+"""" Trae AI """"
+map <Tab> :action AcceptTRAEInlineCompletionAction<CR>
+
+"""" Utils """"
+nmap <leader>: :history<cr>
+nmap <leader>ll :e ~/.ideavimrc<CR>
+nmap <leader>lr :source ~/.ideavimrc<CR>
+nmap <leader>i :action QuickJavaDoc<CR>
+
+"""" Databases """"
+nmap <leader>vd :action ActivateDatabaseToolWindow<CR>
+nmap <leader>vc :action Console.Jdbc.ChooseDataSource<CR>
+nmap <leader>vs :action Console.Jdbc.ChooseSchema<CR>
+nmap <leader>vg :action ActivateGradleToolWindow<CR>
+nmap <leader>vm :action ActivateMavenToolWindow<CR>
+nmap <leader>vt :action ActivateToolsetToolWindow<CR>
+
+"""" Which-Key Descriptions """"
+let g:WhichKeyDesc_001 = "g +goto"
+let g:WhichKeyDesc_002 = "gd Goto Definition"
+let g:WhichKeyDesc_003 = "gs Goto Super Method"
+let g:WhichKeyDesc_004 = "gI Goto Implementation"
+let g:WhichKeyDesc_005 = "gy Goto Type Definition"
+let g:WhichKeyDesc_006 = "gK Signature Help"
+let g:WhichKeyDesc_007 = "gh Goto Head"
+let g:WhichKeyDesc_008 = "gl Goto End"
+let g:WhichKeyDesc_009 = "gc +Comment"
+let g:WhichKeyDesc_010 = "gco Add Comment Below"
+let g:WhichKeyDesc_011 = "gcO Add Comment Above"
+let g:WhichKeyDesc_012 = "[b Prev Buffer"
+let g:WhichKeyDesc_013 = "[B Move buffer prev"
+let g:WhichKeyDesc_014 = "]b Next Buffer"
+let g:WhichKeyDesc_015 = "]B Move buffer next"
+let g:WhichKeyDesc_016 = "<leader>. New Scratch Buffer"
+let g:WhichKeyDesc_017 = "<leader>, Switch Buffer"
+let g:WhichKeyDesc_018 = "<leader>- Split Window Below"
+let g:WhichKeyDesc_019 = "<leader>| Split Window Right"
+let g:WhichKeyDesc_020 = "<leader><Space> Find Files"
+let g:WhichKeyDesc_021 = "<leader>/ Grep (Root Dir)"
+let g:WhichKeyDesc_022 = "]d Next Diagnostic"
+let g:WhichKeyDesc_023 = "[d Prev Diagnostic"
+let g:WhichKeyDesc_024 = "<C-w>d Show diagnostics under the cursor"
+let g:WhichKeyDesc_025 = "<bs> Decrement Selection"
+let g:WhichKeyDesc_026 = "<c-space> Increment Selection"
+let g:WhichKeyDesc_027 = "<leader>: Command History"
+
+let g:WhichKeyDesc_b01 = "<leader>b +buffer"
+let g:WhichKeyDesc_b02 = "<leader>bd Delete Buffer"
+let g:WhichKeyDesc_b03 = "<leader>bo Delete Other Buffers"
+let g:WhichKeyDesc_b04 = "<leader>bl Delete Buffers to the Left"
+let g:WhichKeyDesc_b05 = "<leader>bp Toggle Pin"
+let g:WhichKeyDesc_b06 = "<leader>bP Delete Non-Pinned Buffers"
+let g:WhichKeyDesc_b07 = "<leader>br Delete Buffers to the Right"
+let g:WhichKeyDesc_b08 = "<leader>be Buffer Explorer"
+
+let g:WhichKeyDesc_c01 = "<leader>c +code"
+let g:WhichKeyDesc_c02 = "<leader>ca Code Action"
+let g:WhichKeyDesc_c03 = "<leader>cr Rename"
+let g:WhichKeyDesc_c04 = "<leader>cR Rename File"
+let g:WhichKeyDesc_c05 = "<leader>cc Lsp Info"
+let g:WhichKeyDesc_c06 = "<leader>cA Source Action"
+let g:WhichKeyDesc_c07 = "<leader>cf Format"
+let g:WhichKeyDesc_c08 = "<leader>cs Custom Send To Terminal"
+let g:WhichKeyDesc_c09 = "<leader>cm Minify"
+let g:WhichKeyDesc_c10 = "<leader>ci Lines To Sql Where In"
+let g:WhichKeyDesc_c11 = "<leader>cv Csv To Sql Values"
+let g:WhichKeyDesc_c12 = "<leader>c, Swap"
+let g:WhichKeyDesc_c13 = "<leader>ce Remove Empty Lines"
+
+let g:WhichKeyDesc_d01 = "<leader>d +debug"
+let g:WhichKeyDesc_d02 = "<leader>da Run with Args"
+let g:WhichKeyDesc_d03 = "<leader>db Toggle Breakpoint"
+let g:WhichKeyDesc_d04 = "<leader>dB Breakpoint Condition"
+let g:WhichKeyDesc_d05 = "<leader>dc Continue"
+let g:WhichKeyDesc_d06 = "<leader>dC Run to Cursor"
+let g:WhichKeyDesc_d07 = "<leader>di Step Into"
+let g:WhichKeyDesc_d08 = "<leader>dl Run Last"
+let g:WhichKeyDesc_d09 = "<leader>do Step Out"
+let g:WhichKeyDesc_d10 = "<leader>dO Step Over"
+let g:WhichKeyDesc_d11 = "<leader>dp Pause"
+let g:WhichKeyDesc_d12 = "<leader>dt Terminate"
+let g:WhichKeyDesc_d13 = "<leader>de Eval"
+let g:WhichKeyDesc_d14 = "<leader>du Dap UI"
+let g:WhichKeyDesc_d15 = "<leader>dd Debug this"
+
+let g:WhichKeyDesc_e01 = "<leader>e FileStructurePopup"
+let g:WhichKeyDesc_e02 = "<leader>E SelectInProjectView"
+
+let g:WhichKeyDesc_f01 = "<leader>f +file/find"
+let g:WhichKeyDesc_f02 = "<leader>fb Buffers"
+let g:WhichKeyDesc_f03 = "<leader>ff Find Files"
+let g:WhichKeyDesc_f04 = "<leader>fr Recent"
+let g:WhichKeyDesc_f05 = "<leader>fn New File"
+let g:WhichKeyDesc_f06 = "<leader>ft Terminal (Root Dir)"
+let g:WhichKeyDesc_f07 = "<leader>fe Explorer NeoTree (Root Dir)"
+let g:WhichKeyDesc_f08 = "<leader>fE Explorer NeoTree (cwd)"
+let g:WhichKeyDesc_f09 = "<leader>fi Reveal In"
+let g:WhichKeyDesc_f10 = "<leader>fm Recent Changed Files"
+
+let g:WhichKeyDesc_g01 = "<leader>g +git"
+let g:WhichKeyDesc_g02 = "<leader>gb Git Blame Line"
+let g:WhichKeyDesc_g03 = "<leader>gg Git Commit"
+let g:WhichKeyDesc_g04 = "<leader>gG Git Commit (cwd)"
+let g:WhichKeyDesc_g05 = "<leader>gf Git Current File History"
+let g:WhichKeyDesc_g06 = "<leader>gl Git Log"
+let g:WhichKeyDesc_g07 = "<leader>gm Git Main Menu"
+let g:WhichKeyDesc_g08 = "<leader>gu Git Update Project"
+let g:WhichKeyDesc_g09 = "<leader>gp Git Push"
+let g:WhichKeyDesc_g10 = "<leader>gc Commits"
+let g:WhichKeyDesc_g11 = "<leader>gs Status"
+
+let g:WhichKeyDesc_i01 = "<leader>i QuickJavaDoc"
+
+let g:WhichKeyDesc_p01 = "<leader>p +projects"
+let g:WhichKeyDesc_p02 = "<leader>pd Close Project"
+let g:WhichKeyDesc_p03 = "<leader>pn Next Project Window"
+let g:WhichKeyDesc_p04 = "<leader>pp Previous Project Window"
+let g:WhichKeyDesc_p05 = "<leader>pr Recent Projects"
+let g:WhichKeyDesc_p06 = "<leader>pq Exit"
+
+let g:WhichKeyDesc_r01 = "<leader>r +refactor"
+let g:WhichKeyDesc_r02 = "<leader>rb Extract Block"
+let g:WhichKeyDesc_r03 = "<leader>rf Extract Function"
+let g:WhichKeyDesc_r04 = "<leader>ri Inline Variable"
+let g:WhichKeyDesc_r05 = "<leader>rs Refactor"
+let g:WhichKeyDesc_r06 = "<leader>rx Extract Variable"
+
+let g:WhichKeyDesc_s01 = "<leader>s +search"
+let g:WhichKeyDesc_s02 = "<leader>sr Search and Replace"
+let g:WhichKeyDesc_s03 = "<leader>sb Buffer"
+let g:WhichKeyDesc_s04 = "<leader>sd Document Diagnostics"
+let g:WhichKeyDesc_s05 = "<leader>sg Grep (Root Dir)"
+let g:WhichKeyDesc_s06 = "<leader>sj Jumplist"
+let g:WhichKeyDesc_s07 = "<leader>sm Jump to Mark"
+let g:WhichKeyDesc_s08 = "<leader>ss Goto Symbol"
+let g:WhichKeyDesc_s09 = "<leader>st Add TODO"
+let g:WhichKeyDesc_s14 = "<leader>sT Todo Tool Window"
+let g:WhichKeyDesc_s10 = "<leader>sc Command History"
+let g:WhichKeyDesc_s11 = "<leader>sC Commands"
+let g:WhichKeyDesc_s12 = "<leader>sh Help Pages"
+let g:WhichKeyDesc_s13 = "<leader>sw Word"
+
+let g:WhichKeyDesc_t01 = "<leader>t +test"
+let g:WhichKeyDesc_t02 = "<leader>tl Run Last"
+let g:WhichKeyDesc_t03 = "<leader>tr Run Nearest"
+let g:WhichKeyDesc_t04 = "<leader>ts Show Summary"
+let g:WhichKeyDesc_t05 = "<leader>tS Stop"
+let g:WhichKeyDesc_t06 = "<leader>tt Run File"
+let g:WhichKeyDesc_t07 = "<leader>tT Run All"
+let g:WhichKeyDesc_t08 = "<leader>td Debug Nearest"
+let g:WhichKeyDesc_t09 = "<leader>tw Toggle Watch"
+
+let g:WhichKeyDesc_u01 = "<leader>u +ui"
+let g:WhichKeyDesc_u02 = "<leader>ur Escape and Clear hlsearch"
+let g:WhichKeyDesc_u03 = "<leader>ug Toggle Indentation Guides"
+let g:WhichKeyDesc_u04 = "<leader>uw Toggle Wrap"
+let g:WhichKeyDesc_u05 = "<leader>uL Toggle Relative Number"
+let g:WhichKeyDesc_u06 = "<leader>ul Toggle Line Numbers"
+let g:WhichKeyDesc_u07 = "<leader>uh Toggle Inlay Hints"
+let g:WhichKeyDesc_u08 = "<leader>uC Colorscheme with Preview"
+let g:WhichKeyDesc_u09 = "<leader>us Toggle Spelling"
+
+let g:WhichKeyDesc_w01 = "<leader>w +windows"
+let g:WhichKeyDesc_w02 = "<leader>wd Delete Window"
+let g:WhichKeyDesc_w03 = "<leader>wm Toggle Maximize"
