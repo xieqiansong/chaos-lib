@@ -1,0 +1,139 @@
+body {
+    padding: 0;
+    margin: 0;
+}
+
+/* ===== 字体尺寸 ===== */
+.text-xs   { font-size: var(--el-font-size-extra-small); }
+.text-sm   { font-size: var(--el-font-size-small); }
+.text-base { font-size: var(--el-font-size-base); }
+.text-md   { font-size: var(--el-font-size-medium); }
+
+/* ===== 排版 ===== */
+.flex            { display: flex; }
+.flex-wrap       { flex-wrap: wrap; }
+.items-center    { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm          { gap: 0.5rem; }
+.gap-md          { gap: 1rem; }
+.text-right      { text-align: right; }
+.text-center     { text-align: center; }
+.truncate        { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-mono       { font-family: 'Consolas', 'Courier New', monospace; }
+.flex-1          { flex: 1; }
+.min-w-0         { min-width: 0; }
+.flex-shrink-0   { flex-shrink: 0; }
+.whitespace-nowrap { white-space: nowrap; }
+
+/* ===== 间距（统一刻度，基于 4px 网格） ===== */
+:root {
+  --space-xs: 0.25rem;  /* 4px */
+  --space-05: 0.375rem; /* 6px */
+  --space-sm: 0.5rem;   /* 8px */
+  --space-md: 0.75rem;  /* 12px */
+  --space-lg: 1rem;     /* 16px */
+  --space-xl: 1.5rem;   /* 24px */
+  --space-2xl: 2rem;    /* 32px */
+  --space-3xl: 3rem;    /* 48px */
+}
+
+.gap-xs { gap: var(--space-xs); }
+.gap-05 { gap: var(--space-05); }
+.gap-sm { gap: var(--space-sm); }
+.gap-md { gap: var(--space-md); }
+.gap-lg { gap: var(--space-lg); }
+
+.mt-xs { margin-top: var(--space-xs); }
+.mt-05 { margin-top: var(--space-05); }
+.mt-sm { margin-top: var(--space-sm); }
+.mt-md { margin-top: var(--space-md); }
+.mt-lg { margin-top: var(--space-lg); }
+
+.mb-xs { margin-bottom: var(--space-xs); }
+.mb-05 { margin-bottom: var(--space-05); }
+.mb-sm { margin-bottom: var(--space-sm); }
+.mb-md { margin-bottom: var(--space-md); }
+.mb-lg { margin-bottom: var(--space-lg); }
+
+.ml-xs { margin-left: var(--space-xs); }
+.ml-05 { margin-left: var(--space-05); }
+.ml-sm { margin-left: var(--space-sm); }
+.ml-md { margin-left: var(--space-lg); }
+
+.mr-sm { margin-right: var(--space-sm); }
+.mr-md { margin-right: var(--space-lg); }
+
+/* ===== 公共区块标题栏（section-*） ===== */
+.section-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+
+.section-title {
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.section-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-05);
+}
+
+.empty-wrap {
+  text-align: center;
+  padding: var(--space-3xl) 0;
+}
+
+/* ===== 公共评分选项组（rating-group） ===== */
+.rating-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.rating-group .el-radio {
+  display: flex;
+  align-items: center;
+  margin-right: 0;
+  height: 2rem;
+}
+
+/* ===== 行内操作按钮组（op-actions） ===== */
+.op-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.op-actions .el-button--small {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* ===== 垂直对齐 ===== */
+.align-middle { vertical-align: middle; }
+
+/* ===== 树形表格图标对齐 ===== */
+.el-table__expand-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* ===== 文字颜色（语义化，基于 Element Plus 变量） ===== */
+.text-primary    { color: var(--el-text-color-primary); }
+.text-regular    { color: var(--el-text-color-regular); }
+.text-secondary  { color: var(--el-text-color-secondary); }
+.text-placeholder { color: var(--el-text-color-placeholder); }
+
+/* ===== 背景色 ===== */
+.bg-lighter { background: var(--el-fill-color-lighter); }
+
+/* ===== 边框 ===== */
+.border-light { border: 1px solid var(--el-border-color-lighter); }

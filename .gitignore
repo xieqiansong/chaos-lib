@@ -1,0 +1,20 @@
+.idea
+**/logs/*
+**/*.exe
+chaos-server/cmd/server/web/
+chaos-ui/dist/
+chaos-knots
+# 配置文件（含密码，坚决不提交）
+**/.env
+**/.env.*
+!**/.env.example
+# 数据库文件
+**/*.db
+**/*.db-shm
+**/*.db-wal
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
