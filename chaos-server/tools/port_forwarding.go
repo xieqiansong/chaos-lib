@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"sync"
 	"time"
@@ -48,7 +48,7 @@ func (pf *PortForwarder) AddForward(localPort int, remoteAddr string) error {
 
 	// 检查是否已存在
 	if _, exists := pf.forwards[localPort]; exists {
-		log.Printf("端口 %d 已存在转发，跳过", localPort)
+		slog.Info("端口已存在转发，跳过", "localPort", localPort)
 		return nil
 	}
 
@@ -78,7 +78,7 @@ func (pf *PortForwarder) AddForward(localPort int, remoteAddr string) error {
 	// 启动转发服务
 	go pf.startForwarding(task, taskCtx)
 
-	log.Printf("✅ 已添加端口转发: :%d -> %s (自动重试已启用)", localPort, remoteAddr)
+	slog.Info("已添加端口转发", "localPort", localPort, "remoteAddr", remoteAddr, "autoRetry", true)
 	return nil
 }
 
@@ -110,7 +110,7 @@ func (pf *PortForwarder) RemoveForward(localPort int) error {
 	delete(pf.forwards, localPort)
 	pf.mu.Unlock()
 
-	log.Printf("🗑️ 端口转发 :%d 已停止，所有连接已断开", localPort)
+	slog.Info("端口转发已停止", "localPort", localPort)
 	return nil
 }
 
@@ -143,12 +143,12 @@ func (pf *PortForwarder) tryConnectRemote(task *ForwardTask, ctx context.Context
 
 	conn, err := net.DialTimeout("tcp", task.remoteAddr, 5*time.Second)
 	if err != nil {
-		log.Printf("⚠️ 连接远程 %s 失败，15秒后重试: %v", task.remoteAddr, err)
+		slog.Warn("连接远程失败，将重试", "remoteAddr", task.remoteAddr, "err", err)
 		return
 	}
 
 	conn.Close()
-	log.Printf("✅ 远程服务 %s 可达", task.remoteAddr)
+	slog.Info("远程服务可达", "remoteAddr", task.remoteAddr)
 }
 
 // startForwarding 开始转发流量
@@ -168,7 +168,7 @@ func (pf *PortForwarder) startForwarding(task *ForwardTask, ctx context.Context)
 			case <-ctx.Done():
 				return
 			default:
-				log.Printf("❌ 接受连接失败: %v", err)
+				slog.Error("接受连接失败", "err", err)
 				continue
 			}
 		}
@@ -195,12 +195,12 @@ func (pf *PortForwarder) handleConnectionWithRetry(localConn net.Conn, task *For
 
 	remoteConn, err := pf.connectWithRetry(task.remoteAddr, 15*time.Second)
 	if err != nil {
-		log.Printf("❌ 无法连接远程 %s: %v", task.remoteAddr, err)
+		slog.Error("无法连接远程", "remoteAddr", task.remoteAddr, "err", err)
 		return
 	}
 	defer remoteConn.Close()
 
-	log.Printf("🔄 开始转发: %s <-> %s", localConn.RemoteAddr(), task.remoteAddr)
+	slog.Info("开始转发", "localAddr", localConn.RemoteAddr(), "remoteAddr", task.remoteAddr)
 
 	// 双向转发
 	done := make(chan struct{}, 2)
@@ -209,23 +209,21 @@ func (pf *PortForwarder) handleConnectionWithRetry(localConn net.Conn, task *For
 	go func() {
 		_, err := io.Copy(remoteConn, localConn)
 		if err != nil && err != io.EOF {
-			log.Printf("⚠️ 本地->远程转发中断: %v", err)
+			slog.Warn("本地->远程转发中断", "err", err)
 		}
 		done <- struct{}{}
 	}()
 
-	// 远程 -> 本地
 	go func() {
 		_, err := io.Copy(localConn, remoteConn)
 		if err != nil && err != io.EOF {
-			log.Printf("⚠️ 远程->本地转发中断: %v", err)
+			slog.Warn("远程->本地转发中断", "err", err)
 		}
 		done <- struct{}{}
 	}()
 
-	// 等待任意一端断开
 	<-done
-	log.Printf("🔌 连接关闭: %s", localConn.RemoteAddr())
+	slog.Info("连接关闭", "localAddr", localConn.RemoteAddr())
 }
 
 // connectWithRetry 带重试的远程连接
@@ -245,7 +243,7 @@ func (pf *PortForwarder) connectWithRetry(remoteAddr string, retryInterval time.
 		}
 
 		lastErr = err
-		log.Printf("🔄 连接 %s 失败，%v 后重试: %v", remoteAddr, retryInterval, err)
+		slog.Warn("连接失败，将重试", "remoteAddr", remoteAddr, "retryInterval", retryInterval, "err", err)
 
 		select {
 		case <-time.After(retryInterval):
@@ -261,14 +259,13 @@ func (pf *PortForwarder) ListForwards() {
 	pf.mu.RLock()
 	defer pf.mu.RUnlock()
 
-	fmt.Println("\n📋 活跃的端口转发:")
 	if len(pf.forwards) == 0 {
-		fmt.Println("  (空)")
+		slog.Info("活跃的端口转发: 空")
 		return
 	}
 
 	for port, task := range pf.forwards {
-		fmt.Printf("  :%d -> %s 🔄\n", port, task.remoteAddr)
+		slog.Info("活跃的端口转发", "localPort", port, "remoteAddr", task.remoteAddr)
 	}
 }
 

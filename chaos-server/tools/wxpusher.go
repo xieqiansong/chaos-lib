@@ -1,9 +1,9 @@
 package tools
 
-import "fmt"
+import "log/slog"
 
 func SendMessage(title, content string) {
-	fmt.Printf(" [notify] %s: %s\n", title, content)
+	slog.Info("发送通知", "title", title, "content", content)
 	ShowNotify(NotifyConfig{
 		Title:       title,
 		Text:        content,

@@ -3,7 +3,7 @@ package services
 import (
 	"chaos-lib/config"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +46,7 @@ func GetDeepSeekBalance(c *gin.Context) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("⚠️ DeepSeek 余额接口返回 %d: %s", resp.StatusCode, string(body))
+		slog.Warn("DeepSeek 余额接口返回错误", "statusCode", resp.StatusCode, "body", string(body))
 		c.JSON(resp.StatusCode, gin.H{"error": "DeepSeek 返回错误", "detail": string(body)})
 		return
 	}

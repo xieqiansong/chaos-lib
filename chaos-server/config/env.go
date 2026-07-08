@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"chaos-lib/tools"
 )
 
 type Environment string
@@ -90,7 +90,7 @@ func LoadConfig() *AppConfig {
 	setDefaults(config)
 
 	globalConfig = config
-	log.Printf("✅ 配置加载成功 [环境: %s] [配置目录: %s]", env, configDir)
+	slog.Info("配置加载成功", "env", env, "configDir", configDir)
 	return config
 }
 
@@ -147,7 +147,7 @@ func resolveConfigPathFromDir(dir string, env Environment) string {
 		return path
 	}
 
-	log.Printf("️ 配置文件不存在: %s，使用默认配置", path)
+	slog.Warn("配置文件不存在，使用默认配置", "path", path)
 	return ""
 }
 
@@ -172,7 +172,7 @@ func loadConfigFile(config *AppConfig, path string) {
 
 	file, err := os.Open(path)
 	if err != nil {
-		log.Printf("⚠️ 无法打开配置文件: %v", err)
+		slog.Warn("无法打开配置文件", "err", err)
 		return
 	}
 	defer file.Close()
@@ -197,7 +197,7 @@ func loadConfigFile(config *AppConfig, path string) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("⚠️ 读取配置文件错误: %v", err)
+		slog.Warn("读取配置文件错误", "err", err)
 	}
 }
 
@@ -326,56 +326,10 @@ func InitLog() {
 	if cfg == nil {
 		return
 	}
-
-	var writers []io.Writer
-
-	if cfg.Log.ToConsole {
-		writers = append(writers, os.Stderr)
-	}
-
-	if cfg.Log.ToFile {
-		logPath := cfg.Log.FilePath
-		if !filepath.IsAbs(logPath) {
-			logPath = filepath.Join(getConfigDir(), logPath)
-		}
-
-		logDir := filepath.Dir(logPath)
-		if err := os.MkdirAll(logDir, 0755); err != nil {
-			log.Printf("⚠️ 创建日志目录失败: %v", err)
-		} else {
-			rotatedPath := rotateLogFileIfNeeded(logPath)
-			file, err := os.OpenFile(rotatedPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err != nil {
-				log.Printf("⚠️ 打开日志文件失败: %v", err)
-			} else {
-				writers = append(writers, file)
-			}
-		}
-	}
-
-	if len(writers) > 0 {
-		multiWriter := io.MultiWriter(writers...)
-		log.SetOutput(multiWriter)
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-	}
-}
-
-func rotateLogFileIfNeeded(logPath string) string {
-	if _, err := os.Stat(logPath); err != nil {
-		return logPath
-	}
-
-	info, err := os.Stat(logPath)
-	if err != nil {
-		return logPath
-	}
-
-	now := time.Now()
-	modTime := info.ModTime()
-	if now.YearDay() != modTime.YearDay() || now.Year() != modTime.Year() {
-		backup := logPath + "." + modTime.Format("2006-01-02")
-		_ = os.Rename(logPath, backup)
-	}
-
-	return logPath
+	tools.InitLogger(&tools.LogConfig{
+		Level:     cfg.Log.Level,
+		FilePath:  cfg.Log.FilePath,
+		ToFile:    cfg.Log.ToFile,
+		ToConsole: cfg.Log.ToConsole,
+	})
 }

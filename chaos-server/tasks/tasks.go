@@ -1,7 +1,7 @@
 package tasks
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -39,11 +39,11 @@ func Register(name string, interval time.Duration, fn TaskFunc, enabledFn ...fun
 func Start() {
 	for _, t := range registeredTasks {
 		if t.Enabled != nil && !t.Enabled() {
-			log.Printf("⏰ 跳过后台任务 [%s]（已在配置中关闭）", t.Name)
+			slog.Info("跳过后台任务", "name", t.Name, "reason", "已在配置中关闭")
 			continue
 		}
 		task := t
-		log.Printf("⏰ 启动后台任务 [%s]，周期 %v", task.Name, task.Interval)
+		slog.Info("启动后台任务", "name", task.Name, "interval", task.Interval)
 
 		var mu sync.Mutex
 
@@ -64,17 +64,16 @@ func Start() {
 // safeRun 互斥地执行一次任务，记录 panic
 func safeRun(mu *sync.Mutex, name string, fn TaskFunc) {
 	if !mu.TryLock() {
-		log.Printf("⏰ 后台任务 [%s] 跳过（上一次还未结束）\n", name)
+		slog.Info("后台任务跳过", "name", name, "reason", "上一次还未结束")
 		return
 	}
 	defer mu.Unlock()
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("❌ 后台任务 [%s] panic: %v", name, r)
+			slog.Error("后台任务 panic", "name", name, "panic", r)
 		}
 	}()
 
-	// log.Printf("⏰ 后台任务 [%s] 执行中...\n", name)
 	fn()
 }

@@ -4,7 +4,7 @@ import (
 	"chaos-lib/config"
 	"chaos-lib/models"
 	"chaos-lib/tasks"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -36,7 +36,7 @@ func sweepCronPlans() {
 	if err := db.Where("plan_type = ? AND status = ? AND is_deleted = ?",
 		models.TaskPlanTypeCron, models.TaskPlanStatusStarted, false).
 		Find(&plans).Error; err != nil {
-		log.Printf("❌ 周期任务扫描失败: %v", err)
+		slog.Error("周期任务扫描失败", "err", err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func sweepCronPlans() {
 		}
 		schedule, err := parser.Parse(*plan.CronExpr)
 		if err != nil {
-			log.Printf("⚠️ 计划 %d 的 cron 表达式无效: %v", plan.ID, err)
+			slog.Warn("计划的 cron 表达式无效", "planId", plan.ID, "err", err)
 			continue
 		}
 
@@ -80,7 +80,7 @@ func sweepCronPlans() {
 				continue
 			}
 			if _, err := createCronTask(&plan, next); err != nil {
-				log.Printf("⚠️ 生成 cron 任务失败 plan=%d: %v", plan.ID, err)
+				slog.Warn("生成 cron 任务失败", "planId", plan.ID, "err", err)
 				break
 			}
 			generated++
@@ -97,7 +97,7 @@ func sweepIntervalPlans() {
 	if err := db.Where("plan_type = ? AND status = ? AND is_deleted = ?",
 		models.TaskPlanTypeInterval, models.TaskPlanStatusStarted, false).
 		Find(&plans).Error; err != nil {
-		log.Printf("❌ 间隔任务扫描失败: %v", err)
+		slog.Error("间隔任务扫描失败", "err", err)
 		return
 	}
 
@@ -113,7 +113,7 @@ func sweepIntervalPlans() {
 			continue
 		}
 		if _, err := generateTask(&plan, now, nil); err != nil {
-			log.Printf("⚠️ 补充间隔任务失败 plan=%d: %v", plan.ID, err)
+			slog.Warn("补充间隔任务失败", "planId", plan.ID, "err", err)
 		}
 	}
 }

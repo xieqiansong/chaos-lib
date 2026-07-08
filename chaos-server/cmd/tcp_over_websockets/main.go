@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -45,17 +45,17 @@ func NewTcpToWsForwarder(targetHost, targetPort string, wsConn *websocket.Conn) 
 
 func (f *TcpToWsForwarder) Run(ctx context.Context) {
 	addr := fmt.Sprintf("%s:%s", f.targetHost, f.targetPort)
-	log.Printf("开始建立 TCP 连接 targetHost: %s targetPort: %s", f.targetHost, f.targetPort)
+	slog.Info("开始建立 TCP 连接", "targetHost", f.targetHost, "targetPort", f.targetPort)
 
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
-		log.Printf("TCP 连接失败 %s: %v", addr, err)
+		slog.Error("TCP 连接失败", "addr", addr, "err", err)
 		return
 	}
 	f.conn = conn
 	defer conn.Close()
 
-	log.Printf("TCP 连接成功 %s", addr)
+	slog.Info("TCP 连接成功", "addr", addr)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -71,7 +71,7 @@ func (f *TcpToWsForwarder) Run(ctx context.Context) {
 	}()
 
 	wg.Wait()
-	log.Printf("TCP 连接结束 %s", addr)
+	slog.Info("TCP 连接结束", "addr", addr)
 }
 
 func (f *TcpToWsForwarder) forwardTcpToWs(ctx context.Context) {
@@ -85,18 +85,18 @@ func (f *TcpToWsForwarder) forwardTcpToWs(ctx context.Context) {
 
 		n, err := f.conn.Read(buf)
 		if err != nil {
-			log.Printf("TCP 读取失败: %v", err)
+			slog.Error("TCP 读取失败", "err", err)
 			return
 		}
 
-		log.Printf("TCP 收到数据: %s", hex.EncodeToString(buf[:n]))
+		slog.Debug("TCP 收到数据", "data", hex.EncodeToString(buf[:n]))
 
 		f.mu.Lock()
 		err = f.wsConn.WriteMessage(websocket.BinaryMessage, buf[:n])
 		f.mu.Unlock()
 
 		if err != nil {
-			log.Printf("WebSocket 写入失败: %v", err)
+			slog.Error("WebSocket 写入失败", "err", err)
 			return
 		}
 	}
@@ -112,15 +112,15 @@ func (f *TcpToWsForwarder) forwardWsToTcp(ctx context.Context) {
 
 		_, message, err := f.wsConn.ReadMessage()
 		if err != nil {
-			log.Printf("WebSocket 读取失败: %v", err)
+			slog.Error("WebSocket 读取失败", "err", err)
 			return
 		}
 
-		log.Printf("WebSocket 收到数据: %s", hex.EncodeToString(message))
+		slog.Debug("WebSocket 收到数据", "data", hex.EncodeToString(message))
 
 		_, err = f.conn.Write(message)
 		if err != nil {
-			log.Printf("TCP 写入失败: %v", err)
+			slog.Error("TCP 写入失败", "err", err)
 			return
 		}
 	}
@@ -153,7 +153,7 @@ func (f *WsToTcpForwarder) Connect(ctx context.Context) error {
 		return fmt.Errorf("解析 WebSocket URL 失败: %v", err)
 	}
 
-	log.Printf("开始建立 WebSocket 连接: %s", f.wsUrl)
+	slog.Info("开始建立 WebSocket 连接", "url", f.wsUrl)
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 5 * time.Second,
@@ -165,7 +165,7 @@ func (f *WsToTcpForwarder) Connect(ctx context.Context) error {
 	}
 
 	f.wsConn = wsConn
-	log.Printf("WebSocket 连接成功: %s", wsURL.Host)
+	slog.Info("WebSocket 连接成功", "host", wsURL.Host)
 
 	return nil
 }
@@ -199,18 +199,18 @@ func (f *WsToTcpForwarder) forwardTcpToWs(ctx context.Context) {
 
 		n, err := f.tcpConn.Read(buf)
 		if err != nil {
-			log.Printf("TCP 读取失败: %v", err)
+			slog.Error("TCP 读取失败", "err", err)
 			return
 		}
 
-		log.Printf("TCP 收到数据: %s", hex.EncodeToString(buf[:n]))
+		slog.Debug("TCP 收到数据", "data", hex.EncodeToString(buf[:n]))
 
 		f.mu.Lock()
 		err = f.wsConn.WriteMessage(websocket.BinaryMessage, buf[:n])
 		f.mu.Unlock()
 
 		if err != nil {
-			log.Printf("WebSocket 写入失败: %v", err)
+			slog.Error("WebSocket 写入失败", "err", err)
 			return
 		}
 	}
@@ -226,15 +226,15 @@ func (f *WsToTcpForwarder) forwardWsToTcp(ctx context.Context) {
 
 		_, message, err := f.wsConn.ReadMessage()
 		if err != nil {
-			log.Printf("WebSocket 读取失败: %v", err)
+			slog.Error("WebSocket 读取失败", "err", err)
 			return
 		}
 
-		log.Printf("WebSocket 收到数据: %s", hex.EncodeToString(message))
+		slog.Debug("WebSocket 收到数据", "data", hex.EncodeToString(message))
 
 		_, err = f.tcpConn.Write(message)
 		if err != nil {
-			log.Printf("TCP 写入失败: %v", err)
+			slog.Error("TCP 写入失败", "err", err)
 			return
 		}
 	}
@@ -252,11 +252,11 @@ func (f *WsToTcpForwarder) Close() {
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	log.Printf("收到 WebSocket 连接请求: %s", r.RemoteAddr)
+	slog.Info("收到 WebSocket 连接请求", "remoteAddr", r.RemoteAddr)
 
 	wsConn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket 升级失败: %v", err)
+		slog.Error("WebSocket 升级失败", "err", err)
 		return
 	}
 	defer wsConn.Close()
@@ -268,14 +268,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(uri, "/"), "/")
 
 	if len(parts) < 4 || parts[1] != "forward" {
-		log.Printf("无效的路径: %s", uri)
+		slog.Warn("无效的路径", "uri", uri)
 		return
 	}
 
 	targetHost := parts[2]
 	targetPort := parts[3]
 
-	log.Printf("WebSocket 连接建立，准备转发到 %s:%s", targetHost, targetPort)
+	slog.Info("WebSocket 连接建立，准备转发", "targetHost", targetHost, "targetPort", targetPort)
 
 	forwarder := NewTcpToWsForwarder(targetHost, targetPort, wsConn)
 
@@ -286,16 +286,16 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	select {
 	case <-ctx.Done():
-		log.Printf("WebSocket 连接关闭")
+		slog.Info("WebSocket 连接关闭")
 	case <-r.Context().Done():
-		log.Printf("请求上下文取消")
+		slog.Info("请求上下文取消")
 	}
 
 	forwarder.Close()
 }
 
 func runServer(port int) {
-	log.Printf("WebSocket Server 启动在端口 %d", port)
+	slog.Info("WebSocket Server 启动", "port", port)
 
 	http.HandleFunc("/websocket/forward/", handleWebSocket)
 
@@ -308,21 +308,23 @@ func runServer(port int) {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("服务器启动失败: %v", err)
+			slog.Error("服务器启动失败", "err", err)
+			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("服务器正在关闭...")
+	slog.Info("服务器正在关闭...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("服务器关闭失败: %v", err)
+		slog.Error("服务器关闭失败", "err", err)
+		os.Exit(1)
 	}
 
-	log.Println("服务器已关闭")
+	slog.Info("服务器已关闭")
 }
 
 func runClient(port int, wsUrl string) {
@@ -330,11 +332,12 @@ func runClient(port int, wsUrl string) {
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatalf("TCP 服务器启动失败: %v", err)
+		slog.Error("TCP 服务器启动失败", "err", err)
+		os.Exit(1)
 	}
 	defer listener.Close()
 
-	log.Printf("TCP Client 启动在端口 %d，转发到 %s", port, wsUrl)
+	slog.Info("TCP Client 启动", "port", port, "wsUrl", wsUrl)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -343,14 +346,14 @@ func runClient(port int, wsUrl string) {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 		<-sigChan
-		log.Println("收到关闭信号...")
+		slog.Info("收到关闭信号...")
 		cancel()
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("TCP 服务器关闭")
+			slog.Info("TCP 服务器关闭")
 			return
 		default:
 		}
@@ -361,12 +364,12 @@ func runClient(port int, wsUrl string) {
 			case <-ctx.Done():
 				return
 			default:
-				log.Printf("接受连接失败: %v", err)
+				slog.Error("接受连接失败", "err", err)
 				continue
 			}
 		}
 
-		log.Printf("收到 TCP 连接: %s", conn.RemoteAddr())
+		slog.Info("收到 TCP 连接", "remoteAddr", conn.RemoteAddr())
 
 		go func() {
 			defer conn.Close()
@@ -374,13 +377,13 @@ func runClient(port int, wsUrl string) {
 			forwarder := NewWsToTcpForwarder(wsUrl, conn)
 
 			if err := forwarder.Connect(ctx); err != nil {
-				log.Printf("WebSocket 连接失败: %v", err)
+				slog.Error("WebSocket 连接失败", "err", err)
 				return
 			}
 			defer forwarder.Close()
 
 			forwarder.Run(ctx)
-			log.Printf("连接处理结束: %s", conn.RemoteAddr())
+			slog.Info("连接处理结束", "remoteAddr", conn.RemoteAddr())
 		}()
 	}
 }
@@ -414,7 +417,8 @@ func main() {
 	mode := os.Args[1]
 	port, err := strconv.Atoi(os.Args[2])
 	if err != nil {
-		log.Fatalf("无效的端口号: %s", os.Args[2])
+		slog.Error("无效的端口号", "port", os.Args[2], "err", err)
+		os.Exit(1)
 	}
 
 	switch mode {
@@ -422,11 +426,13 @@ func main() {
 		runServer(port)
 	case "client":
 		if len(os.Args) < 4 {
-			log.Fatal("client 模式需要提供 WebSocket URL 参数")
+			slog.Error("client 模式需要提供 WebSocket URL 参数")
+			os.Exit(1)
 		}
 		wsUrl := os.Args[3]
 		runClient(port, wsUrl)
 	default:
-		log.Fatalf("未知模式: %s，请使用 'server' 或 'client'", mode)
+		slog.Error("未知模式", "mode", mode)
+		os.Exit(1)
 	}
 }

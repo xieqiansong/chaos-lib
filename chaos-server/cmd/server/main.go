@@ -5,8 +5,7 @@ import (
 	"chaos-lib/routes"
 	"chaos-lib/tasks"
 	"embed"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,60 +35,60 @@ func initEarlyLog() {
 		return
 	}
 
-	log.SetOutput(file)
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	handler := slog.NewTextHandler(file, &slog.HandlerOptions{Level: slog.LevelDebug})
+	slog.SetDefault(slog.New(handler))
 }
 
 func setupPprof(cfg *config.PprofConfig) {
 	if !cfg.Enabled {
-		log.Println("🔇 Pprof 已禁用")
+		slog.Info("Pprof 已禁用")
 		return
 	}
 
 	go func() {
-		log.Printf("🔍 Pprof 启动: http://%s", cfg.GetAddress())
+		slog.Info("Pprof 启动", "addr", cfg.GetAddress())
 		err := http.ListenAndServe(cfg.GetAddress(), nil)
 		if err != nil {
-			log.Printf("❌ Pprof 启动失败: %v", err)
+			slog.Error("Pprof 启动失败", "err", err)
 		}
 	}()
 }
 
 func main() {
 	initEarlyLog()
-	log.Printf("🚀 程序启动时间: %s", time.Now().Format("2006-01-02 15:04:05"))
+	slog.Info("程序启动", "time", time.Now().Format("2006-01-02 15:04:05"))
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("❌ 程序崩溃: %v\n%s", r, string(debug.Stack()))
+			slog.Error("程序崩溃", "panic", r, "stack", string(debug.Stack()))
 			execPath, _ := os.Executable()
 			execDir := filepath.Dir(execPath)
 			crashPath := filepath.Join(execDir, "crash.log")
 			f, err := os.OpenFile(crashPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err == nil {
 				defer f.Close()
-				fmt.Fprintf(f, "[%s] 崩溃: %v\n%s\n", time.Now().Format("2006-01-02 15:04:05"), r, string(debug.Stack()))
+				slog.New(slog.NewTextHandler(f, nil)).Error("程序崩溃", "panic", r, "stack", string(debug.Stack()))
 			}
 		}
 	}()
 
 	cfg := config.LoadConfig()
-	log.Println("✅ 配置加载成功")
+	slog.Info("配置加载成功")
 
 	config.InitLog()
-	log.Println("✅ 日志初始化完成")
+	slog.Info("日志初始化完成")
 
 	setupPprof(&cfg.Pprof)
-	log.Println("✅ Pprof 设置完成")
+	slog.Info("Pprof 设置完成")
 
 	tasks.Start()
-	log.Println("✅ 后台任务启动完成")
+	slog.Info("后台任务启动完成")
 
-	log.Printf("🌐 启动 HTTP 服务 %s [%s]", cfg.Server.GetAddress(), cfg.Environment)
+	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress(), "env", cfg.Environment)
 	r := routes.SetupRouter(webFS)
 	go r.Run(cfg.Server.GetAddress())
 
-	log.Println("✅ HTTP 服务启动完成")
+	slog.Info("HTTP 服务启动完成")
 
 	select {}
 }

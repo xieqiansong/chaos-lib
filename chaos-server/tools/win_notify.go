@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"log/slog"
 	"runtime"
 	"sync"
 	"unsafe"
@@ -225,7 +225,7 @@ func ShowNotify(config NotifyConfig) NotifyResult {
 
 	hInstRaw, _, _ := notifyProcGetModuleHandle.Call(0)
 	if hInstRaw == 0 {
-		fmt.Println("GetModuleHandleW failed")
+		slog.Error("GetModuleHandleW failed")
 		return NotifyClose
 	}
 	hInst := windows.Handle(hInstRaw)
@@ -248,8 +248,7 @@ func ShowNotify(config NotifyConfig) NotifyResult {
 	}
 	ret, _, err := notifyProcRegisterClassEx.Call(uintptr(unsafe.Pointer(&wc)))
 	if ret == 0 {
-		// 重复注册可忽略；其它错误打印一下，便于排错
-		fmt.Printf("RegisterClassEx 返回 0: %v\n", err)
+		slog.Warn("RegisterClassEx 返回 0", "err", err)
 	}
 
 	screenW := int(notifyGetSysMetrics(0))
@@ -267,7 +266,7 @@ func ShowNotify(config NotifyConfig) NotifyResult {
 		0, 0, uintptr(hInst), 0,
 	)
 	if hWnd == 0 {
-		fmt.Printf("CreateWindowEx failed: %v\n", err2)
+		slog.Error("CreateWindowEx failed", "err", err2)
 		return NotifyClose
 	}
 	notifyHMainWnd = windows.Handle(hWnd)

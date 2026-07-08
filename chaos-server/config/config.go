@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -49,10 +49,10 @@ func privateConnectDB() (*gorm.DB, error) {
 		sqlDB.SetMaxOpenConns(1)
 		sqlDB.SetMaxIdleConns(1)
 		if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
-			log.Printf("⚠️ 设置 SQLite WAL 模式失败: %v", err)
+			slog.Warn("设置 SQLite WAL 模式失败", "err", err)
 		}
 		if _, err := sqlDB.Exec("PRAGMA foreign_keys=ON"); err != nil {
-			log.Printf("⚠️ 开启 SQLite 外键失败: %v", err)
+			slog.Warn("开启 SQLite 外键失败", "err", err)
 		}
 	} else {
 		sqlDB.SetMaxOpenConns(32)
@@ -88,11 +88,11 @@ func GetDB() *gorm.DB {
 	if dbInstance == nil {
 		db, err := privateConnectDB()
 		if err != nil {
-			log.Printf("❌ 数据库连接失败: %v", err)
+			slog.Error("数据库连接失败", "err", err)
 			return nil
 		}
 		dbInstance = db
-		fmt.Println("✅ Connected to database with GORM")
+		slog.Info("Connected to database with GORM")
 	}
 	return dbInstance
 }
@@ -108,6 +108,6 @@ func TryConnectDB() (*gorm.DB, error) {
 	}
 
 	dbInstance = db
-	fmt.Println("✅ Connected to database with GORM")
+	slog.Info("Connected to database with GORM")
 	return db, nil
 }
