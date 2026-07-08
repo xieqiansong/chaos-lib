@@ -32,14 +32,14 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {id: 'dashboard', label: '看板', children: []},
-  {id: 'browserHistory', label: '历史记录', children: []},
-  {id: 'sdk', label: 'SDK 版本', children: []},
+  {id: 'task', label: '任务管理', children: []},
+  {id: 'projectManage', label: '项目管理', children: []},
+  // {id: 'browserHistory', label: '历史记录', children: []},
+  {id: 'sdk', label: 'SDK版本', children: []},
   {id: 'fileLink', label: '文件连接', children: []},
   {id: 'quickEdit', label: '快速编辑', children: []},
   {id: 'environment', label: '环境变量', children: []},
-  {id: 'task', label: '任务管理', children: []},
-  {id: 'example', label: '测试例子', children: []},
-  {id: 'projectManage', label: '项目管理', children: []},
+  // {id: 'example', label: '测试例子', children: []},
 ]
 
 const activeMenuLabel = computed(() => {

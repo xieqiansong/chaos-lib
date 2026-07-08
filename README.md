@@ -1,19 +1,39 @@
 # chaos-lib
 
-一个自托管的个人工具箱，集成了任务管理、知识卡片（FSRS 间隔复习）、浏览器历史记录、文件连接、端口转发、环境变量管理、快捷编辑等功能。
+一个自托管的个人工具箱，集成了任务管理、知识卡片（FSRS 间隔复习）、文件连接、环境变量管理、快捷编辑等功能。
 
 ## 功能一览
 
 - **📋 任务管理**：支持待办 / 定时（cron）/ 间隔复习三种计划类型，含 FSRS 算法驱动的间隔复习、逾期检测、父子任务树
 - **📖 FSRS 知识卡片**：内嵌 FSRS（Free Spaced Repetition Scheduler）算法，自动计算下一个最佳复习时间
-- **🌐 浏览器历史记录**：同步 Chrome/Edge 等浏览器历史，在 Web UI 中搜索与管理
 - **🔗 文件连接**：像符号链接一样管理本地文件路径映射
-- **🔌 端口转发**：将本地端口透明转发到内网其他主机
 - **⚙️ 环境变量管理**：查看、修改、快照系统及用户环境变量（TOML 格式）
 - **✏️ 快捷编辑**：被管控文件列表 + 内容历史快照，随时回滚
 - **📁 项目组管理**：按目录组织本地项目，记录 Git URL、上次访问时间
 - **📦 SDK 版本切换**：管理多个 SDK 安装版本并一键切换当前版本
-- **🔔 通知**：Windows 本地通知
+
+## 截图展示
+
+<p align="center"><b>📊 看板</b></p>
+<p align="center"><img src="docs/screenshots/dashboard.png" alt="看板" width="1080" /></p>
+
+<p align="center"><b>📋 任务管理（含 FSRS 复习）</b></p>
+<p align="center"><img src="docs/screenshots/tasks.png" alt="任务管理" width="1080" /></p>
+
+<p align="center"><b>⚙️ 环境变量管理</b></p>
+<p align="center"><img src="docs/screenshots/env-variables.png" alt="环境变量" width="1080" /></p>
+
+<p align="center"><b>✏️ 快捷编辑</b></p>
+<p align="center"><img src="docs/screenshots/quick-edit.png" alt="快速编辑" width="1080" /></p>
+
+<p align="center"><b>🔗 文件连接</b></p>
+<p align="center"><img src="docs/screenshots/file-links.png" alt="文件连接" width="1080" /></p>
+
+<p align="center"><b>📁 项目管理</b></p>
+<p align="center"><img src="docs/screenshots/project-manage.png" alt="项目管理" width="1080" /></p>
+
+<p align="center"><b>📦 SDK 版本切换</b></p>
+<p align="center"><img src="docs/screenshots/sdk.png" alt="SDK版本" width="1080" /></p>
 
 ## 技术栈
 
