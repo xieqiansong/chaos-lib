@@ -642,10 +642,12 @@ func ListPlanTasks(c *gin.Context) {
 }
 
 // GetPendingTasks 查询待办任务
-// 查询所有状态为 active 且当前时间已到达 started_at 的任务（含过期任务，通过 IsOverdue 标记）
+// 查询所有状态为 active 的任务（含过期任务，通过 IsOverdue 标记）。
+// 默认只返回当前时间已到达 started_at 的任务；传 ?early=1 可提前查看所有 active 任务（不限开始时间）。
 func GetPendingTasks(c *gin.Context) {
 	// 使用服务器本地时区，与前端显示一致
 	now := time.Now()
+	early := c.Query("early") == "1"
 
 	var rows []struct {
 		models.Task
@@ -654,14 +656,19 @@ func GetPendingTasks(c *gin.Context) {
 		PlanLink    *string             ``
 		ContentSize int                 ``
 	}
-	if err := config.GetDB().Table("tasks").
+	query := config.GetDB().Table("tasks").
 		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.content_size").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", models.TaskStatusActive).
 		Where("tasks.is_deleted = ?", false).
-		Where("task_plans.is_deleted = ?", false).
-		Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now).
-		Order("tasks.priority DESC, tasks.deadline ASC NULLS LAST, tasks.created_at ASC").
+		Where("task_plans.is_deleted = ?", false)
+
+	if !early {
+		query = query.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)
+	}
+
+	if err := query.
+		Order("tasks.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC").
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return

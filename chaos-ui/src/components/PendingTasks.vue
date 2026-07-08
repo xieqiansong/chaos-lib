@@ -32,6 +32,7 @@ interface PendingTask {
 }
 
 const pendingTasks = ref<PendingTask[]>([])
+const earlyMode = ref(false)
 
 const showRatingDialog = ref(false)
 const ratingTargetTask = ref<PendingTask | null>(null)
@@ -70,7 +71,8 @@ function openLink(link: string) {
 
 async function loadPendingTasks() {
   try {
-    const result = await sendMessage('tasks/pending', 'GET')
+    const url = earlyMode.value ? 'tasks/pending?early=1' : 'tasks/pending'
+    const result = await sendMessage(url, 'GET')
     if (Array.isArray(result)) {
       pendingTasks.value = result
     }
@@ -188,6 +190,14 @@ defineExpose({loadPendingTasks})
 
 <template>
   <div class="pending-tasks-wrapper">
+    <div v-if="view === 'table'" class="pending-toolbar">
+      <el-switch
+          v-model="earlyMode"
+          active-text="提前查询"
+          @change="loadPendingTasks"
+      />
+    </div>
+
     <el-empty v-if="pendingTasks.length === 0" description="暂无待办" class="pending-empty"/>
 
     <ul v-else-if="view === 'sidebar'" class="pending-items">
@@ -214,46 +224,48 @@ defineExpose({loadPendingTasks})
       </li>
     </ul>
 
-    <el-table v-else :data="pendingTasks" border stripe class="mb-sm">
-      <el-table-column label="类型" width="90">
-        <template #default="{ row }">
-          <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
-            {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="PlanName" label="任务名称" min-width="200"/>
-      <el-table-column label="字数" width="80">
-        <template #default="{ row }">
-          <span v-if="row.ContentSize > 0">{{ row.ContentSize.toLocaleString() }}</span>
-          <span v-else class="text-secondary">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="90">
-        <template #default="{ row }">
-          <el-tag v-if="row.IsOverdue" size="small" type="danger">已逾期</el-tag>
-          <el-tag v-else size="small" type="primary">待处理</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="开始时间" width="110">
-        <template #default="{ row }">
-          {{ formatTime(row.StartedAt) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="截止时间" width="110">
-        <template #default="{ row }">
-          {{ formatTime(row.Deadline) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
-          <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
-          <el-button v-if="row.PlanType === 'todo' || row.PlanType === 'interval'" size="small" text @click="postponeTask(row)">延期</el-button>
-          <el-button size="small" type="success" text @click="completeTask(row)">完成</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div v-else>
+      <el-table :data="pendingTasks" border stripe class="mb-sm">
+        <el-table-column label="类型" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
+              {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="PlanName" label="任务名称" min-width="200"/>
+        <el-table-column label="字数" width="80">
+          <template #default="{ row }">
+            <span v-if="row.ContentSize > 0">{{ row.ContentSize.toLocaleString() }}</span>
+            <span v-else class="text-secondary">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.IsOverdue" size="small" type="danger">已逾期</el-tag>
+            <el-tag v-else size="small" type="primary">待处理</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="开始时间" width="110">
+          <template #default="{ row }">
+            {{ formatTime(row.StartedAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="截止时间" width="110">
+          <template #default="{ row }">
+            {{ formatTime(row.Deadline) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="250" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
+            <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
+            <el-button v-if="row.PlanType === 'todo' || row.PlanType === 'interval'" size="small" text @click="postponeTask(row)">延期</el-button>
+            <el-button size="small" type="success" text @click="completeTask(row)">完成</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <el-dialog
         v-model="showRatingDialog"
@@ -316,6 +328,12 @@ defineExpose({loadPendingTasks})
 <style scoped>
 .pending-tasks-wrapper {
   height: 100%;
+}
+
+.pending-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-sm);
 }
 
 .pending-empty {
