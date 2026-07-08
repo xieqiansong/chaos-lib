@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
 import {format} from 'date-fns'
+import {ElMessageBox} from 'element-plus'
 import {sendMessage} from '@/utils/api'
 
 interface ProjectGroup {
@@ -297,7 +298,20 @@ async function accessProject(p: Project) {
 }
 
 async function deleteProject(p: Project) {
-  if (!confirm(`确认删除项目「${p.Name}」？`)) return
+  try {
+    await ElMessageBox.confirm(
+      `将删除项目「${p.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
+      '危险操作',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+      },
+    )
+  } catch {
+    return
+  }
   try {
     await sendMessage(`projects/${p.ID}`, 'DELETE')
     await fetchProjects()

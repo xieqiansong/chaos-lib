@@ -18,3 +18,5 @@ chaos-knots
 *.swo
 *~
 .DS_Store
+# 一次性批处理脚本（含硬编码密码/路径，禁止提交）
+chaos-server/tools/task_plans.go

@@ -30,9 +30,44 @@ func MkdirAllSafe(path string) error {
 	return os.MkdirAll(path, 0o755)
 }
 
-// RemoveDirSafe 删除目录（用于删除项目时可选的物理移除）
+// RemoveDirSafe 删除目录（用于删除项目时可选的物理移除）。
+// Windows 下用 PowerShell Remove-Item -Recurse -Force 确保 .git 中的只读文件被可靠删除；
+// 非 Windows 平台使用 os.RemoveAll。
 func RemoveDirSafe(path string) error {
+	if !FileExists(path) {
+		return nil
+	}
+	if runtime.GOOS == "windows" {
+		return removeDirWindows(path)
+	}
 	return os.RemoveAll(path)
+}
+
+// removeDirWindows 暴力删除 Windows 目录（专门对付 .git 这种带只读/隐藏/系统属性的顽固目录）。
+// 步骤：1) 递归遍历所有文件/目录 2) 剥光属性（只读、隐藏、系统全清为 Normal）
+//  3. PowerShell Remove-Item -Recurse -Force 执行删除
+//
+// 账号需要管理员权限。
+func removeDirWindows(path string) error {
+	escaped := strings.ReplaceAll(path, "'", "''")
+	ps := fmt.Sprintf(
+		"$ErrorActionPreference='Stop'; "+
+			"$target='%s'; "+
+			// 递归获取所有项目（-Force 包含隐藏和系统文件），对每个项目剥光属性
+			"$items=Get-ChildItem -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue; "+
+			"if($items){ foreach($i in $items){ try{$i.Attributes='Normal'}catch{} } }; "+
+			// 目录本身也剥光属性
+			"try{(Get-Item -LiteralPath $target -Force).Attributes='Normal'}catch{}; "+
+			// 现在可以安心删除
+			"Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop",
+		escaped,
+	)
+	cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("删除目录失败: %v, 输出: %s", err, string(output))
+	}
+	return nil
 }
 
 // MoveProjectFolder 将源目录递归复制到目标目录（仅复制，不删除源）。
@@ -61,7 +96,7 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 	// 递归拷贝源目录到目标
 	if cerr := copyDir(oldAbs, newAbs); cerr != nil {
 		// 清理可能已部分拷贝的目标，避免脏数据
-		_ = os.RemoveAll(newAbs)
+		_ = RemoveDirSafe(newAbs)
 		return fmt.Errorf("复制目录失败: %v", cerr)
 	}
 	return nil
@@ -97,7 +132,7 @@ func MoveToRecycleBin(path string) error {
 		return nil
 	}
 
-	return os.RemoveAll(path)
+	return RemoveDirSafe(path)
 }
 
 // copyDir 递归拷贝目录（含文件与子目录）

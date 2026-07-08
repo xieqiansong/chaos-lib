@@ -89,6 +89,27 @@ func CreateProject(c *gin.Context) {
 		name = filepath.Base(abs)
 	}
 
+	// 若存在同路径的软删除记录，直接还原（reactivate），避免唯一索引冲突
+	var existing models.Project
+	if err := config.GetDB().Unscoped().Where("absolute_path = ? AND is_deleted = ?", abs, true).First(&existing).Error; err == nil {
+		updates := map[string]interface{}{
+			"is_deleted":    false,
+			"name":          name,
+			"group_id":      group.ID,
+			"relative_path": rel,
+			"git_url":       req.GitURL,
+			"remark":        req.Remark,
+			"updated_at":    time.Now(),
+		}
+		if uerr := config.GetDB().Model(&existing).Updates(updates).Error; uerr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "还原项目失败: " + uerr.Error()})
+			return
+		}
+		config.GetDB().First(&existing, existing.ID)
+		c.JSON(http.StatusOK, gin.H{"message": "项目已还原（reactivated）", "project": existing})
+		return
+	}
+
 	// 添加时间取文件夹的创建时间（Windows 下为文件创建时间），获取不到则回退为当前时间；
 	// 上次访问时间默认等于添加时间。
 	createdAt := tools.DirCreatedAt(abs)
@@ -400,14 +421,12 @@ func AccessProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "已记录访问", "lastAccessedAt": now})
 }
 
-// DeleteProject 删除项目（软删除）
-// 默认仅删除元数据；?removeDir=true 时同时物理删除磁盘目录。
+// DeleteProject 删除项目（软删除），同时物理删除磁盘目录。
 func DeleteProject(c *gin.Context) {
 	id, ok := getProjectID(c)
 	if !ok {
 		return
 	}
-	removeDir := c.Query("removeDir") == "true"
 
 	var project models.Project
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
@@ -423,15 +442,13 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if removeDir {
-		if err := tools.RemoveDirSafe(project.AbsolutePath); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"message":        "已软删除项目，但物理目录删除失败",
-				"dirRemoveError": err.Error(),
-			})
-			return
-		}
+	if err := tools.RemoveDirSafe(project.AbsolutePath); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message":        "已软删除项目，但物理目录删除失败",
+			"dirRemoveError": err.Error(),
+		})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功", "removeDir": removeDir})
+	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }

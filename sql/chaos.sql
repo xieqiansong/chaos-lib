@@ -29,3 +29,6 @@ SELECT * from task_plans where name = '每日计划';
 SELECT id, name, link, SUBSTR(link, 0, 24) AS content_path
 FROM task_plans
 WHERE link != '';
+
+
+SELECT * from projects;

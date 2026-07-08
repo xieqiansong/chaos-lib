@@ -221,5 +221,6 @@ COMMENT ON COLUMN projects.last_accessed_at IS '上次访问时间';
 COMMENT ON COLUMN projects.created_at IS '创建时间';
 COMMENT ON COLUMN projects.updated_at IS '更新时间';
 
-CREATE UNIQUE INDEX idx_projects_abs_path ON projects (absolute_path);
+-- 部分唯一索引：仅对未删除的项目做唯一约束，软删除记录不参与唯一性校验
+CREATE UNIQUE INDEX idx_projects_abs_path ON projects (absolute_path) WHERE is_deleted = FALSE;
 CREATE INDEX idx_projects_group ON projects (group_id);
