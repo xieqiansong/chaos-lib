@@ -88,6 +88,10 @@ chaos-lib/
 └── scripts/                # 辅助脚本
 ```
 
+## 参考
+
+- [TypeWords](https://github.com/zyronon/TypeWords) — FSRS 间隔复习功能参考
+
 ## License
 
 [MIT](LICENSE)
