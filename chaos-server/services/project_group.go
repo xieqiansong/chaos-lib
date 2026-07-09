@@ -21,19 +21,49 @@ func getGroupID(c *gin.Context) (int, bool) {
 	return id, true
 }
 
+// getRecycleBinGroup 返回唯一的回收站项目组。
+// 若不存在则直接返回错误响应，调用方应据此提前返回。
+func getRecycleBinGroup(c *gin.Context) (models.ProjectGroup, bool) {
+	var group models.ProjectGroup
+	if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&group).Error; err != nil {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":      "未配置回收站项目组，请先创建一个 is_recycle_bin=true 的项目组",
+			"suggestion": "POST /api/projectGroups 并携带 {\"isRecycleBin\": true, \"name\": \"回收站\", \"absolutePath\": \"<回收站目录>\"}",
+		})
+		return group, false
+	}
+	return group, true
+}
+
 // CreateProjectGroup 创建项目组
 // 校验根目录是否存在；不存在则尝试创建。
+// 若 isRecycleBin=true，则强制唯一（已存在回收站分组时拒绝），名称缺省为「回收站」。
 func CreateProjectGroup(c *gin.Context) {
 	var req struct {
 		Name         string  ``
 		OrderNum     *int    ``
 		AbsolutePath string  ``
 		Remark       *string ``
+		IsRecycleBin *bool   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	isRecycle := req.IsRecycleBin != nil && *req.IsRecycleBin
+	if isRecycle {
+		// 回收站分组唯一
+		var existing models.ProjectGroup
+		if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&existing).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "回收站项目组已存在，不能重复创建", "existingId": existing.ID})
+			return
+		}
+		if req.Name == "" {
+			req.Name = "回收站"
+		}
+	}
+
 	if req.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "项目组名称不能为空"})
 		return
@@ -61,6 +91,7 @@ func CreateProjectGroup(c *gin.Context) {
 		OrderNum:     orderNum,
 		AbsolutePath: filepath.Clean(req.AbsolutePath),
 		Remark:       req.Remark,
+		IsRecycleBin: isRecycle,
 	}
 	if err := config.GetDB().Create(&group).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建项目组失败: " + err.Error()})
@@ -111,6 +142,7 @@ func UpdateProjectGroup(c *gin.Context) {
 		OrderNum     *int    ``
 		AbsolutePath *string ``
 		Remark       *string ``
+		IsRecycleBin *bool   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -123,6 +155,21 @@ func UpdateProjectGroup(c *gin.Context) {
 		return
 	}
 
+	// 回收站分组不可被改造为非回收站，也不可把普通分组改造成回收站（若已存在其它回收站）
+	if req.IsRecycleBin != nil {
+		wantRecycle := *req.IsRecycleBin
+		if wantRecycle != group.IsRecycleBin {
+			if wantRecycle {
+				// 要避免出现第二个回收站
+				var other models.ProjectGroup
+				if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ? AND id <> ?", true, false, id).First(&other).Error; err == nil {
+					c.JSON(http.StatusConflict, gin.H{"error": "回收站项目组已存在，不能重复创建", "existingId": other.ID})
+					return
+				}
+			}
+		}
+	}
+
 	updated := map[string]interface{}{}
 	if req.Name != nil {
 		updated["name"] = *req.Name
@@ -132,6 +179,9 @@ func UpdateProjectGroup(c *gin.Context) {
 	}
 	if req.Remark != nil {
 		updated["remark"] = *req.Remark
+	}
+	if req.IsRecycleBin != nil {
+		updated["is_recycle_bin"] = *req.IsRecycleBin
 	}
 
 	// 根目录变更：仅更新元数据并级联重算子项目绝对路径
@@ -197,6 +247,11 @@ func DeleteProjectGroup(c *gin.Context) {
 	var group models.ProjectGroup
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&group).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
+		return
+	}
+
+	if group.IsRecycleBin {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "回收站项目组不可删除"})
 		return
 	}
 

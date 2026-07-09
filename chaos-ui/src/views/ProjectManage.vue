@@ -12,6 +12,7 @@ interface ProjectGroup {
   Remark: string | null
   CreatedAt: string
   UpdatedAt: string
+  IsRecycleBin?: boolean
 }
 
 interface Project {
@@ -36,7 +37,7 @@ const error = ref('')
 // 项目组弹窗
 const showGroupModal = ref(false)
 const isGroupEdit = ref(false)
-const groupForm = ref({ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: ''})
+const groupForm = ref({ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: '', IsRecycleBin: false})
 
 // 项目弹窗
 const showProjectModal = ref(false)
@@ -50,6 +51,12 @@ const showMoveModal = ref(false)
 const moving = ref(false)
 const moveProjectId = ref(0)
 const moveForm = ref({TargetGroupID: 0, TargetRelativePath: ''})
+
+// 还原弹窗
+const showRestoreModal = ref(false)
+const restoring = ref(false)
+const restoreProjectId = ref(0)
+const restoreForm = ref({TargetGroupID: 0, TargetRelativePath: ''})
 
 // 详情弹窗
 const showDetail = ref(false)
@@ -71,6 +78,12 @@ function formatTime(value: string | null | undefined): string {
 const selectedGroup = computed(() =>
   groups.value.find(g => g.ID === selectedGroupId.value) || null
 )
+
+// 当前选中的是否为回收站分组（决定右侧操作区展示还原/彻底删除）
+const isRecycle = computed(() => !!selectedGroup.value?.IsRecycleBin)
+
+// 可选的目标分组（排除回收站自身），用于还原时选择
+const normalGroups = computed(() => groups.value.filter(g => !g.IsRecycleBin))
 
 // 项目列表请求令牌：每次重新拉取自增，用于丢弃过期的旧响应
 let projectReqToken = 0
@@ -124,13 +137,13 @@ function selectGroup(id: number) {
 // ===== 项目组 =====
 function openCreateGroup() {
   isGroupEdit.value = false
-  groupForm.value = {ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: ''}
+  groupForm.value = {ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: '', IsRecycleBin: false}
   showGroupModal.value = true
 }
 
 function openEditGroup(g: ProjectGroup) {
   isGroupEdit.value = true
-  groupForm.value = {ID: g.ID, Name: g.Name, OrderNum: g.OrderNum, AbsolutePath: g.AbsolutePath, Remark: g.Remark || ''}
+  groupForm.value = {ID: g.ID, Name: g.Name, OrderNum: g.OrderNum, AbsolutePath: g.AbsolutePath, Remark: g.Remark || '', IsRecycleBin: !!g.IsRecycleBin}
   showGroupModal.value = true
 }
 
@@ -149,14 +162,16 @@ async function saveGroup() {
         Name: groupForm.value.Name,
         OrderNum: groupForm.value.OrderNum,
         AbsolutePath: groupForm.value.AbsolutePath,
-        Remark: groupForm.value.Remark || null
+        Remark: groupForm.value.Remark || null,
+        IsRecycleBin: groupForm.value.IsRecycleBin
       })
     } else {
       await sendMessage('projectGroups', 'POST', {
         Name: groupForm.value.Name,
         OrderNum: groupForm.value.OrderNum,
         AbsolutePath: groupForm.value.AbsolutePath,
-        Remark: groupForm.value.Remark || null
+        Remark: groupForm.value.Remark || null,
+        IsRecycleBin: groupForm.value.IsRecycleBin
       })
     }
     showGroupModal.value = false
@@ -287,23 +302,47 @@ async function claimProject(item: Project) {
   }
 }
 
-// ===== 访问 / 删除 =====
-async function accessProject(p: Project) {
+// ===== 回收站：还原 / 彻底删除 =====
+function openRestore(p: Project) {
+  restoreProjectId.value = p.ID
+  // 默认还原到第一个普通分组
+  restoreForm.value = {TargetGroupID: normalGroups.value[0]?.ID || 0, TargetRelativePath: p.RelativePath}
+  showRestoreModal.value = true
+}
+
+async function doRestore() {
+  if (restoreForm.value.TargetGroupID === 0) {
+    error.value = '请选择目标项目组'
+    return
+  }
+  restoring.value = true
+  error.value = ''
   try {
-    await sendMessage(`projects/${p.ID}/access`, 'PATCH')
+    const res = await sendMessage(`projects/${restoreProjectId.value}/restore`, 'POST', {
+      TargetGroupID: restoreForm.value.TargetGroupID,
+      TargetRelativePath: restoreForm.value.TargetRelativePath || undefined
+    })
+    if (res.recycleWarning) {
+      error.value = '已还原，但回收站内原目录未能删除: ' + res.recycleWarning
+    }
+    showRestoreModal.value = false
     await fetchProjects()
   } catch (e) {
+    error.value = '还原失败'
     console.error(e)
+  } finally {
+    restoring.value = false
   }
 }
 
-async function deleteProject(p: Project) {
+// 回收站内二次删除 = 永久删除
+async function purgeProject(p: Project) {
   try {
     await ElMessageBox.confirm(
-      `将删除项目「${p.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
+      `将永久删除项目「${p.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
       '危险操作',
       {
-        confirmButtonText: '确认删除',
+        confirmButtonText: '永久删除',
         cancelButtonText: '取消',
         type: 'warning',
         confirmButtonClass: 'el-button--danger',
@@ -316,7 +355,44 @@ async function deleteProject(p: Project) {
     await sendMessage(`projects/${p.ID}`, 'DELETE')
     await fetchProjects()
   } catch (e) {
-    error.value = '删除失败'
+    error.value = '彻底删除失败'
+    console.error(e)
+  }
+}
+
+// ===== 访问 / 删除 =====
+async function accessProject(p: Project) {
+  try {
+    await sendMessage(`projects/${p.ID}/access`, 'PATCH')
+    await fetchProjects()
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+async function deleteProject(p: Project) {
+  const inRecycle = isRecycle.value
+  try {
+    await ElMessageBox.confirm(
+      inRecycle
+        ? `将永久删除项目「${p.Name}」及其磁盘目录，此操作不可恢复，确定继续？`
+        : `将把项目「${p.Name}」移入回收站（磁盘目录保留，可在回收站还原），确定继续？`,
+      inRecycle ? '彻底删除' : '移入回收站',
+      {
+        confirmButtonText: inRecycle ? '永久删除' : '移入回收站',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+      },
+    )
+  } catch {
+    return
+  }
+  try {
+    await sendMessage(`projects/${p.ID}`, 'DELETE')
+    await fetchProjects()
+  } catch (e) {
+    error.value = inRecycle ? '彻底删除失败' : '移入回收站失败'
     console.error(e)
   }
 }
@@ -359,12 +435,14 @@ onMounted(fetchGroups)
               :class="{active: g.ID === selectedGroupId}"
               @click="selectGroup(g.ID)">
             <div class="group-item-main">
-              <div class="text-primary text-sm truncate">{{ g.Name }}</div>
+              <div class="text-primary text-sm truncate">{{ g.Name }}
+                <el-tag v-if="g.IsRecycleBin" size="small" type="info" effect="plain" class="ml-xs">回收站</el-tag>
+              </div>
               <div class="text-placeholder text-xs font-mono truncate">{{ g.AbsolutePath }}</div>
             </div>
             <div class="group-item-ops" @click.stop>
               <el-button size="small" text @click="openEditGroup(g)">编辑</el-button>
-              <el-button size="small" text type="danger" @click="deleteGroup(g)">删除</el-button>
+              <el-button v-if="!g.IsRecycleBin" size="small" text type="danger" @click="deleteGroup(g)">删除</el-button>
             </div>
           </li>
         </ul>
@@ -409,8 +487,14 @@ onMounted(fetchGroups)
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="{row}">
               <div class="op-actions">
-                <el-button v-if="row.Claimed" size="small" text type="primary" @click="openDetail(row)">详情</el-button>
-                <el-button v-else size="small" type="success" @click="claimProject(row)">认领</el-button>
+                <template v-if="isRecycle">
+                  <el-button size="small" text type="primary" @click="openRestore(row)">还原</el-button>
+                  <el-button size="small" text type="danger" @click="purgeProject(row)">彻底删除</el-button>
+                </template>
+                <template v-else>
+                  <el-button v-if="row.Claimed" size="small" text type="primary" @click="openDetail(row)">详情</el-button>
+                  <el-button v-else size="small" type="success" @click="claimProject(row)">认领</el-button>
+                </template>
               </div>
             </template>
           </el-table-column>
@@ -432,6 +516,10 @@ onMounted(fetchGroups)
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="groupForm.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
+        </el-form-item>
+        <el-form-item label="回收站">
+          <el-switch v-model="groupForm.IsRecycleBin"/>
+          <span class="text-placeholder text-xs ml-sm">开启后此分组作为删除项目的回收站（全局唯一）</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -483,6 +571,24 @@ onMounted(fetchGroups)
       </template>
     </el-dialog>
 
+    <!-- 还原弹窗 -->
+    <el-dialog v-model="showRestoreModal" title="还原项目" width="600px">
+      <el-form :model="restoreForm" label-width="100px">
+        <el-form-item label="目标项目组">
+          <el-select v-model="restoreForm.TargetGroupID" placeholder="选择目标项目组" style="width:100%">
+            <el-option v-for="g in normalGroups" :key="g.ID" :label="g.Name" :value="g.ID"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="目标相对路径">
+          <el-input v-model="restoreForm.TargetRelativePath" placeholder="相对目标组根目录的路径，如 proj 或 sub/proj"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showRestoreModal = false">取消</el-button>
+        <el-button type="primary" :loading="restoring" @click="doRestore">还原</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 详情弹窗 -->
     <el-dialog v-model="showDetail" title="项目详情" width="640px">
       <div v-if="detailItem" class="detail-body">
@@ -522,7 +628,11 @@ onMounted(fetchGroups)
         </div>
       </div>
       <template #footer>
-        <template v-if="detailItem?.Claimed">
+        <template v-if="isRecycle">
+          <el-button size="small" type="primary" @click="openRestore(detailItem!); showDetail = false">还原</el-button>
+          <el-button size="small" type="danger" @click="purgeProject(detailItem!); showDetail = false">彻底删除</el-button>
+        </template>
+        <template v-else-if="detailItem?.Claimed">
           <el-button size="small" @click="accessProject(detailItem!)">访问</el-button>
           <el-button size="small" type="primary" @click="openMove(detailItem!); showDetail = false">移动</el-button>
           <el-button size="small" @click="openEditProject(detailItem!); showDetail = false">编辑</el-button>

@@ -34,6 +34,27 @@ func getTaskID(c *gin.Context) (int, bool) {
 	return id, true
 }
 
+// collectPlanWithDescendants 收集 rootID 及其所有子孙任务计划的 ID（含自身）
+func collectPlanWithDescendants(rootID int) ([]int, error) {
+	db := config.GetDB()
+	ids := []int{}
+	var walk func(int) error
+	walk = func(id int) error {
+		ids = append(ids, id)
+		var children []models.TaskPlan
+		if err := db.Where("parent_id = ? AND is_deleted = ?", id, false).Find(&children).Error; err != nil {
+			return err
+		}
+		for _, child := range children {
+			if err := walk(child.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return ids, walk(rootID)
+}
+
 func buildTaskPlanTree(plans []models.TaskPlan) []models.TaskPlanTree {
 	childrenMap := make(map[int][]models.TaskPlan)
 	var roots []models.TaskPlan
@@ -625,6 +646,85 @@ func DeleteTaskPlan(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// SuspendTaskPlan 挂起（暂停）任务计划
+// 递归将其本身及所有子孙任务计划标记为 is_suspended = true，
+// 被挂起的计划不会出现在待办任务列表中（GetPendingTasks 已过滤）。
+// 主要用于暂时不想继续、但后续会恢复的任务。
+func SuspendTaskPlan(c *gin.Context) {
+	id, ok := getPlanID(c)
+	if !ok {
+		return
+	}
+
+	// 校验计划存在
+	var plan models.TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		return
+	}
+
+	ids, err := collectPlanWithDescendants(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		return
+	}
+
+	now := time.Now()
+	if err := config.GetDB().Model(&models.TaskPlan{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"is_suspended": true,
+			"updated_at":   now,
+		}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "挂起失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "已挂起",
+		"suspendedID":   id,
+		"affectedCount": len(ids),
+	})
+}
+
+// ResumeTaskPlan 恢复（启动）任务计划
+// 递归将其本身及所有子孙任务计划标记为 is_suspended = false。
+func ResumeTaskPlan(c *gin.Context) {
+	id, ok := getPlanID(c)
+	if !ok {
+		return
+	}
+
+	var plan models.TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		return
+	}
+
+	ids, err := collectPlanWithDescendants(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		return
+	}
+
+	now := time.Now()
+	if err := config.GetDB().Model(&models.TaskPlan{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"is_suspended": false,
+			"updated_at":   now,
+		}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "恢复失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "已恢复",
+		"resumedID":     id,
+		"affectedCount": len(ids),
+	})
+}
+
 // ListPlanTasks 查询任务计划下的任务列表
 func ListPlanTasks(c *gin.Context) {
 	id, ok := getPlanID(c)
@@ -661,7 +761,8 @@ func GetPendingTasks(c *gin.Context) {
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", models.TaskStatusActive).
 		Where("tasks.is_deleted = ?", false).
-		Where("task_plans.is_deleted = ?", false)
+		Where("task_plans.is_deleted = ?", false).
+		Where("task_plans.is_suspended = ?", false)
 
 	if !early {
 		query = query.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)

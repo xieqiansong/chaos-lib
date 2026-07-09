@@ -60,6 +60,8 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			taskPlans.PATCH("/:id/start", services.StartTaskPlan)
 			taskPlans.PATCH("/:id/complete", services.CompleteTaskPlan)
 			taskPlans.PATCH("/:id/archive", services.ArchiveTaskPlan)
+			taskPlans.PATCH("/:id/suspend", services.SuspendTaskPlan)
+			taskPlans.PATCH("/:id/resume", services.ResumeTaskPlan)
 			taskPlans.DELETE("/:id", services.DeleteTaskPlan)
 			taskPlans.GET("/:id/tasks", services.ListPlanTasks)
 		}
@@ -98,6 +100,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			projects.PATCH("/:id/move", services.MoveProject)
 			projects.PATCH("/:id/access", services.AccessProject)
 			projects.DELETE("/:id", services.DeleteProject)
+			projects.POST("/:id/restore", services.RestoreProject)
 		}
 
 		api.GET("/balance/deepseek", services.GetDeepSeekBalance)

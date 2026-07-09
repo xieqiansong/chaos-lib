@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS task_plans
     link                TEXT,
     created_at          TIMESTAMPTZ           DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMPTZ           DEFAULT CURRENT_TIMESTAMP,
-    is_deleted          BOOLEAN               DEFAULT FALSE
+    is_deleted          BOOLEAN               DEFAULT FALSE,
+    is_suspended        BOOLEAN               DEFAULT FALSE
 );
 
 COMMENT ON TABLE task_plans IS '任务计划表';
@@ -94,6 +95,7 @@ COMMENT ON COLUMN task_plans.remark IS '备注';
 COMMENT ON COLUMN task_plans.link IS '关联链接';
 COMMENT ON COLUMN task_plans.created_at IS '创建时间';
 COMMENT ON COLUMN task_plans.updated_at IS '更新时间';
+COMMENT ON COLUMN task_plans.is_suspended IS '是否挂起/暂停: true 表示暂时不想继续，待办任务列表会过滤掉该计划及其所有子任务，恢复后重新显示';
 
 CREATE INDEX idx_task_plans_parent ON task_plans (parent_id);
 CREATE INDEX idx_task_plans_type_status ON task_plans (plan_type, status);
@@ -176,7 +178,8 @@ CREATE TABLE IF NOT EXISTS project_groups
     remark        TEXT,
     created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    is_deleted    BOOLEAN     DEFAULT FALSE
+    is_deleted    BOOLEAN     DEFAULT FALSE,
+    is_recycle_bin BOOLEAN    DEFAULT FALSE
 );
 
 COMMENT ON TABLE project_groups IS '项目组表';
@@ -187,7 +190,10 @@ COMMENT ON COLUMN project_groups.absolute_path IS '项目组根目录绝对路�
 COMMENT ON COLUMN project_groups.remark IS '备注';
 COMMENT ON COLUMN project_groups.created_at IS '创建时间';
 COMMENT ON COLUMN project_groups.updated_at IS '更新时间';
+COMMENT ON COLUMN project_groups.is_recycle_bin IS '是否为回收站（唯一），删除项目时文件夹移入此分组目录';
 
+-- 回收站分组唯一：同一时刻只能存在一个 is_recycle_bin=true 的分组
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_groups_recycle ON project_groups (is_recycle_bin) WHERE is_recycle_bin = true;
 CREATE UNIQUE INDEX idx_project_groups_path ON project_groups (absolute_path);
 
 

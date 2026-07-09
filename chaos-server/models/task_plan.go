@@ -41,6 +41,7 @@ type TaskPlan struct {
 	CreatedAt         time.Time      `gorm:"default:CURRENT_TIMESTAMP"`
 	UpdatedAt         time.Time      `gorm:"default:CURRENT_TIMESTAMP"`
 	IsDeleted         bool           `gorm:"default:false"`
+	IsSuspended       bool           `gorm:"default:false"`
 }
 
 func (TaskPlan) TableName() string {

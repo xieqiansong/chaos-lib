@@ -22,6 +22,7 @@ interface TaskPlan {
   Priority: number | null
   CreatedAt: string
   UpdatedAt: string
+  IsSuspended: boolean
 }
 
 interface TaskPlanTree extends TaskPlan {
@@ -504,6 +505,42 @@ async function deletePlan(plan: TaskPlan) {
   }
 }
 
+async function suspendPlan(plan: TaskPlan) {
+  try {
+    await ElMessageBox.confirm(
+      `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
+      '提示',
+      {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
+    )
+    await sendMessage(`taskPlans/${plan.ID}/suspend`, 'PATCH', {})
+    await refreshAll()
+    await refreshAllPlans()
+    ElMessage.success('已挂起')
+  } catch (e: any) {
+    if (e === 'cancel') return
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
+async function resumePlan(plan: TaskPlan) {
+  try {
+    await ElMessageBox.confirm(
+      `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
+      '提示',
+      {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
+    )
+    await sendMessage(`taskPlans/${plan.ID}/resume`, 'PATCH', {})
+    await refreshAll()
+    await refreshAllPlans()
+    ElMessage.success('已恢复')
+  } catch (e: any) {
+    if (e === 'cancel') return
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
 function openEditDialog(plan: TaskPlan) {
   editingPlan.value = plan
   formData.value = {
@@ -624,7 +661,8 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag size="small" :type="statusMap[row.Status]?.type || 'info'">
+            <el-tag v-if="row.IsSuspended" size="small" type="warning">已挂起</el-tag>
+            <el-tag v-else size="small" :type="statusMap[row.Status]?.type || 'info'">
               {{ statusMap[row.Status]?.text || row.Status }}
             </el-tag>
           </template>
@@ -661,6 +699,8 @@ onMounted(async () => {
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
+                    <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起</el-dropdown-item>
+                    <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'completed'" @click="archivePlan(row)">归档</el-dropdown-item>
                     <el-dropdown-item divided type="danger" @click="deletePlan(row)">删除</el-dropdown-item>

@@ -31,4 +31,4 @@ FROM task_plans
 WHERE link != '';
 
 
-SELECT * from projects;
+SELECT * from project_groups;

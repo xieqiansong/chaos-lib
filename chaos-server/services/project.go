@@ -138,8 +138,9 @@ func CreateProject(c *gin.Context) {
 
 // ListProjects 查询项目列表
 // 支持 ?groupId= 过滤；按 last_accessed_at 倒序、created_at 倒序排序。
+// 默认列表（不指定 groupId）会排除「回收站」分组下的项目。
 // 当指定 groupId 时，额外扫描该组根目录下的「一层子目录」，将尚未入库的目录作为
-// claimed=false 的未认领项合并返回，便于前端一键认领。
+// claimed=false 的未认领项合并返回，便于前端一键认领（回收站分组不扫描磁盘）。
 func ListProjects(c *gin.Context) {
 	db := config.GetDB().Model(&models.Project{}).Where("is_deleted = ?", false)
 
@@ -154,17 +155,29 @@ func ListProjects(c *gin.Context) {
 		db = db.Where("group_id = ?", id)
 	}
 
+	// 默认列表排除回收站分组（回收站内的项目仍 is_deleted=false，仅从常规视图隐藏）
+	if groupID == nil {
+		var recycleGroup models.ProjectGroup
+		if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&recycleGroup).Error; err == nil {
+			db = db.Where("group_id <> ?", recycleGroup.ID)
+		}
+	}
+
 	var projects []models.Project
 	if err := db.Order("last_accessed_at DESC NULLS LAST, created_at DESC, id DESC").Find(&projects).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
 	}
 
-	// 指定项目组时：合并磁盘扫描出的未认领子目录
+	// 指定项目组时：合并磁盘扫描出的未认领子目录（回收站分组不扫描磁盘）
 	if groupID != nil {
 		var group models.ProjectGroup
 		if err := config.GetDB().Where("id = ? AND is_deleted = ?", *groupID, false).First(&group).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
+			return
+		}
+		if group.IsRecycleBin {
+			c.JSON(http.StatusOK, projects)
 			return
 		}
 		items := buildProjectList(group, projects)
@@ -421,7 +434,31 @@ func AccessProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "已记录访问", "lastAccessedAt": now})
 }
 
-// DeleteProject 删除项目（软删除），同时物理删除磁盘目录。
+// resolveRecycleTarget 计算项目移入回收站分组后的目标绝对/相对路径。
+// 以项目名称命名，若回收站目录下已存在同名项则追加序号避免冲突。
+func resolveRecycleTarget(recycleGroup models.ProjectGroup, project models.Project) (string, string, error) {
+	if !tools.DirExists(recycleGroup.AbsolutePath) {
+		if err := tools.MkdirAllSafe(recycleGroup.AbsolutePath); err != nil {
+			return "", "", fmt.Errorf("回收站根目录不存在且创建失败: %v", err)
+		}
+	}
+	base := filepath.Join(recycleGroup.AbsolutePath, project.Name)
+	candidate := base
+	for i := 1; tools.FileExists(candidate); i++ {
+		candidate = fmt.Sprintf("%s_%d", base, i)
+	}
+	abs := filepath.Clean(candidate)
+	rel, err := filepath.Rel(recycleGroup.AbsolutePath, abs)
+	if err != nil {
+		return "", "", fmt.Errorf("计算回收站相对路径失败: %v", err)
+	}
+	return abs, rel, nil
+}
+
+// DeleteProject 删除项目。
+// 若项目不在回收站分组：将磁盘目录移入回收站分组目录，并将 DB 记录的 group_id 切到回收站分组
+// （is_deleted 保持 false，仅从常规列表隐藏）。此为「软回收」，可经 RestoreProject 还原。
+// 若项目已在回收站分组（二次删除）：物理永久删除磁盘目录并硬删除 DB 记录。
 func DeleteProject(c *gin.Context) {
 	id, ok := getProjectID(c)
 	if !ok {
@@ -434,21 +471,155 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := config.GetDB().Model(&project).Updates(map[string]interface{}{
-		"is_deleted": true,
-		"updated_at": time.Now(),
-	}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
+	recycleGroup, isRecycle := getRecycleBinGroup(c)
+	if !isRecycle {
 		return
 	}
 
-	if err := tools.RemoveDirSafe(project.AbsolutePath); err != nil {
+	// 已在回收站内 → 永久删除
+	if project.GroupID == recycleGroup.ID {
+		if err := tools.RemoveDirSafe(project.AbsolutePath); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"message":        "已软删除项目，但物理目录删除失败",
+				"dirRemoveError": err.Error(),
+			})
+			return
+		}
+		if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "已永久删除"})
+		return
+	}
+
+	// 常规删除 → 移入回收站
+	newAbs, newRel, err := resolveRecycleTarget(recycleGroup, project)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 第 1 步：物理复制到回收站目录（不删源），失败则原目录保持不动
+	if err := tools.MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "移入回收站失败: " + err.Error()})
+		return
+	}
+
+	// 第 2 步：更新元数据（事务）
+	tx := config.GetDB().Begin()
+	if err := tx.Model(&project).Updates(map[string]interface{}{
+		"group_id":      recycleGroup.ID,
+		"absolute_path": newAbs,
+		"relative_path": newRel,
+		"is_deleted":    false,
+		"updated_at":    time.Now(),
+	}).Error; err != nil {
+		tx.Rollback()
+		// 元数据失败：清理已复制的副本，源目录保留（安全）
+		_ = tools.RemoveDirSafe(newAbs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
+		return
+	}
+	tx.Commit()
+
+	// 第 3 步：DB 更新成功后删除原目录；失败仅警告（数据已安全落入回收站）
+	oldAbs := project.AbsolutePath
+	if err := tools.RemoveDirSafe(oldAbs); err != nil {
 		c.JSON(http.StatusOK, gin.H{
-			"message":        "已软删除项目，但物理目录删除失败",
-			"dirRemoveError": err.Error(),
+			"message":        "已移入回收站，但原目录未能删除",
+			"recycleWarning": err.Error(),
+			"newAbsPath":     newAbs,
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+	config.GetDB().First(&project, id)
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "已移入回收站",
+		"recycled":   true,
+		"project":    project,
+		"newAbsPath": newAbs,
+	})
+}
+
+// RestoreProject 从回收站还原项目。
+// 请求体同 MoveProject：{ targetGroupId, targetRelativePath } 或 { targetAbsPath }。
+// 将磁盘目录从回收站移回目标分组，并恢复 group_id / 路径；is_deleted 保持 false。
+func RestoreProject(c *gin.Context) {
+	id, ok := getProjectID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		TargetGroupID      int    ``
+		TargetRelativePath string ``
+		TargetAbsPath      string ``
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.TargetGroupID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "目标项目组ID不能为空"})
+		return
+	}
+
+	var project models.Project
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
+		return
+	}
+
+	var targetGroup models.ProjectGroup
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", req.TargetGroupID, false).First(&targetGroup).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "目标项目组不存在"})
+		return
+	}
+
+	newAbs, newRel, err := resolveProjectPaths(targetGroup, req.TargetAbsPath, req.TargetRelativePath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 第 1 步：复制到目标分组目录（不删源）
+	if err := tools.MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "复制到目标分组失败: " + err.Error()})
+		return
+	}
+
+	// 第 2 步：更新元数据（事务）
+	tx := config.GetDB().Begin()
+	if err := tx.Model(&project).Updates(map[string]interface{}{
+		"group_id":      targetGroup.ID,
+		"absolute_path": newAbs,
+		"relative_path": newRel,
+		"updated_at":    time.Now(),
+	}).Error; err != nil {
+		tx.Rollback()
+		_ = tools.RemoveDirSafe(newAbs)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
+		return
+	}
+	tx.Commit()
+
+	// 第 3 步：删除回收站中的原目录
+	oldAbs := project.AbsolutePath
+	if err := tools.RemoveDirSafe(oldAbs); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"message":        "已还原，但回收站内原目录未能删除",
+			"recycleWarning": err.Error(),
+			"newAbsPath":     newAbs,
+		})
+		return
+	}
+
+	config.GetDB().First(&project, id)
+	c.JSON(http.StatusOK, gin.H{
+		"message":    "已还原",
+		"project":    project,
+		"newAbsPath": newAbs,
+	})
 }
