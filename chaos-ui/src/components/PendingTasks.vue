@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref} from 'vue'
+import {onMounted, onUnmounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format} from 'date-fns'
+import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 
 const props = withDefaults(defineProps<{
   view?: 'sidebar' | 'table'
@@ -96,7 +97,7 @@ async function completeTask(task: PendingTask) {
       type: 'info',
     })
     await sendMessage(`tasks/${task.ID}/complete`, 'PATCH', {})
-    await loadPendingTasks()
+    refreshPendingTasks()
     emit('refresh')
     ElMessage.success('任务已完成')
   } catch (e: any) {
@@ -113,7 +114,7 @@ async function cancelTask(task: PendingTask) {
       type: 'warning',
     })
     await sendMessage(`tasks/${task.ID}/cancel`, 'PATCH', {})
-    await loadPendingTasks()
+    refreshPendingTasks()
     emit('refresh')
     ElMessage.success('任务已取消')
   } catch (e: any) {
@@ -136,7 +137,7 @@ async function submitRatingDialog() {
     }
     showRatingDialog.value = false
     ratingTargetTask.value = null
-    await loadPendingTasks()
+    refreshPendingTasks()
     emit('refresh')
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -164,7 +165,7 @@ async function submitPostponeDialog() {
     }
     showPostponeDialog.value = false
     postponeTargetTask.value = null
-    await loadPendingTasks()
+    refreshPendingTasks()
     emit('refresh')
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -173,16 +174,22 @@ async function submitPostponeDialog() {
 }
 
 let pendingTimer: ReturnType<typeof setInterval>
+let stopVersionWatch: () => void
 
 onMounted(() => {
   loadPendingTasks()
   pendingTimer = setInterval(() => {
     loadPendingTasks()
   }, 30000)
+  // 订阅全局刷新信号：其它实例（如侧边栏/任务表格）操作后本实例实时同步
+  stopVersionWatch = watch(pendingTasksVersion, () => {
+    loadPendingTasks()
+  })
 })
 
 onUnmounted(() => {
   clearInterval(pendingTimer)
+  stopVersionWatch?.()
 })
 
 defineExpose({loadPendingTasks})

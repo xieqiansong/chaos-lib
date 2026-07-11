@@ -885,10 +885,12 @@ func GetTaskDailyStats(c *gin.Context) {
 		CompletedAt time.Time
 	}
 	var rows []Row
-	if err := db.Model(&models.Task{}).
+	if err := db.Table("tasks").
 		Select("completed_at").
-		Where("status = ? AND is_deleted = ? AND completed_at IS NOT NULL AND completed_at >= ?",
+		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
+		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.completed_at IS NOT NULL AND tasks.completed_at >= ?",
 			models.TaskStatusDone, false, cutoff).
+		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
@@ -932,10 +934,12 @@ func GetTaskActiveStats(c *gin.Context) {
 		StartedAt time.Time
 	}
 	var rows []Row
-	if err := db.Model(&models.Task{}).
+	if err := db.Table("tasks").
 		Select("started_at").
-		Where("status = ? AND is_deleted = ? AND started_at IS NOT NULL AND started_at >= ?",
+		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
+		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ?",
 			models.TaskStatusActive, false, cutoff).
+		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return

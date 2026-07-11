@@ -3,6 +3,7 @@ import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import PendingTasks from '../components/PendingTasks.vue'
+import {refreshPendingTasks} from '@/utils/pendingTasksStore'
 
 const props = defineProps<{
   searchText: string
@@ -286,6 +287,7 @@ function getProgress(row: TaskPlanTree): { completed: number; total: number; pct
 
 async function refreshAll() {
   loading.value = true
+  refreshPendingTasks()
   await pendingRef.value?.loadPendingTasks()
   loading.value = false
 }
