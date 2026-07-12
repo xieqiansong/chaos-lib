@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -282,12 +283,57 @@ func ListTaskPlans(c *gin.Context) {
 }
 
 // GetTaskPlanTree 查询任务计划树
-// 递归组装树形结构
+// 递归组装树形结构；支持 ?search= 按名称/备注模糊匹配，并保留命中节点的全部祖先以保证树连通
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []models.TaskPlan
 	if err := config.GetDB().Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
+	}
+
+	if keyword := strings.TrimSpace(c.Query("search")); keyword != "" {
+		lower := strings.ToLower(keyword)
+		byID := make(map[int]models.TaskPlan, len(plans))
+		for _, p := range plans {
+			byID[p.ID] = p
+		}
+
+		keep := make(map[int]bool)
+		markWithAncestors := func(start models.TaskPlan) {
+			cur := start
+			for {
+				if keep[cur.ID] {
+					break
+				}
+				keep[cur.ID] = true
+				if cur.ParentID == nil {
+					break
+				}
+				parent, ok := byID[*cur.ParentID]
+				if !ok {
+					break
+				}
+				cur = parent
+			}
+		}
+		for _, p := range plans {
+			name := strings.ToLower(p.Name)
+			remark := ""
+			if p.Remark != nil {
+				remark = strings.ToLower(*p.Remark)
+			}
+			if strings.Contains(name, lower) || strings.Contains(remark, lower) {
+				markWithAncestors(p)
+			}
+		}
+
+		filtered := make([]models.TaskPlan, 0, len(keep))
+		for _, p := range plans {
+			if keep[p.ID] {
+				filtered = append(filtered, p)
+			}
+		}
+		plans = filtered
 	}
 
 	tree := buildTaskPlanTree(plans)

@@ -300,7 +300,8 @@ async function fetchAllPlans() {
   const expandedIds = captureExpandedIds()
 
   try {
-    const result = await sendMessage('taskPlans/tree', 'GET')
+    const searchParam = props.searchText.trim()
+    const result = await sendMessage('taskPlans/tree', 'GET', searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
     }
