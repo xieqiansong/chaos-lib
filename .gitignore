@@ -1,9 +1,8 @@
 .idea
 **/logs/*
 **/*.exe
-chaos-server/cmd/server/web/
+chaos-go/cmd/server/web/
 chaos-ui/dist/
-chaos-knots
 # 配置文件（含密码，坚决不提交）
 **/.env
 **/.env.*
@@ -18,3 +17,9 @@ chaos-knots
 *.swo
 *~
 .DS_Store
+# 一次性批处理脚本（含硬编码密码/路径，禁止提交）
+chaos-go/tools/task_plans.go
+
+# 文件连接
+chaos-knots
+Awesome-Prompts

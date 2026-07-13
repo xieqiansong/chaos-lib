@@ -29,3 +29,10 @@ SELECT * from task_plans where name = '每日计划';
 SELECT id, name, link, SUBSTR(link, 0, 24) AS content_path
 FROM task_plans
 WHERE link != '';
+
+
+SELECT * from project_groups;
+
+
+select * from task_plans where name = 'Go';
+SELECT * from tasks where plan_id = '';

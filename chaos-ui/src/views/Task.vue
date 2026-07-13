@@ -3,6 +3,7 @@ import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import PendingTasks from '../components/PendingTasks.vue'
+import {refreshPendingTasks} from '@/utils/pendingTasksStore'
 
 const props = defineProps<{
   searchText: string
@@ -22,6 +23,7 @@ interface TaskPlan {
   Priority: number | null
   CreatedAt: string
   UpdatedAt: string
+  IsSuspended: boolean
 }
 
 interface TaskPlanTree extends TaskPlan {
@@ -46,6 +48,10 @@ const showRatingDialog = ref(false)
 const ratingAction = ref<'start-plan' | 'complete-plan'>('complete-plan')
 const ratingTargetPlan = ref<TaskPlan | null>(null)
 const ratingValue = ref<number | null>(3)
+
+const showPriorityDialog = ref(false)
+const priorityTargetPlan = ref<TaskPlan | null>(null)
+const priorityValue = ref<number>(5)
 
 const pendingRef = ref<InstanceType<typeof PendingTasks> | null>(null)
 
@@ -91,6 +97,32 @@ async function submitRatingDialog() {
     ratingTargetPlan.value = null
     await refreshAll()
     await refreshAllPlans()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
+function openPriorityDialog(plan: TaskPlan) {
+  priorityTargetPlan.value = plan
+  priorityValue.value = plan.Priority ?? 5
+  showPriorityDialog.value = true
+}
+
+async function submitPriorityDialog() {
+  if (!priorityTargetPlan.value) return
+  if (priorityValue.value < 0) {
+    ElMessage.error('优先级不能为负数')
+    return
+  }
+  try {
+    await sendMessage(`taskPlans/${priorityTargetPlan.value.ID}/priority`, 'PATCH', {
+      priority: priorityValue.value,
+    })
+    showPriorityDialog.value = false
+    priorityTargetPlan.value = null
+    await refreshAllPlans()
+    ElMessage.success('优先级已更新')
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
@@ -285,6 +317,7 @@ function getProgress(row: TaskPlanTree): { completed: number; total: number; pct
 
 async function refreshAll() {
   loading.value = true
+  refreshPendingTasks()
   await pendingRef.value?.loadPendingTasks()
   loading.value = false
 }
@@ -297,7 +330,8 @@ async function fetchAllPlans() {
   const expandedIds = captureExpandedIds()
 
   try {
-    const result = await sendMessage('taskPlans/tree', 'GET')
+    const searchParam = props.searchText.trim()
+    const result = await sendMessage('taskPlans/tree', 'GET', searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
     }
@@ -504,6 +538,42 @@ async function deletePlan(plan: TaskPlan) {
   }
 }
 
+async function suspendPlan(plan: TaskPlan) {
+  try {
+    await ElMessageBox.confirm(
+      `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
+      '提示',
+      {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
+    )
+    await sendMessage(`taskPlans/${plan.ID}/suspend`, 'PATCH', {})
+    await refreshAll()
+    await refreshAllPlans()
+    ElMessage.success('已挂起')
+  } catch (e: any) {
+    if (e === 'cancel') return
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
+async function resumePlan(plan: TaskPlan) {
+  try {
+    await ElMessageBox.confirm(
+      `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
+      '提示',
+      {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
+    )
+    await sendMessage(`taskPlans/${plan.ID}/resume`, 'PATCH', {})
+    await refreshAll()
+    await refreshAllPlans()
+    ElMessage.success('已恢复')
+  } catch (e: any) {
+    if (e === 'cancel') return
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
 function openEditDialog(plan: TaskPlan) {
   editingPlan.value = plan
   formData.value = {
@@ -624,7 +694,8 @@ onMounted(async () => {
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
-            <el-tag size="small" :type="statusMap[row.Status]?.type || 'info'">
+            <el-tag v-if="row.IsSuspended" size="small" type="warning">已挂起</el-tag>
+            <el-tag v-else size="small" :type="statusMap[row.Status]?.type || 'info'">
               {{ statusMap[row.Status]?.text || row.Status }}
             </el-tag>
           </template>
@@ -661,6 +732,9 @@ onMounted(async () => {
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
+                    <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
+                    <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起</el-dropdown-item>
+                    <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'completed'" @click="archivePlan(row)">归档</el-dropdown-item>
                     <el-dropdown-item divided type="danger" @click="deletePlan(row)">删除</el-dropdown-item>
@@ -856,6 +930,27 @@ onMounted(async () => {
       <template #footer>
         <el-button @click="showRatingDialog = false; ratingTargetPlan = null">取消</el-button>
         <el-button type="primary" @click="submitRatingDialog">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+        v-model="showPriorityDialog"
+        :title="`设置优先级 — ${priorityTargetPlan?.Name || ''}`"
+        width="420px"
+    >
+      <div class="postpone-content">
+        <p class="text-secondary mb-sm">将递归应用到该计划及其所有子任务计划。</p>
+        <el-input-number
+            v-model="priorityValue"
+            :min="0"
+            :max="999"
+            controls-position="right"
+            style="width: 100%"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="showPriorityDialog = false; priorityTargetPlan = null">取消</el-button>
+        <el-button type="primary" @click="submitPriorityDialog">确认</el-button>
       </template>
     </el-dialog>
   </div>

@@ -53,7 +53,7 @@
 ### 后端
 
 ```bash
-cd chaos-server
+cd chaos-go
 
 # 复制配置模板（已内置 SQLite 默认值）
 cp .env.example .env
@@ -62,7 +62,7 @@ cp .env.example .env
 go run cmd/server/main.go -env=dev
 
 # 或构建
-go build -o chaos-server.exe cmd/server/main.go
+go build -o chaos-go.exe cmd/server/main.go
 ```
 
 ### 前端构建并嵌入
@@ -89,13 +89,13 @@ pnpm build
 | `SERVER_PORT` | HTTP 服务端口 | `8080` |
 | `LOG_LEVEL` | 日志级别 | `info` |
 
-详见 [`chaos-server/CONFIG.md`](chaos-server/CONFIG.md)。
+详见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md)。
 
 ## 项目结构
 
 ```
 chaos-lib/
-├── chaos-server/           # Go 后端
+├── chaos-go/           # Go 后端
 │   ├── cmd/server/         # HTTP 服务入口
 │   ├── config/             # 配置与数据库初始化
 │   ├── models/             # 数据模型

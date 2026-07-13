@@ -1,7 +1,7 @@
 $uiDir = "D:\project\chaos\chaos-lib\chaos-ui"
-$webDir = "D:\project\chaos\chaos-lib\chaos-server\cmd\server\web"
-$serverDir = "D:\project\chaos\chaos-lib\chaos-server"
-$outputPath = "D:\data\chaos\chaos-server.exe"
+$webDir = "D:\project\chaos\chaos-lib\chaos-go\cmd\server\web"
+$serverDir = "D:\project\chaos\chaos-lib\chaos-go"
+$outputPath = "D:\data\chaos\chaos-go.exe"
 
 cd $uiDir
 pnpm install
