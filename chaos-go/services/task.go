@@ -105,7 +105,6 @@ func generateTask(plan *models.TaskPlan, now time.Time, rating *tools.FsrsRating
 	task := models.Task{
 		PlanID:    plan.ID,
 		Status:    models.TaskStatusActive,
-		Priority:  plan.Priority,
 		StartedAt: &now,
 	}
 
@@ -159,7 +158,6 @@ func buildTaskResponse(task models.Task) gin.H {
 		"id":        task.ID,
 		"planId":    task.PlanID,
 		"status":    task.Status,
-		"priority":  task.Priority,
 		"createdAt": task.CreatedAt,
 	}
 	if task.StartedAt != nil {
@@ -816,6 +814,9 @@ func SetPriorityTaskPlan(c *gin.Context) {
 		return
 	}
 
+	// 待办任务的排序由 task_plans.priority 决定（GetPendingTasks 已改为按
+	// task_plans.priority 排序），无需再同步 tasks 表。
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "已更新优先级",
 		"planID":        id,
@@ -868,7 +869,7 @@ func GetPendingTasks(c *gin.Context) {
 	}
 
 	if err := query.
-		Order("tasks.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC").
+		Order("task_plans.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC").
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return

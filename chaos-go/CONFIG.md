@@ -16,7 +16,7 @@ go run cmd/server/main.go -env=dev
 go run cmd/server/main.go -env=prod
 
 # 构建后运行
-.\chaos-server.exe -env=prod
+.\chaos-go.exe -env=prod
 ```
 
 ### 方式二：环境变量

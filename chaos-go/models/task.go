@@ -14,7 +14,6 @@ type Task struct {
 	ID          int        `gorm:"primaryKey"`
 	PlanID      int        ``
 	Status      TaskStatus `gorm:"default:active"`
-	Priority    int        `gorm:"default:5"`
 	StartedAt   *time.Time ``
 	CompletedAt *time.Time ``
 	Deadline    *time.Time ``

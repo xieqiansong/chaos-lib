@@ -1,13 +1,13 @@
 # chaos-lib 项目规则
 
 > 本文件为项目唯一规则来源（AGENTS.md），供所有 AI 编程助手统一遵循。
-> 已对齐 `chaos-server/`（Go 后端）与 `chaos-ui/`（Vue3 前端）真实结构。
+> 已对齐 `chaos-go/`（Go 后端）与 `chaos-ui/`（Vue3 前端）真实结构。
 
 ## 项目概述
 
 仓库根包含两大部分与一个共享 SQL 目录：
 
-- `chaos-server/`：Go 1.26.3 后端，**模块名为 `chaos-lib`**，使用 Gin 框架 + GORM ORM，PostgreSQL 数据库。
+- `chaos-go/`：Go 1.26.3 后端，**模块名为 `chaos-lib`**，使用 Gin 框架 + GORM ORM，PostgreSQL 数据库。
 - `chaos-ui/`：Vue 3 + TypeScript 前端（Element Plus、ECharts、Monaco、Vite，包管理用 pnpm）。
 - `sql/`：DDL 脚本（`chaos_ddl.sql`、`chaos.sql`）。
 
@@ -19,7 +19,7 @@ SDK 版本切换（`services/sdk.go`）、文件连接管理、端口转发、�
 
 ```
 chaos-lib/
-├── chaos-server/                 # Go 后端（模块名 chaos-lib）
+├── chaos-go/                 # Go 后端（模块名 chaos-lib）
 │   ├── cmd/
 │   │   ├── server/               # 主 HTTP 服务入口 main.go
 │   │   ├── tcp_over_websockets/  # 独立 CLI 工具（TCP over WebSocket）
@@ -256,7 +256,7 @@ wg.Wait()
 
 - 通过 `config/` 包管理（`config.GetConfig()`、`config.GetDB()`）
 - 环境切换：命令行 `-env=dev|prod`，或环境变量 `APP_ENV`；默认 `dev`
-- 配置文件位于 `chaos-server/` 根目录：
+- 配置文件位于 `chaos-go/` 根目录：
   - `.env.dev` / `.env.prod`（已在 `.gitignore`，**勿提交**）
   - `.env.example` 为提交到仓库的模板
 - 新增配置项：在 `config/env.go` 结构体中加字段 → `setConfigValue()` 解析 → `setDefaults()` 默认值
@@ -300,16 +300,16 @@ wg.Wait()
 
 ```bash
 # 启动 HTTP 服务（dev 环境）
-go run chaos-server/cmd/server/main.go -env=dev
+go run chaos-go/cmd/server/main.go -env=dev
 
 # 生产环境
-go run chaos-server/cmd/server/main.go -env=prod
+go run chaos-go/cmd/server/main.go -env=prod
 # 或构建后运行
-.\chaos-server.exe -env=prod
+.\chaos-go.exe -env=prod
 
 # TCP over WebSocket 工具
-go run chaos-server/cmd/tcp_over_websockets/server 7002
-go run chaos-server/cmd/tcp_over_websockets/client 13306 ws://localhost:7002/websocket/forward/host/port
+go run chaos-go/cmd/tcp_over_websockets/server 7002
+go run chaos-go/cmd/tcp_over_websockets/client 13306 ws://localhost:7002/websocket/forward/host/port
 ```
 
 ### 性能分析

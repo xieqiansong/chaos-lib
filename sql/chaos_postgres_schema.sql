@@ -737,8 +737,7 @@ CREATE TABLE public.tasks (
     deadline timestamp with time zone,
     remark text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    is_deleted boolean DEFAULT false,
-    priority integer DEFAULT 5
+    is_deleted boolean DEFAULT false
 );
 
 
@@ -1038,6 +1037,14 @@ ALTER TABLE ONLY public.task_plans
 
 ALTER TABLE ONLY public.tasks
     ADD CONSTRAINT tasks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.task_plans(id) ON DELETE CASCADE;
+
+
+--
+-- Migration: 删除 tasks 表的 priority 列（优先级改由 task_plans.priority 决定）
+-- 对已存在的数据库执行：
+--
+
+ALTER TABLE IF EXISTS public.tasks DROP COLUMN IF EXISTS priority;
 
 
 --

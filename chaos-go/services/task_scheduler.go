@@ -133,7 +133,6 @@ func createCronTask(plan *models.TaskPlan, startedAt time.Time) (*models.Task, e
 	task := models.Task{
 		PlanID:    plan.ID,
 		Status:    models.TaskStatusActive,
-		Priority:  plan.Priority,
 		StartedAt: &startedAt,
 		Deadline:  &endOfDay,
 	}

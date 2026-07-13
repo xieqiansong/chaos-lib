@@ -209,7 +209,9 @@ defineExpose({loadPendingTasks})
 
     <ul v-else-if="view === 'sidebar'" class="pending-items">
       <li v-for="task in pendingTasks" :key="task.ID" class="pending-item">
-        <div class="pending-item-name">{{ task.PlanName }}</div>
+        <div class="pending-item-name">
+          {{ task.PlanName }}
+        </div>
         <div v-if="task.Deadline" class="pending-item-time text-xs text-secondary">
           截止: {{ formatTime(task.Deadline) }}
         </div>
