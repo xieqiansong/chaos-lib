@@ -49,6 +49,10 @@ const ratingAction = ref<'start-plan' | 'complete-plan'>('complete-plan')
 const ratingTargetPlan = ref<TaskPlan | null>(null)
 const ratingValue = ref<number | null>(3)
 
+const showPriorityDialog = ref(false)
+const priorityTargetPlan = ref<TaskPlan | null>(null)
+const priorityValue = ref<number>(5)
+
 const pendingRef = ref<InstanceType<typeof PendingTasks> | null>(null)
 
 const ratingOptions = [
@@ -93,6 +97,32 @@ async function submitRatingDialog() {
     ratingTargetPlan.value = null
     await refreshAll()
     await refreshAllPlans()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '操作失败')
+    console.error(e)
+  }
+}
+
+function openPriorityDialog(plan: TaskPlan) {
+  priorityTargetPlan.value = plan
+  priorityValue.value = plan.Priority ?? 5
+  showPriorityDialog.value = true
+}
+
+async function submitPriorityDialog() {
+  if (!priorityTargetPlan.value) return
+  if (priorityValue.value < 0) {
+    ElMessage.error('优先级不能为负数')
+    return
+  }
+  try {
+    await sendMessage(`taskPlans/${priorityTargetPlan.value.ID}/priority`, 'PATCH', {
+      priority: priorityValue.value,
+    })
+    showPriorityDialog.value = false
+    priorityTargetPlan.value = null
+    await refreshAllPlans()
+    ElMessage.success('优先级已更新')
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
@@ -702,6 +732,7 @@ onMounted(async () => {
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
+                    <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
                     <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起</el-dropdown-item>
                     <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
@@ -899,6 +930,27 @@ onMounted(async () => {
       <template #footer>
         <el-button @click="showRatingDialog = false; ratingTargetPlan = null">取消</el-button>
         <el-button type="primary" @click="submitRatingDialog">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+        v-model="showPriorityDialog"
+        :title="`设置优先级 — ${priorityTargetPlan?.Name || ''}`"
+        width="420px"
+    >
+      <div class="postpone-content">
+        <p class="text-secondary mb-sm">将递归应用到该计划及其所有子任务计划。</p>
+        <el-input-number
+            v-model="priorityValue"
+            :min="0"
+            :max="999"
+            controls-position="right"
+            style="width: 100%"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="showPriorityDialog = false; priorityTargetPlan = null">取消</el-button>
+        <el-button type="primary" @click="submitPriorityDialog">确认</el-button>
       </template>
     </el-dialog>
   </div>

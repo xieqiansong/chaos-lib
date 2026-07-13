@@ -62,6 +62,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			taskPlans.PATCH("/:id/archive", services.ArchiveTaskPlan)
 			taskPlans.PATCH("/:id/suspend", services.SuspendTaskPlan)
 			taskPlans.PATCH("/:id/resume", services.ResumeTaskPlan)
+			taskPlans.PATCH("/:id/priority", services.SetPriorityTaskPlan)
 			taskPlans.DELETE("/:id", services.DeleteTaskPlan)
 			taskPlans.GET("/:id/tasks", services.ListPlanTasks)
 		}

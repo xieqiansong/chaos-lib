@@ -32,3 +32,7 @@ WHERE link != '';
 
 
 SELECT * from project_groups;
+
+
+select * from task_plans where name = 'Go';
+SELECT * from tasks where plan_id = '';

@@ -771,6 +771,59 @@ func ResumeTaskPlan(c *gin.Context) {
 	})
 }
 
+// SetPriorityTaskPlan 递归修改任务计划及其所有子孙任务计划的优先级
+// 用于一次性调整整棵子树的重要程度。
+func SetPriorityTaskPlan(c *gin.Context) {
+	id, ok := getPlanID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Priority int ``
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "优先级必须为整数"})
+		return
+	}
+	if req.Priority < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "优先级不能为负数"})
+		return
+	}
+
+	// 校验计划存在
+	var plan models.TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		return
+	}
+
+	// 递归收集自身及所有子孙任务计划的 ID
+	ids, err := collectPlanWithDescendants(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		return
+	}
+
+	now := time.Now()
+	if err := config.GetDB().Model(&models.TaskPlan{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"priority":   req.Priority,
+			"updated_at": now,
+		}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新优先级失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "已更新优先级",
+		"planID":        id,
+		"priority":      req.Priority,
+		"affectedCount": len(ids),
+	})
+}
+
 // ListPlanTasks 查询任务计划下的任务列表
 func ListPlanTasks(c *gin.Context) {
 	id, ok := getPlanID(c)
