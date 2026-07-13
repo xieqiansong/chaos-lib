@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
 import {format} from 'date-fns'
-import {ElMessageBox} from 'element-plus'
+import {ElMessageBox, ElMessage} from 'element-plus'
 import {sendMessage} from '@/utils/api'
 
 interface ProjectGroup {
@@ -360,7 +360,7 @@ async function purgeProject(p: Project) {
   }
 }
 
-// ===== 访问 / 删除 =====
+// ===== 访问 / 打开 / 删除 =====
 async function accessProject(p: Project) {
   try {
     await sendMessage(`projects/${p.ID}/access`, 'PATCH')
@@ -368,6 +368,37 @@ async function accessProject(p: Project) {
   } catch (e) {
     console.error(e)
   }
+}
+
+// 复制项目绝对路径到剪贴板（后端以 nssm 服务运行，无桌面会话，无法直接打开资源管理器）
+async function copyPath(p: Project) {
+  if (!p.AbsolutePath) return
+  error.value = ''
+  try {
+    await writeClipboard(p.AbsolutePath)
+    error.value = '' // 不污染错误提示区，复制成功用单独反馈
+    ElMessage.success('已复制路径：' + p.AbsolutePath)
+  } catch (e) {
+    error.value = '复制失败，请手动复制：' + p.AbsolutePath
+    console.error(e)
+  }
+}
+
+// writeClipboard 复制文本，优先 navigator.clipboard（需安全上下文），失败降级到 textarea 方案
+async function writeClipboard(text: string): Promise<void> {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.position = 'fixed'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  ta.select()
+  const ok = document.execCommand('copy')
+  document.body.removeChild(ta)
+  if (!ok) throw new Error('execCommand copy failed')
 }
 
 async function deleteProject(p: Project) {
@@ -493,6 +524,7 @@ onMounted(fetchGroups)
                 </template>
                 <template v-else>
                   <el-button v-if="row.Claimed" size="small" text type="primary" @click="openDetail(row)">详情</el-button>
+                  <el-button v-if="row.Claimed" size="small" text @click="copyPath(row)">复制路径</el-button>
                   <el-button v-else size="small" type="success" @click="claimProject(row)">认领</el-button>
                 </template>
               </div>
@@ -634,6 +666,7 @@ onMounted(fetchGroups)
         </template>
         <template v-else-if="detailItem?.Claimed">
           <el-button size="small" @click="accessProject(detailItem!)">访问</el-button>
+          <el-button size="small" @click="copyPath(detailItem!)">复制路径</el-button>
           <el-button size="small" type="primary" @click="openMove(detailItem!); showDetail = false">移动</el-button>
           <el-button size="small" @click="openEditProject(detailItem!); showDetail = false">编辑</el-button>
           <el-button size="small" type="danger" @click="deleteProject(detailItem!); showDetail = false">删除</el-button>
