@@ -207,6 +207,13 @@ function loadChildren(row: TaskPlanTree, _treeNode: unknown, resolve: (data: Tas
   resolve(childrenMap.value.get(row.ID) || [])
 }
 
+// 是否为叶子节点：直接依据 childrenMap（后端完整树构建）判断，比 hasChildren 派生字段更可靠。
+// 任何在 childrenMap 中有记录的节点都拥有子节点。
+function isLeaf(row: TaskPlanTree): boolean {
+  const kids = childrenMap.value.get(row.ID)
+  return !kids || kids.length === 0
+}
+
 function captureExpandedIds(): Set<number> {
   if (!tableRef.value) return new Set()
   try {
@@ -416,7 +423,7 @@ async function createPlan() {
       payload.Priority = formData.value.Priority
     }
 
-    await sendMessage('taskPlans', 'POST', payload)
+    await sendMessage('taskPlans/', 'POST', payload)
     showCreateDialog.value = false
     showAddChildDialog.value = false
     resetForm()
@@ -725,12 +732,13 @@ onMounted(async () => {
           <template #default="{ row }">
             <div class="op-actions">
               <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
-              <el-button v-if="row.Status === 'created'" size="small" type="success" text @click="startPlan(row)">开启</el-button>
+              <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
               <el-button v-if="row.Link" size="small" text @click="openLink(row.Link!)">跳转</el-button>
               <el-dropdown trigger="click" style="margin-left: 4px">
                 <el-button size="small" text>更多</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
+                    <el-dropdown-item v-if="row.Status === 'created' && !isLeaf(row)" @click="startPlan(row)">开启</el-dropdown-item>
                     <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
                     <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
                     <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起</el-dropdown-item>
