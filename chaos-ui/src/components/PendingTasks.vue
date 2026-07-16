@@ -29,6 +29,7 @@ interface PendingTask {
   CreatedAt: string
   PlanName: string
   PlanType: string
+  FsrsReps: number
   IsOverdue: boolean
 }
 
@@ -223,6 +224,9 @@ defineExpose({loadPendingTasks})
           <span v-if="task.ContentSize > 0" class="pending-item-size text-xs text-secondary">
             {{ task.ContentSize.toLocaleString() }} 字
           </span>
+          <span v-if="task.PlanType === 'interval'" class="pending-item-size text-xs text-secondary">
+            复习次数: {{ task.FsrsReps }}
+          </span>
           <span class="pending-item-header-actions op-actions">
             <el-button v-if="task.Link" size="small" type="primary" text @click="openLink(task.Link!)">跳转</el-button>
             <el-button v-if="task.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(task)">取消</el-button>
@@ -246,6 +250,12 @@ defineExpose({loadPendingTasks})
         <el-table-column label="字数" width="80">
           <template #default="{ row }">
             <span v-if="row.ContentSize > 0">{{ row.ContentSize.toLocaleString() }}</span>
+            <span v-else class="text-secondary">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="复习次数" width="90">
+          <template #default="{ row }">
+            <span v-if="row.PlanType === 'interval'">{{ row.FsrsReps }}</span>
             <span v-else class="text-secondary">-</span>
           </template>
         </el-table-column>

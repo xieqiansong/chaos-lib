@@ -129,7 +129,7 @@ LOG_LEVEL=info
 在代码中获取配置：
 
 ```go
-import "chaos-lib/config"
+import "chaos-go/config"
 
 // 获取完整配置
 cfg := config.GetConfig()

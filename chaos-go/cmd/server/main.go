@@ -1,9 +1,9 @@
 package main
 
 import (
-	"chaos-lib/config"
-	"chaos-lib/routes"
-	"chaos-lib/tasks"
+	"chaos-go/config"
+	"chaos-go/routes"
+	"chaos-go/tasks"
 	"embed"
 	"log/slog"
 	"net/http"

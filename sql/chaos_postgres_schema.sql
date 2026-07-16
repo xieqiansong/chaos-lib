@@ -665,7 +665,7 @@ COMMENT ON COLUMN public.task_plans.fsrs_difficulty IS 'fsrs: 卡片难度，pla
 -- Name: COLUMN task_plans.fsrs_reps; Type: COMMENT; Schema: public; Owner: postgres
 --
 
-COMMENT ON COLUMN public.task_plans.fsrs_reps IS 'fsrs: 复习次数，plan_type=interval 时使用';
+COMMENT ON COLUMN public.task_plans. IS 'fsrs: 复习次数，plan_type=interval 时使用';
 
 
 --

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"chaos-lib/config"
-	"chaos-lib/models"
+	"chaos-go/config"
+	"chaos-go/models"
 	"os"
 	"path/filepath"
 	"strings"

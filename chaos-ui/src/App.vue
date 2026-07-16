@@ -11,6 +11,7 @@ import Example from './views/Example.vue'
 import Task from './views/Task.vue'
 import Dashboard from './views/Dashboard.vue'
 import ProjectManage from './views/ProjectManage.vue'
+import MobileBoard from './views/MobileBoard.vue'
 import PendingTasks from './components/PendingTasks.vue'
 
 const searchText = ref('')
@@ -47,6 +48,9 @@ const activeMenuLabel = computed(() => {
   return item?.label || ''
 })
 
+// 合法路由：菜单项 + 全屏小看板页（不显示在侧边栏）
+const validKeys = [...menuItems.map(m => m.id), 'board']
+
 const componentMap: Record<string, any> = {
   dashboard: Dashboard,
   browserHistory: BrowserHistory,
@@ -57,11 +61,15 @@ const componentMap: Record<string, any> = {
   example: Example,
   task: Task,
   projectManage: ProjectManage,
+  board: MobileBoard,
 }
 
 const currentComponent = computed(() => {
   return componentMap[activeKey.value] || BrowserHistory
 })
+
+// 小看板页为全屏模式，脱离常规布局
+const isBoard = computed(() => activeKey.value === 'board')
 
 const treeProps = {
   children: 'children',
@@ -82,7 +90,7 @@ watch(activeKey, (val) => {
 
 function onHashChange() {
   const hash = window.location.hash.slice(1)
-  if (hash && menuItems.some(m => m.id === hash) && hash !== activeKey.value) {
+  if (hash && validKeys.includes(hash) && hash !== activeKey.value) {
     activeKey.value = hash
   }
 }
@@ -101,7 +109,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-layout">
+  <div v-if="isBoard" class="board-layout">
+    <component :is="currentComponent" :key="activeKey"/>
+  </div>
+  <div v-else class="app-layout">
     <aside class="app-sidebar">
       <div class="sidebar-header">
         <span class="text-sm font-mono text-primary">{{ now }}</span>

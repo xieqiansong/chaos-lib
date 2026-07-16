@@ -1,4 +1,4 @@
-module chaos-lib
+module chaos-go
 
 go 1.26.3
 

@@ -1,9 +1,9 @@
 package services
 
 import (
-	"chaos-lib/config"
-	"chaos-lib/models"
-	"chaos-lib/tools"
+	"chaos-go/config"
+	"chaos-go/models"
+	"chaos-go/tools"
 	"fmt"
 	"net/http"
 	"strconv"

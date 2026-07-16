@@ -1,7 +1,7 @@
 package services
 
 import (
-	"chaos-lib/config"
+	"chaos-go/config"
 	"io"
 	"log/slog"
 	"net/http"

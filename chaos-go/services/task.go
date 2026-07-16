@@ -1,9 +1,9 @@
 package services
 
 import (
-	"chaos-lib/config"
-	"chaos-lib/models"
-	"chaos-lib/tools"
+	"chaos-go/config"
+	"chaos-go/models"
+	"chaos-go/tools"
 	"fmt"
 	"net/http"
 	"sort"
@@ -855,9 +855,10 @@ func GetPendingTasks(c *gin.Context) {
 		PlanType    models.TaskPlanType ``
 		PlanLink    *string             ``
 		ContentSize int                 ``
+		FsrsReps    int                 ``
 	}
 	query := config.GetDB().Table("tasks").
-		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.content_size").
+		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.content_size, task_plans.fsrs_reps").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", models.TaskStatusActive).
 		Where("tasks.is_deleted = ?", false).
@@ -883,6 +884,7 @@ func GetPendingTasks(c *gin.Context) {
 			PlanType:    row.PlanType,
 			Link:        row.PlanLink,
 			ContentSize: row.ContentSize,
+			FsrsReps:    row.FsrsReps,
 			IsOverdue:   row.Deadline != nil && now.After(*row.Deadline),
 		}
 		result = append(result, pt)

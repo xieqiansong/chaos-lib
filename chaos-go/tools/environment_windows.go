@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"chaos-lib/models"
+	"chaos-go/models"
 	"fmt"
 	"strings"
 	"syscall"

@@ -32,5 +32,6 @@ type PendingTask struct {
 	PlanType    TaskPlanType ``
 	Link        *string      ``
 	ContentSize int          ``
+	FsrsReps    int          ``
 	IsOverdue   bool         ``
 }

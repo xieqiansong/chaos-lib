@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"chaos-lib/models"
+	"chaos-go/models"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"

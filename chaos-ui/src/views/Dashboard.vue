@@ -155,6 +155,10 @@ async function fetchActiveStats() {
   }
 }
 
+function goBoard() {
+  window.location.hash = 'board'
+}
+
 onMounted(() => {
   fetchBalance()
   fetchDailyStats()
@@ -174,6 +178,15 @@ onMounted(() => {
             CNY
           </span>
           <span v-else>{{ balance }}</span>
+          <el-button
+              class="clock-jump-btn"
+              type="primary"
+              plain
+              size="small"
+              @click="goBoard"
+          >
+            全屏时钟
+          </el-button>
         </div>
       </el-col>
     </el-row>
@@ -203,6 +216,10 @@ onMounted(() => {
 .api-balance {
   margin-bottom: var(--space-2xl);
   font-size: var(--el-font-size-base);
+}
+
+.clock-jump-btn {
+  margin-left: var(--space-lg);
 }
 
 .balance-amount {

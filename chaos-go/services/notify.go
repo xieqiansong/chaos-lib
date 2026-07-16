@@ -1,7 +1,7 @@
 package services
 
 import (
-	"chaos-lib/tools"
+	"chaos-go/tools"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

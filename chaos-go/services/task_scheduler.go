@@ -1,9 +1,9 @@
 package services
 
 import (
-	"chaos-lib/config"
-	"chaos-lib/models"
-	"chaos-lib/tasks"
+	"chaos-go/config"
+	"chaos-go/models"
+	"chaos-go/tasks"
 	"log/slog"
 	"time"
 

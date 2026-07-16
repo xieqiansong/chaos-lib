@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"chaos-lib/tools"
+	"chaos-go/tools"
 )
 
 type Environment string

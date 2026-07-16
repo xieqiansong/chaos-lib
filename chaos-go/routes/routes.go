@@ -1,7 +1,7 @@
 package routes
 
 import (
-	"chaos-lib/services"
+	"chaos-go/services"
 	"embed"
 	"io"
 	"net/http"
