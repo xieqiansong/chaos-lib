@@ -28,6 +28,7 @@ type AppConfig struct {
 	Features    FeatureConfig
 	Log         LogConfig
 	DeepSeek    DeepSeekConfig
+	Baidu       BaiduConfig
 }
 
 type ServerConfig struct {
@@ -65,6 +66,10 @@ type LogConfig struct {
 
 type DeepSeekConfig struct {
 	APIKey string
+}
+
+type BaiduConfig struct {
+	AK string
 }
 
 var globalConfig *AppConfig
@@ -247,6 +252,8 @@ func setConfigValue(config *AppConfig, key, value string) {
 		config.Log.ToConsole = parseBool(value)
 	case "DEEPSEEK_API_KEY":
 		config.DeepSeek.APIKey = value
+	case "BAIDU_AK":
+		config.Baidu.AK = value
 	}
 }
 

@@ -105,6 +105,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		}
 
 		api.GET("/balance/deepseek", services.GetDeepSeekBalance)
+		api.GET("/weather", services.GetWeather)
 	}
 
 	r.GET("/", func(c *gin.Context) {

@@ -131,40 +131,7 @@ function savePos(p: SavedPos) {
   }
 }
 
-function weatherCodeToText(code: number): string {
-  const map: Record<number, string> = {
-    0: '晴',
-    1: '大致晴朗',
-    2: '局部多云',
-    3: '阴',
-    45: '雾',
-    48: '雾凇',
-    51: '小毛毛雨',
-    53: '毛毛雨',
-    55: '大毛毛雨',
-    56: '冻毛毛雨',
-    57: '冻毛毛雨',
-    61: '小雨',
-    63: '中雨',
-    65: '大雨',
-    66: '冻雨',
-    67: '冻雨',
-    71: '小雪',
-    73: '中雪',
-    75: '大雪',
-    77: '雪粒',
-    80: '阵雨',
-    81: '阵雨',
-    82: '强阵雨',
-    85: '阵雪',
-    86: '强阵雪',
-    95: '雷阵雨',
-    96: '雷阵雨伴冰雹',
-    99: '强雷阵雨伴冰雹',
-  }
-  return map[code] ?? '未知'
-}
-
+// 天气由后端 /api/weather 代理（AK 在后端 .env，前端不持有），规避跨域/ORB 问题
 async function getPosition(): Promise<GeoPos> {
   if (cachedPos) return cachedPos
   // 优先使用手动保存的位置
@@ -188,28 +155,22 @@ async function getPosition(): Promise<GeoPos> {
   return pos
 }
 
-// 区域名只解析一次
-async function fetchRegion(pos: { lat: number; lon: number }) {
+// 天气数据：后端代理请求，拉取失败不修改原值（不闪烁、无加载感）
+async function fetchWeatherNow(pos: GeoPos) {
   try {
-    const geoUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${pos.lat}&longitude=${pos.lon}&localityLanguage=zh`
-    const geo = await (await fetch(geoUrl)).json()
-    weatherRegion.value = geo.city || geo.locality || geo.principalSubdivision || (pos === DEFAULT_POS ? '成都' : '本地')
-  } catch (e) {
-    weatherRegion.value = (pos === DEFAULT_POS) ? '成都' : '本地'
-  }
-}
-
-// 天气数据：拉取失败不修改原值（不闪烁、无加载感）
-async function fetchWeatherNow(pos: { lat: number; lon: number }) {
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${pos.lat}&longitude=${pos.lon}` +
-        `&current=relative_humidity_2m,temperature_2m,weather_code`
-    const data = await (await fetch(url)).json()
-    const c = data.current
-    if (c) {
-      weatherTemp.value = Math.round(c.temperature_2m)
-      weatherHumidity.value = Math.round(c.relative_humidity_2m)
-      weatherDesc.value = weatherCodeToText(c.weather_code)
+    const url = `/api/weather?lat=${pos.lat}&lon=${pos.lon}`
+    const res = await fetch(url, {cache: 'no-store'})
+    if (!res.ok) return
+    const data = await res.json()
+    if (data.status !== 0 || !data.result || !data.result.now) return
+    const now = data.result.now
+    weatherTemp.value = now.temp
+    weatherHumidity.value = now.rh
+    weatherDesc.value = now.text
+    // 区域名：手动设置（pos.name 存在）时保留；否则用百度返回的区域
+    if (!pos.name && data.result.location) {
+      const loc = data.result.location
+      weatherRegion.value = loc.name || loc.city || loc.province || '本地'
     }
   } catch (e) {
     // 拉取失败不修改
@@ -218,7 +179,6 @@ async function fetchWeatherNow(pos: { lat: number; lon: number }) {
 
 async function refreshWeather() {
   const pos = await getPosition()
-  if (!pos.name) fetchRegion(pos)
   await fetchWeatherNow(pos)
 }
 
@@ -279,7 +239,6 @@ onMounted(async () => {
   syncTime()
   const pos = await getPosition()
   if (pos.name) weatherRegion.value = pos.name
-  else fetchRegion(pos)
   fetchWeatherNow(pos)
   // 本地每秒走字（基于校准偏移）
   timer = setInterval(() => {
