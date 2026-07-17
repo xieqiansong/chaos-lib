@@ -14,3 +14,6 @@ FROM tasks t
          INNER JOIN public.task_plans tp ON tp.id = t.plan_id
 WHERE t.status = 'active'
 ORDER BY t.started_at;
+
+
+SELECT * FROM file_links;

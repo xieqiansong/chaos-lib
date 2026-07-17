@@ -68,6 +68,7 @@ CREATE TABLE public.file_links (
     target_path text,
     status boolean,
     remark text,
+    sort integer DEFAULT 0,
     is_deleted boolean DEFAULT false
 );
 

@@ -3,6 +3,7 @@ package services
 import (
 	"chaos-go/config"
 	"chaos-go/models"
+	"chaos-go/tools"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,7 @@ import (
 )
 
 func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
-	targetInfo, err := os.Lstat(targetPath)
+	_, err := os.Lstat(targetPath)
 
 	if err != nil {
 		if enabled {
@@ -24,14 +25,15 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 		return "invalid"
 	}
 
-	if targetInfo.Mode()&os.ModeSymlink != 0 {
-		actualTarget, err := os.Readlink(targetPath)
-		if err == nil {
-			absActual, _ := filepath.Abs(actualTarget)
-			absSource, _ := filepath.Abs(sourcePath)
-			if strings.EqualFold(absActual, absSource) {
-				return "normal"
-			}
+	// 符号链接与普通目录联接点(Junction，MOUNT_POINT reparse point)在 Go 中
+	// Lstat 可能既不置 ModeSymlink 也不置 ModeDir，故直接尝试读取指向目标：
+	// 命中即视为正常，普通目录/文件则 Readlink 报错而落入 conflict。
+	actualTarget, err := os.Readlink(targetPath)
+	if err == nil {
+		absActual, _ := filepath.Abs(actualTarget)
+		absSource, _ := filepath.Abs(sourcePath)
+		if strings.EqualFold(absActual, absSource) {
+			return "normal"
 		}
 	}
 
@@ -40,7 +42,7 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 
 func GetFileLinks(c *gin.Context) {
 	var links []models.FileLink
-	config.GetDB().Debug().Find(&links)
+	config.GetDB().Debug().Order("sort ASC, id ASC").Find(&links)
 
 	responses := make([]models.FileLinkResponse, 0, len(links))
 	for _, link := range links {
@@ -50,6 +52,7 @@ func GetFileLinks(c *gin.Context) {
 			TargetPath: link.TargetPath,
 			Status:     link.Status,
 			Remark:     link.Remark,
+			Sort:       link.Sort,
 			LinkStatus: checkLinkStatus(link.SourcePath, link.TargetPath, link.Status),
 		})
 	}
@@ -62,6 +65,7 @@ func CreateFileLink(c *gin.Context) {
 		SourcePath string ``
 		TargetPath string ``
 		Remark     string ``
+		Sort       int    ``
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -79,6 +83,7 @@ func CreateFileLink(c *gin.Context) {
 		TargetPath: req.TargetPath,
 		Status:     false,
 		Remark:     req.Remark,
+		Sort:       req.Sort,
 	}
 
 	result := config.GetDB().Create(&link)
@@ -111,6 +116,37 @@ func DeleteFileLink(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{"message": "删除成功"})
+}
+
+func UpdateFileLink(c *gin.Context) {
+	id := c.Param("id")
+
+	var link models.FileLink
+	result := config.GetDB().First(&link, "id = ?", id)
+	if result.Error != nil {
+		c.JSON(404, gin.H{"error": "文件连接不存在"})
+		return
+	}
+
+	var req struct {
+		Remark string ``
+		Sort   int    ``
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	link.Remark = req.Remark
+	link.Sort = req.Sort
+
+	result = config.GetDB().Save(&link)
+	if result.Error != nil {
+		c.JSON(500, gin.H{"error": "更新失败: " + result.Error.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "更新成功", "data": link})
 }
 
 func UpdateFileLinkStatus(c *gin.Context) {
@@ -147,9 +183,9 @@ func UpdateFileLinkStatus(c *gin.Context) {
 			return
 		}
 
-		err := os.Symlink(link.SourcePath, link.TargetPath)
+		err := tools.CreateDirectoryLink(link.TargetPath, link.SourcePath)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "创建符号链接失败: " + err.Error() + " (可能需要管理员权限)"})
+			c.JSON(500, gin.H{"error": "创建目录联接点失败: " + err.Error()})
 			return
 		}
 

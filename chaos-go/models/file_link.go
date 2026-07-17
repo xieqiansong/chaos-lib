@@ -6,6 +6,7 @@ type FileLink struct {
 	TargetPath string ``
 	Status     bool   ``
 	Remark     string ``
+	Sort       int    `gorm:"default:0"`
 }
 
 type FileLinkResponse struct {
@@ -14,5 +15,6 @@ type FileLinkResponse struct {
 	TargetPath string ``
 	Status     bool   ``
 	Remark     string ``
+	Sort       int    ``
 	LinkStatus string ``
 }

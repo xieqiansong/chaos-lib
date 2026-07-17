@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref, watch} from 'vue'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import {sendMessage} from '@/utils/api'
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ interface FileLink {
   TargetPath: string
   Status: boolean
   Remark: string
+  Sort: number
   LinkStatus: string
 }
 
@@ -19,12 +21,29 @@ const fileLinks = ref<FileLink[]>([])
 const error = ref('')
 const loading = ref(false)
 const showCreateModal = ref(false)
+const showEditModal = ref(false)
 
 const newLink = ref({
   SourcePath: '',
   TargetPath: '',
-  Remark: ''
+  Remark: '',
+  Sort: 0
 })
+
+const editLink = ref({
+  ID: 0,
+  Remark: '',
+  Sort: 0
+})
+
+function openEditModal(link: FileLink) {
+  editLink.value = {
+    ID: link.ID,
+    Remark: link.Remark,
+    Sort: link.Sort
+  }
+  showEditModal.value = true
+}
 
 const linkStatusMap: Record<string, { text: string, type: string }> = {
   normal: {text: '正常', type: 'success'},
@@ -56,10 +75,24 @@ async function createLink() {
   try {
     await sendMessage('fileLinks', 'POST', newLink.value)
     showCreateModal.value = false
-    newLink.value = {SourcePath: '', TargetPath: '', Remark: ''}
+    newLink.value = {SourcePath: '', TargetPath: '', Remark: '', Sort: 0}
     await fetchFileLinks()
   } catch (e) {
     error.value = '创建文件连接失败'
+    console.error(e)
+  }
+}
+
+async function updateEditLink() {
+  try {
+    await sendMessage(`fileLinks/${editLink.value.ID}`, 'PATCH', {
+      Remark: editLink.value.Remark,
+      Sort: editLink.value.Sort
+    })
+    showEditModal.value = false
+    await fetchFileLinks()
+  } catch (e) {
+    error.value = '更新失败'
     console.error(e)
   }
 }
@@ -78,6 +111,20 @@ async function toggleLinkStatus(link: FileLink, newStatus: boolean) {
 }
 
 async function deleteLink(id: number) {
+  try {
+    await ElMessageBox.confirm(
+      '确认删除该文件连接？删除后无法恢复。',
+      '警告',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+
   try {
     await sendMessage(`fileLinks/${id}`, 'DELETE')
     await fetchFileLinks()
@@ -129,6 +176,7 @@ onMounted(() => {
       <el-table-column prop="SourcePath" label="源路径" min-width="200"/>
       <el-table-column prop="TargetPath" label="目标路径" min-width="200"/>
       <el-table-column prop="Remark" label="备注" min-width="120"/>
+      <el-table-column prop="Sort" label="排序" width="80" sortable/>
       <el-table-column label="状态" width="100">
         <template #default="{row}">
           <el-tag :type="linkStatusMap[row.LinkStatus]?.type || 'info'">
@@ -144,8 +192,14 @@ onMounted(() => {
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100">
+      <el-table-column label="操作" width="160">
         <template #default="{row}">
+          <el-button
+              type="primary"
+              size="small"
+              @click="openEditModal(row)">
+            编辑
+          </el-button>
           <el-button
               type="danger"
               size="small"
@@ -178,10 +232,41 @@ onMounted(() => {
               :rows="2"
               placeholder="可选备注信息"/>
         </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number
+              v-model="newLink.Sort"
+              :min="0"
+              controls-position="right"/>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateModal = false">取消</el-button>
         <el-button type="primary" @click="createLink">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+        v-model="showEditModal"
+        title="编辑文件连接"
+        width="600px">
+      <el-form :model="editLink" label-width="100px">
+        <el-form-item label="备注">
+          <el-input
+              v-model="editLink.Remark"
+              type="textarea"
+              :rows="2"
+              placeholder="可选备注信息"/>
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number
+              v-model="editLink.Sort"
+              :min="0"
+              controls-position="right"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditModal = false">取消</el-button>
+        <el-button type="primary" @click="updateEditLink">保存</el-button>
       </template>
     </el-dialog>
   </div>

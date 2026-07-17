@@ -27,6 +27,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		api.GET("/fileLinks", services.GetFileLinks)
 		api.POST("/fileLinks", services.CreateFileLink)
 		api.DELETE("/fileLinks/:id", services.DeleteFileLink)
+		api.PATCH("/fileLinks/:id", services.UpdateFileLink)
 		api.PATCH("/fileLinks/:id/status", services.UpdateFileLinkStatus)
 
 		quickEdits := api.Group("/quickEdits")
