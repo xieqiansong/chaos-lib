@@ -1,4 +1,3 @@
-.idea
 **/logs/*
 **/*.exe
 chaos-go/cmd/server/web/
