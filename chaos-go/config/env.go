@@ -4,13 +4,12 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"chaos-go/tools"
 )
 
 type Environment string
@@ -333,10 +332,35 @@ func InitLog() {
 	if cfg == nil {
 		return
 	}
-	tools.InitLogger(&tools.LogConfig{
-		Level:     cfg.Log.Level,
-		FilePath:  cfg.Log.FilePath,
-		ToFile:    cfg.Log.ToFile,
-		ToConsole: cfg.Log.ToConsole,
-	})
+
+	var level slog.Level
+	switch cfg.Log.Level {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	default:
+		level = slog.LevelInfo
+	}
+
+	writers := []io.Writer{os.Stderr}
+
+	if cfg.Log.ToFile && cfg.Log.FilePath != "" {
+		dir := filepath.Dir(cfg.Log.FilePath)
+		os.MkdirAll(dir, 0o755)
+		f, err := os.OpenFile(cfg.Log.FilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			slog.Warn("failed to open log file, falling back to stderr only", "path", cfg.Log.FilePath, "error", err)
+		} else {
+			slog.Info("log file configured", "path", cfg.Log.FilePath)
+			writers = append(writers, f)
+		}
+	}
+
+	handler := slog.NewTextHandler(io.MultiWriter(writers...), &slog.HandlerOptions{Level: level})
+	slog.SetDefault(slog.New(handler))
 }
