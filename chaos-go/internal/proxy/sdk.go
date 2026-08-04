@@ -25,10 +25,10 @@ type SdkSourceItem struct {
 // Sources 为该类型下的来源数组（repo 与 single 可混合）；
 // Current 为当前启用版本的绝对路径（单值即保证同时仅一个版本启用）。
 type SdkSource struct {
-	ID        uint   `gorm:"primaryKey"`
-	Name      string `gorm:"uniqueIndex:idx_sdk_sources_name,priority:1"` // SDK 类型，如 jdk / maven
-	Sources   []byte `gorm:"type:jsonb"`                                   // [{"kind":"repo","root":"..."},{"kind":"single","root":"..."}]
-	Current   string // 当前启用版本绝对路径
+	ID        uint            `gorm:"primaryKey"`
+	Name      string          `gorm:"uniqueIndex:idx_sdk_sources_name,priority:1"` // SDK 类型，如 jdk / maven
+	Sources   json.RawMessage `gorm:"type:jsonb"`                                    // [{"kind":"repo","root":"..."},{"kind":"single","root":"..."}]
+	Current   string          // 当前启用版本绝对路径
 	Enabled   bool   `gorm:"default:true"`
 	Note      string
 	IsDeleted bool `gorm:"default:false"`
@@ -78,7 +78,7 @@ func seedSdkSources() {
 }
 
 // parseSources 解析 Sources JSON 数组。
-func parseSources(raw []byte) []SdkSourceItem {
+func parseSources(raw json.RawMessage) []SdkSourceItem {
 	var items []SdkSourceItem
 	if len(raw) > 0 {
 		_ = json.Unmarshal(raw, &items)
@@ -263,10 +263,10 @@ func UpdateSdkSource(c *gin.Context) {
 		return
 	}
 	var patch struct {
-		Sources []byte `json:"sources"`
-		Current string `json:"current"`
-		Enabled *bool  `json:"enabled"`
-		Note    string `json:"note"`
+		Sources json.RawMessage `json:"sources"`
+		Current string          `json:"current"`
+		Enabled *bool           `json:"enabled"`
+		Note    string          `json:"note"`
 	}
 	if err := c.ShouldBindJSON(&patch); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

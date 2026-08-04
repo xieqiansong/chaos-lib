@@ -71,3 +71,64 @@ export async function sendMessage(path: string, method: string, payload?: any): 
     }
     return response.json()
 }
+
+// ---- SDK 版本切换 ----
+
+export interface SdkInfo {
+    currentVersion: string
+    versionList: string[]
+}
+
+export function getSdkVersions(): Promise<Record<string, SdkInfo>> {
+    return sendMessage('sdks', 'GET')
+}
+
+export function updateSdkVersion(type: string, version: string): Promise<any> {
+    return sendMessage(`sdks/${type}/switch`, 'PATCH', { version })
+}
+
+// ---- SDK 类型 / 来源管理 (defs) ----
+
+export interface SdkSourceItem {
+    kind: 'repo' | 'single'
+    root: string
+}
+
+export interface SdkSource {
+    ID: number
+    Name: string
+    Sources: SdkSourceItem[]
+    Current: string
+    Enabled: boolean
+    Note: string
+    IsDeleted: boolean
+}
+
+export function getSdkDefs(): Promise<SdkSource[]> {
+    return sendMessage('sdks/defs', 'GET')
+}
+
+export function createSdkDef(payload: {
+    Name: string
+    Sources: SdkSourceItem[]
+    Enabled?: boolean
+    Note?: string
+}): Promise<SdkSource> {
+    return sendMessage('sdks/defs', 'POST', payload)
+}
+
+export function updateSdkDef(
+    name: string,
+    payload: {
+        Sources?: SdkSourceItem[]
+        Current?: string
+        Enabled?: boolean
+        Note?: string
+    }
+): Promise<SdkSource> {
+    return sendMessage(`sdks/defs/${name}`, 'PATCH', payload)
+}
+
+export function deleteSdkDef(name: string): Promise<any> {
+    return sendMessage(`sdks/defs/${name}`, 'DELETE')
+}
