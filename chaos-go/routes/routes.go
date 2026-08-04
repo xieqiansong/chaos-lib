@@ -1,7 +1,13 @@
 package routes
 
 import (
-	"chaos-go/services"
+	"chaos-go/internal/envvar"
+	"chaos-go/internal/filelink"
+	notifysvc "chaos-go/internal/notify"
+	"chaos-go/internal/project"
+	"chaos-go/internal/proxy"
+	"chaos-go/internal/quickedit"
+	"chaos-go/internal/taskplan"
 	"embed"
 	"io"
 	"net/http"
@@ -16,97 +22,96 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 
 	api := r.Group("/api")
 	{
-		api.GET("/browserHistories", services.GetBrowserHistories)
-		api.POST("/browserHistories", services.SaveBrowserHistory)
-		api.POST("/browserHistoryVisits", services.SaveBrowserHistoryVisits)
+		api.GET("/browserHistories", proxy.GetBrowserHistories)
+		api.POST("/browserHistories", proxy.SaveBrowserHistory)
+		api.POST("/browserHistoryVisits", proxy.SaveBrowserHistoryVisits)
 
-		api.GET("/sdks", services.GetSdkVersions)
-		api.GET("/sdks/:type", services.GetSdkVersion)
-		api.PATCH("/sdks/:type/switch", services.UpdateSdkVersion)
+		api.GET("/sdks", proxy.GetSdkVersions)
+		api.GET("/sdks/:type", proxy.GetSdkVersion)
+		api.PATCH("/sdks/:type/switch", proxy.UpdateSdkVersion)
 
-		api.GET("/fileLinks", services.GetFileLinks)
-		api.POST("/fileLinks", services.CreateFileLink)
-		api.DELETE("/fileLinks/:id", services.DeleteFileLink)
-		api.PATCH("/fileLinks/:id", services.UpdateFileLink)
-		api.PATCH("/fileLinks/:id/status", services.UpdateFileLinkStatus)
+		api.GET("/fileLinks", filelink.GetFileLinks)
+		api.POST("/fileLinks", filelink.CreateFileLink)
+		api.DELETE("/fileLinks/:id", filelink.DeleteFileLink)
+		api.PATCH("/fileLinks/:id", filelink.UpdateFileLink)
+		api.PATCH("/fileLinks/:id/status", filelink.UpdateFileLinkStatus)
 
 		quickEdits := api.Group("/quickEdits")
 		{
-			quickEdits.GET("/", services.ListQuickEdits)
-			quickEdits.POST("/", services.CreateQuickEdit)
-			quickEdits.DELETE("/:id", services.DeleteQuickEdit)
-			quickEdits.GET("/:id/content", services.GetQuickEditContent)
-			quickEdits.PUT("/:id/content", services.UpdateQuickEditContent)
-			quickEdits.GET("/:id/snapshots", services.ListQuickEditSnapshots)
-			quickEdits.GET("/:id/snapshots/:snapshotId", services.GetQuickEditSnapshot)
-			quickEdits.POST("/:id/restore", services.RestoreQuickEdit)
+			quickEdits.GET("/", quickedit.ListQuickEdits)
+			quickEdits.POST("/", quickedit.CreateQuickEdit)
+			quickEdits.DELETE("/:id", quickedit.DeleteQuickEdit)
+			quickEdits.GET("/:id/content", quickedit.GetQuickEditContent)
+			quickEdits.PUT("/:id/content", quickedit.UpdateQuickEditContent)
+			quickEdits.GET("/:id/snapshots", quickedit.ListQuickEditSnapshots)
+			quickEdits.GET("/:id/snapshots/:snapshotId", quickedit.GetQuickEditSnapshot)
+			quickEdits.POST("/:id/restore", quickedit.RestoreQuickEdit)
 		}
 
 		envVars := api.Group("/envVariables")
 		{
-			envVars.GET("/", services.GetEnvVariables)
-			envVars.PATCH("/", services.PatchEnvVariables)
-			envVars.PUT("/", services.PutEnvVariables)
-			envVars.POST("/sync", services.SyncEnvVariables)
-			envVars.GET("/snapshots/:snapshotId", services.GetEnvSnapshotDetail)
+			envVars.GET("/", envvar.GetEnvVariables)
+			envVars.PATCH("/", envvar.PatchEnvVariables)
+			envVars.PUT("/", envvar.PutEnvVariables)
+			envVars.POST("/sync", envvar.SyncEnvVariables)
+			envVars.GET("/snapshots/:snapshotId", envvar.GetEnvSnapshotDetail)
 		}
 
 		taskPlans := api.Group("/taskPlans")
 		{
-			taskPlans.POST("/", services.CreateTaskPlan)
-			taskPlans.GET("/", services.ListTaskPlans)
-			taskPlans.GET("/tree", services.GetTaskPlanTree)
-			taskPlans.GET("/:id", services.GetTaskPlan)
-			taskPlans.PATCH("/:id", services.UpdateTaskPlan)
-			taskPlans.PATCH("/:id/start", services.StartTaskPlan)
-			taskPlans.PATCH("/:id/complete", services.CompleteTaskPlan)
-			taskPlans.PATCH("/:id/archive", services.ArchiveTaskPlan)
-			taskPlans.PATCH("/:id/suspend", services.SuspendTaskPlan)
-			taskPlans.PATCH("/:id/resume", services.ResumeTaskPlan)
-			taskPlans.PATCH("/:id/priority", services.SetPriorityTaskPlan)
-			taskPlans.DELETE("/:id", services.DeleteTaskPlan)
-			taskPlans.GET("/:id/tasks", services.ListPlanTasks)
+			taskPlans.POST("/", taskplan.CreateTaskPlan)
+			taskPlans.GET("/", taskplan.ListTaskPlans)
+			taskPlans.GET("/tree", taskplan.GetTaskPlanTree)
+			taskPlans.GET("/:id", taskplan.GetTaskPlan)
+			taskPlans.PATCH("/:id", taskplan.UpdateTaskPlan)
+			taskPlans.PATCH("/:id/start", taskplan.StartTaskPlan)
+			taskPlans.PATCH("/:id/complete", taskplan.CompleteTaskPlan)
+			taskPlans.PATCH("/:id/archive", taskplan.ArchiveTaskPlan)
+			taskPlans.PATCH("/:id/suspend", taskplan.SuspendTaskPlan)
+			taskPlans.PATCH("/:id/resume", taskplan.ResumeTaskPlan)
+			taskPlans.PATCH("/:id/priority", taskplan.SetPriorityTaskPlan)
+			taskPlans.DELETE("/:id", taskplan.DeleteTaskPlan)
+			taskPlans.GET("/:id/tasks", taskplan.ListPlanTasks)
 		}
 
 		tasks := api.Group("/tasks")
 		{
-			tasks.GET("/pending", services.GetPendingTasks)
-			tasks.GET("/dailyStats", services.GetTaskDailyStats)
-			tasks.GET("/activeStats", services.GetTaskActiveStats)
-			tasks.PATCH("/:id/complete", services.CompleteTask)
-			tasks.PATCH("/:id/cancel", services.CancelTask)
-			tasks.PATCH("/:id/postpone", services.PostponeTask)
+			tasks.GET("/pending", taskplan.GetPendingTasks)
+			tasks.GET("/dailyStats", taskplan.GetTaskDailyStats)
+			tasks.GET("/activeStats", taskplan.GetTaskActiveStats)
+			tasks.PATCH("/:id/complete", taskplan.CompleteTask)
+			tasks.PATCH("/:id/cancel", taskplan.CancelTask)
+			tasks.PATCH("/:id/postpone", taskplan.PostponeTask)
 		}
 
 		notify := api.Group("/notify")
 		{
-			notify.POST("/", services.ShowNotify)
+			notify.POST("/", notifysvc.ShowNotify)
 		}
 
-		// 本地项目文件夹管理
 		projectGroups := api.Group("/projectGroups")
 		{
-			projectGroups.POST("/", services.CreateProjectGroup)
-			projectGroups.GET("/", services.ListProjectGroups)
-			projectGroups.GET("/:id", services.GetProjectGroup)
-			projectGroups.PATCH("/:id", services.UpdateProjectGroup)
-			projectGroups.DELETE("/:id", services.DeleteProjectGroup)
+			projectGroups.POST("/", project.CreateProjectGroup)
+			projectGroups.GET("/", project.ListProjectGroups)
+			projectGroups.GET("/:id", project.GetProjectGroup)
+			projectGroups.PATCH("/:id", project.UpdateProjectGroup)
+			projectGroups.DELETE("/:id", project.DeleteProjectGroup)
 		}
 
 		projects := api.Group("/projects")
 		{
-			projects.POST("/", services.CreateProject)
-			projects.GET("/", services.ListProjects)
-			projects.GET("/:id", services.GetProject)
-			projects.PATCH("/:id", services.UpdateProject)
-			projects.PATCH("/:id/move", services.MoveProject)
-			projects.PATCH("/:id/access", services.AccessProject)
-			projects.DELETE("/:id", services.DeleteProject)
-			projects.POST("/:id/restore", services.RestoreProject)
+			projects.POST("/", project.CreateProject)
+			projects.GET("/", project.ListProjects)
+			projects.GET("/:id", project.GetProject)
+			projects.PATCH("/:id", project.UpdateProject)
+			projects.PATCH("/:id/move", project.MoveProject)
+			projects.PATCH("/:id/access", project.AccessProject)
+			projects.DELETE("/:id", project.DeleteProject)
+			projects.POST("/:id/restore", project.RestoreProject)
 		}
 
-		api.GET("/balance/deepseek", services.GetDeepSeekBalance)
-		api.GET("/weather", services.GetWeather)
+		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
+		api.GET("/weather", proxy.GetWeather)
 	}
 
 	r.GET("/", func(c *gin.Context) {

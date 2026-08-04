@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"chaos-go/models"
-
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -60,28 +58,13 @@ func privateConnectDB() (*gorm.DB, error) {
 		sqlDB.SetConnMaxLifetime(time.Hour)
 	}
 
-	// 自动迁移：首次启动建表，已存在则幂等（不会破坏现有数据）
-	if err := autoMigrate(db); err != nil {
-		return nil, fmt.Errorf("failed to auto migrate: %v", err)
-	}
-
 	return db, nil
 }
 
-// autoMigrate 依据模型结构创建/更新表，使 PostgreSQL 与 SQLite 共用同一份表定义。
-func autoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&models.BrowserHistory{},
-		&models.BrowserHistoryVisit{},
-		&models.PortForwarding{},
-		&models.FileLink{},
-		&models.QuickEditFile{},
-		&models.QuickEditSnapshot{},
-		&models.ProjectGroup{},
-		&models.Project{},
-		&models.TaskPlan{},
-		&models.Task{},
-	)
+// AutoMigrate 通用数据库迁移。由 cmd/server/main.go 在启动时调用，
+// 传入所有需要建表的模型实例。
+func AutoMigrate(db *gorm.DB, dst ...interface{}) error {
+	return db.AutoMigrate(dst...)
 }
 
 func GetDB() *gorm.DB {
