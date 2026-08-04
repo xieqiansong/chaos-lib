@@ -10,11 +10,11 @@ type FileLink struct {
 }
 
 type FileLinkResponse struct {
-	ID         int    ``
-	SourcePath string ``
-	TargetPath string ``
-	Status     bool   ``
-	Remark     string ``
-	Sort       int    ``
-	LinkStatus string ``
+	ID         int
+	SourcePath string
+	TargetPath string
+	Status     bool
+	Remark     string
+	Sort       int
+	LinkStatus string
 }

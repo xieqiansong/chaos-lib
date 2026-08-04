@@ -276,4 +276,9 @@ onMounted(() => {
 .filelink-table {
   width: 100%;
 }
+
+.filelink-table :deep(.cell),
+.filelink-table :deep(td.el-table__cell) {
+  color: var(--term-green) !important;
+}
 </style>

@@ -212,7 +212,7 @@ onMounted(() => {
     <div class="section-toolbar">
       <span class="text-primary text-base section-title">环境变量管理</span>
       <span v-if="data" class="text-secondary text-xs">
-        {{ data.Meta.Hostname || '本机' }}
+        {{ data.Meta?.Hostname || '本机' }}
       </span>
       <div class="section-actions">
         <el-button size="small" @click="fetchEnv" :loading="loading" plain>刷新</el-button>

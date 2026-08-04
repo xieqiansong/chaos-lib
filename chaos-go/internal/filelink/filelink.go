@@ -21,13 +21,13 @@ type FileLink struct {
 }
 
 type FileLinkResponse struct {
-	ID         int    `json:"id"`
-	SourcePath string `json:"sourcePath"`
-	TargetPath string `json:"targetPath"`
-	Status     bool   `json:"status"`
-	Remark     string `json:"remark"`
-	Sort       int    `json:"sort"`
-	LinkStatus string `json:"linkStatus"`
+	ID         int
+	SourcePath string
+	TargetPath string
+	Status     bool
+	Remark     string
+	Sort       int
+	LinkStatus string
 }
 
 // ── 辅助 ──────────────────────────────────────────────────────────
@@ -72,10 +72,10 @@ func GetFileLinks(c *gin.Context) {
 
 func CreateFileLink(c *gin.Context) {
 	var req struct {
-		SourcePath string `json:"sourcePath"`
-		TargetPath string `json:"targetPath"`
-		Remark     string `json:"remark"`
-		Sort       int    `json:"sort"`
+		SourcePath string
+		TargetPath string
+		Remark     string
+		Sort       int
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -122,8 +122,8 @@ func UpdateFileLink(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Remark string `json:"remark"`
-		Sort   int    `json:"sort"`
+		Remark string
+		Sort   int
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -148,7 +148,7 @@ func UpdateFileLinkStatus(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Status bool `json:"status"`
+		Status bool
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

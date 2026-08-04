@@ -32,21 +32,21 @@ type QuickEditSnapshot struct {
 }
 
 type QuickEditFileResponse struct {
-	ID               int       `json:"id"`
-	Name             string    `json:"name"`
-	FilePath         string    `json:"filePath"`
-	Remark           string    `json:"remark"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-	LastSnapshotID   int       `json:"lastSnapshotId"`
-	LastSnapshotTime time.Time `json:"lastSnapshotTime"`
+	ID               int
+	Name             string
+	FilePath         string
+	Remark           string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	LastSnapshotID   int
+	LastSnapshotTime time.Time
 }
 
 type QuickEditSnapshotResponse struct {
-	ID        int       `json:"id"`
-	FileID    int       `json:"fileId"`
-	SizeBytes int       `json:"sizeBytes"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        int
+	FileID    int
+	SizeBytes int
+	CreatedAt time.Time
 }
 
 // ── 环境变量虚拟文件常量 ─────────────────────────────────────────
@@ -129,9 +129,9 @@ func ListQuickEdits(c *gin.Context) {
 
 func CreateQuickEdit(c *gin.Context) {
 	var req struct {
-		Name     string `json:"name"`
-		FilePath string `json:"filePath"`
-		Remark   string `json:"remark"`
+		Name     string
+		FilePath string
+		Remark   string
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -247,7 +247,7 @@ func UpdateQuickEditContent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct{ Content string `json:"content"` }
+	var req struct{ Content string }
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -354,7 +354,7 @@ func RestoreQuickEdit(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req struct{ SnapshotID int `json:"snapshotId"` }
+	var req struct{ SnapshotID int }
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

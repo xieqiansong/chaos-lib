@@ -29,8 +29,45 @@ let originalModel: any = null
 let modifiedModel: any = null
 let isSelfUpdate = false
 
+function defineTerminalTheme() {
+  monaco.editor.defineTheme('chaos-terminal', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: '', foreground: '8de8a3', background: '0a0e0a' },
+      { token: 'comment', foreground: '4f9d68', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '33ff66', fontStyle: 'bold' },
+      { token: 'identifier', foreground: 'b8ffc8' },
+      { token: 'string', foreground: 'ffb000' },
+      { token: 'number', foreground: '2de2e6' },
+      { token: 'operator', foreground: '33ff66' },
+    ],
+    colors: {
+      'editor.background': '#0a0e0a',
+      'editor.foreground': '#8de8a3',
+      'editorLineNumber.foreground': '#4f9d68',
+      'editorLineNumber.activeForeground': '#33ff66',
+      'editor.selectionBackground': '#1d9b3e55',
+      'editor.lineHighlightBackground': '#111811',
+      'editorCursor.foreground': '#33ff66',
+      'editor.inactiveSelectionBackground': '#1d9b3e33',
+      'editorSuggestWidget.background': '#0d120d',
+      'editorSuggestWidget.border': '#1f3d28',
+      'editorSuggestWidget.foreground': '#8de8a3',
+      'editorSuggestWidget.highlightForeground': '#33ff66',
+      'editorSuggestWidget.selectedBackground': '#1f3d28',
+      'diffEditor.insertedTextBackground': '#33ff6622',
+      'diffEditor.removedTextBackground': '#ff5f5622',
+      'diffEditor.insertedLineBackground': '#0e3a18',
+      'diffEditor.removedLineBackground': '#3a0e0e',
+    },
+  })
+}
+
 function createEditor() {
   if (!containerRef.value) return
+
+  defineTerminalTheme()
 
   const lang = props.language || 'plaintext'
 
@@ -46,7 +83,7 @@ function createEditor() {
     lineNumbers: 'on',
     renderSideBySide: true,
     fontSize: 13,
-    theme: 'vs',
+    theme: 'chaos-terminal',
     wordWrap: 'on',
   })
 

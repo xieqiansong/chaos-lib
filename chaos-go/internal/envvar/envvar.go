@@ -18,56 +18,56 @@ const (
 )
 
 type EnvMeta struct {
-	SavedAt  string `toml:"saved_at" json:"savedAt"`
-	Hostname string `toml:"hostname,omitempty" json:"hostname,omitempty"`
-	Username string `toml:"username,omitempty" json:"username,omitempty"`
+	SavedAt  string `toml:"saved_at"`
+	Hostname string `toml:"hostname,omitempty"`
+	Username string `toml:"username,omitempty"`
 }
 
 type EnvSection map[string]string
 
 type EnvSnapshot struct {
-	Meta   EnvMeta    `toml:"meta" json:"meta"`
-	System EnvSection `toml:"system" json:"system"`
-	User   EnvSection `toml:"user" json:"user"`
+	Meta   EnvMeta    `toml:"meta"`
+	System EnvSection `toml:"system"`
+	User   EnvSection `toml:"user"`
 }
 
 type EnvPathPatch struct {
-	Prepend []string `json:"prepend"`
-	Append  []string `json:"append"`
-	Remove  []string `json:"remove"`
-	Replace []string `json:"replace"`
+	Prepend []string
+	Append  []string
+	Remove  []string
+	Replace []string
 }
 
 type EnvSectionPatch struct {
-	Set   map[string]string `json:"set"`
-	Unset []string          `json:"unset"`
-	Path  EnvPathPatch      `json:"path"`
+	Set   map[string]string
+	Unset []string
+	Path  EnvPathPatch
 }
 
 type EnvPatchRequest struct {
-	System *EnvSectionPatch `json:"system"`
-	User   *EnvSectionPatch `json:"user"`
+	System *EnvSectionPatch
+	User   *EnvSectionPatch
 }
 
 type EnvPutRequest struct {
-	System *EnvSection `json:"system"`
-	User   *EnvSection `json:"user"`
+	System *EnvSection
+	User   *EnvSection
 }
 
 type EnvGetResponse struct {
-	Meta         EnvMeta    `json:"meta"`
-	System       EnvSection `json:"system"`
-	User         EnvSection `json:"user"`
-	SnapshotID   int        `json:"snapshotId"`
-	SnapshotTime string     `json:"snapshotTime"`
-	Warnings     []string   `json:"warnings"`
+	Meta         EnvMeta
+	System       EnvSection
+	User         EnvSection
+	SnapshotID   int
+	SnapshotTime string
+	Warnings     []string
 }
 
 type EnvApplyResponse struct {
-	Message      string   `json:"message"`
-	SnapshotID   int      `json:"snapshotId"`
-	SnapshotTime string   `json:"snapshotTime"`
-	Warnings     []string `json:"warnings"`
+	Message      string
+	SnapshotID   int
+	SnapshotTime string
+	Warnings     []string
 }
 
 // ── TOML 序列化 ──────────────────────────────────────────────────

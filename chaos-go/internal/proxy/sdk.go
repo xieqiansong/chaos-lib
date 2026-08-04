@@ -17,8 +17,8 @@ const (
 
 // SdkSourceItem 是 Sources JSON 数组中的一个来源元素。
 type SdkSourceItem struct {
-	Kind string `json:"kind"` // "repo" | "single"
-	Root string `json:"root"` // 绝对路径
+	Kind string // "repo" | "single"
+	Root string // 绝对路径
 }
 
 // SdkSource 一行代表一个 SDK 类型（jdk/maven/python/...）。
@@ -36,8 +36,8 @@ type SdkSource struct {
 
 // SdkInfo 返回给前端的版本信息。
 type SdkInfo struct {
-	CurrentVersion string   `json:"currentVersion"`
-	VersionList    []string `json:"versionList"`
+	CurrentVersion string
+	VersionList    []string
 }
 
 // 默认种子：每个 SDK 类型含一个 repo 来源（兼容旧 D:\opt\xxx 布局）。
@@ -158,7 +158,7 @@ func UpdateSdkVersion(c *gin.Context) {
 	}
 
 	var req struct {
-		Version string `json:"version"`
+		Version string
 	}
 	if err := c.BindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid JSON body"})
@@ -263,10 +263,10 @@ func UpdateSdkSource(c *gin.Context) {
 		return
 	}
 	var patch struct {
-		Sources json.RawMessage `json:"sources"`
-		Current string          `json:"current"`
-		Enabled *bool           `json:"enabled"`
-		Note    string          `json:"note"`
+		Sources json.RawMessage
+		Current string
+		Enabled *bool
+		Note    string
 	}
 	if err := c.ShouldBindJSON(&patch); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

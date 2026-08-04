@@ -92,9 +92,9 @@ async function createFile() {
   }
   try {
     const result = await sendMessage('quickEdits', 'POST', {
-      name: newFile.value.Name,
-      filePath: newFile.value.FilePath,
-      remark: newFile.value.Remark
+      Name: newFile.value.Name,
+      FilePath: newFile.value.FilePath,
+      Remark: newFile.value.Remark
     })
     if (result && result.error) {
       error.value = result.error || '创建失败'
@@ -256,7 +256,7 @@ async function restoreSnapshot() {
     const result = await sendMessage(
         `quickEdits/${activeFileId.value}/restore`,
         'POST',
-        {snapshotId: selectedSnapshotId.value}
+        {SnapshotID: selectedSnapshotId.value}
     )
     if (result && !result.error) {
       activeFileId.value = null

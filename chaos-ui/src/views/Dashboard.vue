@@ -84,13 +84,13 @@ async function fetchDailyStats() {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                {offset: 0, color: 'rgba(64,158,255,0.25)'},
-                {offset: 1, color: 'rgba(64,158,255,0.02)'},
+                {offset: 0, color: 'rgba(51,255,102,0.25)'},
+                {offset: 1, color: 'rgba(51,255,102,0.02)'},
               ],
             },
           },
-          lineStyle: {color: '#409EFF', width: 2},
-          itemStyle: {color: '#409EFF'},
+          lineStyle: {color: '#33ff66', width: 2},
+          itemStyle: {color: '#33ff66'},
         },
       ],
       grid: {left: '4%', right: '2%', top: '16%', bottom: '8%'},
@@ -132,7 +132,7 @@ async function fetchActiveStats() {
           data: capped.map((c, i) => ({
             value: c.visual,
             itemStyle: {
-              color: data[i].date < today ? '#F56C6C' : '#E6A23C',
+              color: data[i].date < today ? '#ff5f56' : '#ffb000',
             },
           })),
           barMaxWidth: 20,

@@ -84,7 +84,7 @@ func UpdatePortForwardingStatus(context *gin.Context) {
 		return
 	}
 	var request struct {
-		Status bool `json:"status"`
+		Status bool
 	}
 	if err := context.ShouldBindJSON(&request); err != nil {
 		context.JSON(400, gin.H{"error": err.Error()})

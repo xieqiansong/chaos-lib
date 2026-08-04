@@ -13,6 +13,47 @@ import Dashboard from './views/Dashboard.vue'
 import ProjectManage from './views/ProjectManage.vue'
 import MobileBoard from './views/MobileBoard.vue'
 import PendingTasks from './components/PendingTasks.vue'
+import TerminalFrame from './components/TerminalFrame.vue'
+import CommandPalette from './components/CommandPalette.vue'
+
+// 终端风格：命令面板开关 + 全局热键
+const CMD_ALIAS: Record<string, string> = {
+  dashboard: 'top',
+  task: 'task',
+  projectManage: 'proj',
+  sdk: 'sdk',
+  fileLink: 'link',
+  quickEdit: 'edit',
+  environment: 'env',
+  board: 'board',
+}
+
+const paletteVisible = ref(false)
+
+function togglePalette() {
+  paletteVisible.value = !paletteVisible.value
+}
+
+function onPaletteSelect(key: string) {
+  activeKey.value = key
+  paletteVisible.value = false
+}
+
+function onGlobalKey(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    togglePalette()
+  }
+}
+
+// CRT 装饰开关：?crt=0 或系统减少动态效果时关闭
+function applyCrtPreference() {
+  const params = new URLSearchParams(window.location.search)
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (params.get('crt') === '0' || reduceMotion) {
+    document.body.classList.add('no-crt')
+  }
+}
 
 const searchText = ref('')
 const activeKey = ref((window.location.hash.slice(1) || 'dashboard'))
@@ -47,6 +88,13 @@ const activeMenuLabel = computed(() => {
   const item = menuItems.find(m => m.id === activeKey.value)
   return item?.label || ''
 })
+
+// 命令面板条目（基于 menuItems + shell 别名）
+const commandItems = computed(() => menuItems.map(m => ({
+  key: m.id,
+  label: m.label,
+  alias: CMD_ALIAS[m.id] || m.id,
+})))
 
 // 合法路由：菜单项 + 全屏小看板页（不显示在侧边栏）
 const validKeys = [...menuItems.map(m => m.id), 'board']
@@ -97,6 +145,8 @@ function onHashChange() {
 
 onMounted(() => {
   window.addEventListener('hashchange', onHashChange)
+  window.addEventListener('keydown', onGlobalKey)
+  applyCrtPreference()
   timer = setInterval(() => {
     now.value = format(new Date(), 'MM-dd HH:mm:ss')
   }, 1000)
@@ -105,6 +155,7 @@ onMounted(() => {
 onUnmounted(() => {
   clearInterval(timer)
   window.removeEventListener('hashchange', onHashChange)
+  window.removeEventListener('keydown', onGlobalKey)
 })
 </script>
 
@@ -113,43 +164,59 @@ onUnmounted(() => {
     <component :is="currentComponent" :key="activeKey"/>
   </div>
   <div v-else class="app-layout">
-    <aside class="app-sidebar">
-      <div class="sidebar-header">
-        <span class="text-sm font-mono text-primary">{{ now }}</span>
-      </div>
-      <el-tree
-          :data="menuItems"
-          :props="treeProps"
-          node-key="id"
-          :default-expanded-keys="[]"
-          class="sidebar-tree"
-          @node-click="handleNodeClick"
-      />
+    <aside class="app-sidebar app-sidebar--frame">
+      <TerminalFrame title="nav" prompt="chaos@nav">
+        <div class="sidebar-header">
+          <span class="text-sm font-mono text-primary">{{ now }}</span>
+        </div>
+        <el-tree
+            :data="menuItems"
+            :props="treeProps"
+            node-key="id"
+            :default-expanded-keys="[]"
+            class="sidebar-tree"
+            @node-click="handleNodeClick"
+        />
+      </TerminalFrame>
     </aside>
     <div class="app-main">
-      <header class="app-header">
-        <el-breadcrumb separator="/">
-          <el-breadcrumb-item></el-breadcrumb-item>
-          <el-breadcrumb-item>{{ activeMenuLabel }}</el-breadcrumb-item>
-        </el-breadcrumb>
-        <div class="search-wrapper">
-          <Search @search-change="handleSearchChange"/>
-        </div>
-      </header>
-      <main class="app-content">
-        <component :is="currentComponent" :search-text="searchText" :key="activeKey"/>
-      </main>
+      <TerminalFrame :title="activeMenuLabel || 'main'" prompt="chaos@main">
+        <header class="app-header">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item></el-breadcrumb-item>
+            <el-breadcrumb-item>{{ activeMenuLabel }}</el-breadcrumb-item>
+          </el-breadcrumb>
+          <div class="search-wrapper">
+            <Search @search-change="handleSearchChange"/>
+          </div>
+          <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
+            <span class="term-prompt">$</span> ⌘K
+          </button>
+        </header>
+        <main class="app-content">
+          <component :is="currentComponent" :search-text="searchText" :key="activeKey"/>
+        </main>
+      </TerminalFrame>
     </div>
-    <aside class="app-sidebar">
-      <div class="sidebar-header">
-        <span class="text-sm font-mono text-primary">待办任务</span>
-        <el-tag v-if="pendingTaskCount > 0" size="small" type="primary" class="ml-sm">{{ pendingTaskCount }}</el-tag>
-      </div>
-      <div class="sidebar-scroll">
-        <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event" />
-      </div>
+    <aside class="app-sidebar app-sidebar--frame">
+      <TerminalFrame title="todo" prompt="chaos@queue">
+        <div class="sidebar-header">
+          <span class="text-sm font-mono text-primary">待办任务</span>
+          <el-tag v-if="pendingTaskCount > 0" size="small" type="primary" class="ml-sm">{{ pendingTaskCount }}</el-tag>
+        </div>
+        <div class="sidebar-scroll">
+          <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event" />
+        </div>
+      </TerminalFrame>
     </aside>
   </div>
+
+  <CommandPalette
+      :visible="paletteVisible"
+      :commands="commandItems"
+      @select="onPaletteSelect"
+      @update:visible="paletteVisible = $event"
+  />
 </template>
 
 <style scoped>
@@ -164,9 +231,11 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--el-border-color-lighter);
-  border-left: 1px solid var(--el-border-color-lighter);
-  background: var(--el-bg-color);
+  min-height: 0;
+}
+
+.app-sidebar--frame {
+  padding: var(--space-xs);
 }
 
 .sidebar-scroll {
@@ -180,7 +249,7 @@ onUnmounted(() => {
   align-items: center;
   height: 2.05rem;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--term-border);
   flex-shrink: 0;
 }
 
@@ -190,7 +259,7 @@ onUnmounted(() => {
   justify-content: space-between;
   height: 2.05rem;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
 }
@@ -208,18 +277,52 @@ onUnmounted(() => {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  padding: var(--space-xs);
 }
 
 .search-wrapper {
   flex: 1;
-  max-width: 66%;
+  max-width: 60%;
   min-width: 0;
   margin-left: var(--space-lg);
+}
+
+.cmdpalette-hint {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--term-border);
+  color: var(--term-green-faint);
+  font-family: inherit;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.cmdpalette-hint:hover {
+  color: var(--term-green);
+  border-color: var(--term-green-dim);
 }
 
 .app-content {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-xl);
+}
+</style>
+
+<!-- 全局覆盖：确保所有 el-table 数据单元格在终端暗色主题下可读 -->
+<style>
+html.dark .el-table td.el-table__cell,
+html.dark .el-table td.el-table__cell .cell {
+  color: var(--term-green) !important;
+}
+
+html.dark .el-table th.el-table__cell,
+html.dark .el-table th.el-table__cell .cell {
+  color: var(--term-green-faint) !important;
 }
 </style>

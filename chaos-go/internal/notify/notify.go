@@ -8,8 +8,8 @@ import (
 
 func ShowNotify(c *gin.Context) {
 	var req struct {
-		Title   string `json:"title"`
-		Content string `json:"content"`
+		Title   string
+		Content string
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})

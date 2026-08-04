@@ -46,17 +46,17 @@
                     <!-- 版本标签 -->
                     <div class="version-tags">
                         <el-tag
-                            v-for="v in info.versionList"
+                            v-for="v in info.VersionList"
                             :key="v"
                             class="version-tag"
-                            :type="v === info.currentVersion ? 'success' : 'info'"
-                            :effect="v === info.currentVersion ? 'dark' : 'plain'"
+                            :type="v === info.CurrentVersion ? 'success' : 'info'"
+                            :effect="v === info.CurrentVersion ? 'dark' : 'plain'"
                             :class="{ clickable: canSwitch(type), disabled: !canSwitch(type) }"
                             @click="canSwitch(type) ? switchVersion(type, v) : onSingleClick(type)"
                         >
                             {{ v }}
                         </el-tag>
-                        <span v-if="info.versionList.length === 0" class="empty-hint">暂无版本</span>
+                        <span v-if="info.VersionList.length === 0" class="empty-hint">暂无版本</span>
                     </div>
                 </el-card>
             </el-col>
@@ -152,8 +152,8 @@ import {
 } from '@/utils/api'
 
 interface SdkListEntry {
-    currentVersion: string
-    versionList: string[]
+    CurrentVersion: string
+    VersionList: string[]
 }
 
 const sdkList = ref<Record<string, SdkListEntry>>({})
@@ -352,7 +352,7 @@ onMounted(() => {
     font-size: 13px;
 }
 .source-root {
-    color: #909399;
+    color: var(--term-green-faint);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -370,7 +370,7 @@ onMounted(() => {
     opacity: 0.7;
 }
 .empty-hint {
-    color: #c0c4cc;
+    color: var(--term-green-faint);
     font-size: 13px;
 }
 .manage-toolbar {
@@ -384,7 +384,7 @@ onMounted(() => {
 }
 .def-root {
     font-size: 13px;
-    color: #606266;
+    color: var(--el-text-color-secondary);
 }
 .source-form-list {
     display: flex;

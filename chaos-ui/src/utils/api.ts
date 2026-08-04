@@ -75,8 +75,8 @@ export async function sendMessage(path: string, method: string, payload?: any): 
 // ---- SDK 版本切换 ----
 
 export interface SdkInfo {
-    currentVersion: string
-    versionList: string[]
+    CurrentVersion: string
+    VersionList: string[]
 }
 
 export function getSdkVersions(): Promise<Record<string, SdkInfo>> {

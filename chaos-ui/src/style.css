@@ -1,6 +1,199 @@
+/* ===== 终端主题（terminal-style-ui） ===== */
+/* 覆盖 Element Plus 暗色变量为荧光绿/黑底 CRT 风格 */
+html.dark {
+  /* 背景层级 */
+  --el-bg-color: #0a0e0a;
+  --el-bg-color-page: #060906;
+  --el-bg-color-overlay: #0d120d;
+  --el-fill-color-blank: #0a0e0a;
+  --el-fill-color: #111811;
+  --el-fill-color-light: #141d14;
+  --el-fill-color-lighter: #0f150f;
+  --el-fill-color-extra-light: #0c110c;
+
+  /* 文字 */
+  --el-text-color-primary: #b8ffc8;
+  --el-text-color-regular: #8de8a3;
+  --el-text-color-secondary: #4f9d68;
+  --el-text-color-placeholder: #356b46;
+  --el-text-color-disabled: #2c5538;
+
+  /* 边框 */
+  --el-border-color: #1f3d28;
+  --el-border-color-light: #1a3320;
+  --el-border-color-lighter: #16291b;
+  --el-border-color-extra-light: #122216;
+
+  /* 主色：荧光绿 */
+  --el-color-primary: #33ff66;
+  --el-color-primary-light-3: #25c24d;
+  --el-color-primary-light-5: #1d9b3e;
+  --el-color-primary-light-7: #156e2c;
+  --el-color-primary-light-8: #124f20;
+  --el-color-primary-light-9: #0e3a18;
+  --el-color-primary-dark-2: #5cff86;
+
+  /* 语义色（终端化） */
+  --el-color-success: #33ff66;
+  --el-color-warning: #ffb000;
+  --el-color-danger: #ff5f56;
+  --el-color-error: #ff5f56;
+  --el-color-info: #4f9d68;
+
+  /* 表格 */
+  --el-table-text-color: var(--el-text-color-regular);
+  --el-table-header-text-color: var(--el-text-color-secondary);
+  --el-table-row-hover-bg-color: rgba(51, 255, 102, 0.08);
+  --el-table-current-row-bg-color: rgba(51, 255, 102, 0.12);
+  --el-table-header-bg-color: var(--el-fill-color);
+  --el-table-tr-bg-color: var(--el-bg-color);
+
+  /* 字体 */
+  --el-font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
+}
+
+/* 终端自有变量 */
+:root {
+  --term-bg: #0a0e0a;
+  --term-bg-deep: #060906;
+  --term-green: #33ff66;
+  --term-green-dim: #1d9b3e;
+  --term-green-faint: #4f9d68;
+  --term-amber: #ffb000;
+  --term-red: #ff5f56;
+  --term-cyan: #2de2e6;
+  --term-border: #1f3d28;
+  --term-glow: rgba(51, 255, 102, 0.35);
+  --term-scanline: rgba(51, 255, 102, 0.04);
+}
+
+/* 全局等宽字体 */
 body {
-    padding: 0;
-    margin: 0;
+  padding: 0;
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  background: var(--term-bg-deep);
+  color: var(--term-green-faint);
+}
+
+/* CRT 扫描线 + 微弧阴影装饰层 */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--term-scanline) 0,
+    var(--term-scanline) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.55);
+  animation: term-flicker 4s infinite;
+}
+
+@keyframes term-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.92; }
+}
+
+/* 关闭 CRT 装饰 */
+body.no-crt::after {
+  display: none;
+}
+
+/* ===== 终端工具类 ===== */
+.term-cursor::after {
+  content: "_";
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--term-green);
+  animation: term-blink 1.1s steps(1) infinite;
+}
+
+@keyframes term-blink {
+  50% { opacity: 0; }
+}
+
+.term-glow {
+  border: 1px solid var(--term-border);
+  box-shadow: 0 0 0 1px rgba(51, 255, 102, 0.08),
+  inset 0 0 18px rgba(51, 255, 102, 0.06);
+}
+
+.term-titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 1.7rem;
+  padding: 0 var(--space-md);
+  font-size: 0.75rem;
+  color: var(--term-green-faint);
+  background: linear-gradient(180deg, #0e150e, #0a0e0a);
+  border-bottom: 1px solid var(--term-border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.term-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.term-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.term-dot.red { background: var(--term-red); }
+.term-dot.amber { background: var(--term-amber); }
+.term-dot.green { background: var(--term-green); }
+
+.term-prompt { color: var(--term-green); }
+
+/* 减少动态效果时关闭动画 */
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; }
+  .term-cursor::after { animation: none; }
+  body.no-crt::after { display: none; }
+}
+
+/* ===== Element Plus 组件覆盖（确保暗色下文字可读） ===== */
+html.dark .el-table,
+html.dark .el-table .cell,
+html.dark .el-table th.el-table__cell,
+html.dark .el-table td.el-table__cell,
+html.dark .el-table .el-table__cell {
+  color: var(--el-text-color-regular) !important;
+}
+
+html.dark .el-table th.el-table__cell .cell {
+  color: var(--el-text-color-secondary) !important;
+}
+
+html.dark .el-table tr,
+html.dark .el-table__row {
+  background-color: var(--el-bg-color) !important;
+  color: var(--el-text-color-regular) !important;
+}
+
+html.dark .el-tree-node__label {
+  color: var(--el-text-color-regular);
+}
+
+html.dark .el-input__inner,
+html.dark .el-textarea__inner {
+  color: var(--el-text-color-primary);
+}
+
+html.dark .el-dialog,
+html.dark .el-message-box {
+  background: var(--el-bg-color);
+  border: 1px solid var(--term-border);
 }
 
 /* ===== 字体尺寸 ===== */
