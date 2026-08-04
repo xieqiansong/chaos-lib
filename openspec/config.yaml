@@ -14,11 +14,8 @@ context: |
   - DB 用 config.GetDB() 单例，不搞依赖注入
   - GORM 模型只加必要标签，不写 gorm:"column:xxx"，列名自动推断为 snake_case
   - 软删除：字段统一 IsDeleted bool，查询手动加 WHERE is_deleted = ?
-  - 后台任务在各自包 init() 中 scheduler.Register(name, interval, fn)
-  - envvar 与 quickedit 互相调用，通过 main.go 里的回调注入解循环依赖
   - 路由在 routes.SetupRouter(webFS embed.FS) 注册，统一前缀 /api，SPA 经 NoRoute 回退
   - 配置用 -env=dev|prod 或 APP_ENV 切换，.env 模板见 chaos-go/CONFIG.md
-  - Windows 特有能力（Junction / 注册表 / 通知）仅 Windows 平台
 
 rules:
   tasks:
@@ -29,3 +26,5 @@ rules:
   proposal:
     - 明确区分功能规格（做什么）与技术实现（怎么写）
     - 涉及现有模块时引用 internal/ 下对应包
+    - 用户提需求后，主动询问是否需要补充 / 生成测试用例（后端 Go 改改动建议配套 _test.go），由用户决定是否添加，不自动强写
+    - 涉及前端的改动（chaos-ui），不引入测试框架；在 change 的 tasks.md 必须附「前端手动验证清单」（列出要点的按钮 / 接口 / 预期结果），由用户照清单人工验收
