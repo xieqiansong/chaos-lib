@@ -100,6 +100,7 @@ func main() {
 		&filelink.FileLink{},
 		&quickedit.QuickEditFile{},
 		&quickedit.QuickEditSnapshot{},
+		&proxy.SdkSource{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}

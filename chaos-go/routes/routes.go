@@ -30,6 +30,11 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		api.GET("/sdks/:type", proxy.GetSdkVersion)
 		api.PATCH("/sdks/:type/switch", proxy.UpdateSdkVersion)
 
+		api.GET("/sdks/defs", proxy.ListSdkSources)
+		api.POST("/sdks/defs", proxy.CreateSdkSource)
+		api.PATCH("/sdks/defs/:name", proxy.UpdateSdkSource)
+		api.DELETE("/sdks/defs/:name", proxy.DeleteSdkSource)
+
 		api.GET("/fileLinks", filelink.GetFileLinks)
 		api.POST("/fileLinks", filelink.CreateFileLink)
 		api.DELETE("/fileLinks/:id", filelink.DeleteFileLink)

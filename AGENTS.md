@@ -14,6 +14,8 @@
 - GORM 模型只加必要标签，**不写 `gorm:"column:xxx"`**（列名自动 snake_case）
 - 软删除：字段统一 `IsDeleted bool`，查询手动加 `WHERE is_deleted = ?`
 - 新模型必须在 `cmd/server/main.go` 的 `AutoMigrate()` 登记
+- `chaos-go/sql/chaos_postgres_schema.sql` 是**手动导出的基准快照，AI 不得修改**
+- 新增/修改 GORM 模型时，**必须写入 `chaos-go/sql/chaos_postgres_update.sql`**（变动日志形式，增量 DDL，紧凑迁移风格，非 pg_dump 导出格式）：建表（`id integer NOT NULL` + `IDENTITY` 序列）、表级与列级 `COMMENT`、主键约束、唯一/普通索引；保持与代码模型字段一致，注释用紧凑 `COMMENT ON` 写法而非 `-- Name:` 导出块。每条变动追加在文件末尾并注明日期与用途
 
 ## 后台任务
 
