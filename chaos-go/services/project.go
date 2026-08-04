@@ -79,7 +79,7 @@ func CreateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if !tools.DirExists(abs) {
+	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "项目目录不存在: " + abs})
 		return
 	}
@@ -437,14 +437,15 @@ func AccessProject(c *gin.Context) {
 // resolveRecycleTarget 计算项目移入回收站分组后的目标绝对/相对路径。
 // 以项目名称命名，若回收站目录下已存在同名项则追加序号避免冲突。
 func resolveRecycleTarget(recycleGroup models.ProjectGroup, project models.Project) (string, string, error) {
-	if !tools.DirExists(recycleGroup.AbsolutePath) {
-		if err := tools.MkdirAllSafe(recycleGroup.AbsolutePath); err != nil {
-			return "", "", fmt.Errorf("回收站根目录不存在且创建失败: %v", err)
-		}
+	if err := os.MkdirAll(recycleGroup.AbsolutePath, 0o755); err != nil {
+		return "", "", fmt.Errorf("回收站根目录不存在且创建失败: %v", err)
 	}
 	base := filepath.Join(recycleGroup.AbsolutePath, project.Name)
 	candidate := base
-	for i := 1; tools.FileExists(candidate); i++ {
+	for i := 1; ; i++ {
+		if _, err := os.Stat(candidate); err != nil {
+			break
+		}
 		candidate = fmt.Sprintf("%s_%d", base, i)
 	}
 	abs := filepath.Clean(candidate)

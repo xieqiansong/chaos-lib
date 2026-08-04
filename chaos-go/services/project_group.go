@@ -3,8 +3,8 @@ package services
 import (
 	"chaos-go/config"
 	"chaos-go/models"
-	"chaos-go/tools"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -78,12 +78,10 @@ func CreateProjectGroup(c *gin.Context) {
 		orderNum = *req.OrderNum
 	}
 
-	// 根目录不存在则创建（允许用户直接以绝对路径登记一个尚未创建的目录）
-	if !tools.DirExists(req.AbsolutePath) {
-		if err := tools.MkdirAllSafe(req.AbsolutePath); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "根目录不存在且创建失败: " + err.Error()})
-			return
-		}
+	// 确保根目录存在（允许用户直接以绝对路径登记一个尚未创建的目录）
+	if err := os.MkdirAll(req.AbsolutePath, 0o755); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "根目录不存在且创建失败: " + err.Error()})
+		return
 	}
 
 	group := models.ProjectGroup{

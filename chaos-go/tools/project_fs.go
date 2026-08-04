@@ -12,26 +12,6 @@ import (
 	"time"
 )
 
-// DirExists 判断目录是否存在
-func DirExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
-}
-
-// FileExists 判断路径（文件或目录）是否存在
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// MkdirAllSafe 递归创建目录（便于登记一个尚未在磁盘上存在的项目组根目录）
-func MkdirAllSafe(path string) error {
-	return os.MkdirAll(path, 0o755)
-}
-
 // RemoveDirSafe 删除目录（用于删除项目时可选的物理移除）。
 // 专门针对 .git 这类「只读 + 隐藏 + 海量小文件」的顽固目录做了加固：
 //  1. 递归清除只读属性（os.Chmod 在 Windows 下等价于清除 READONLY 位）
@@ -49,7 +29,7 @@ func forceRemoveAll(path string) error {
 	const maxAttempts = 3
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if !FileExists(path) {
+		if _, err := os.Stat(path); err != nil {
 			return nil
 		}
 		// 每次尝试前都先清一遍只读属性（可能有新文件出现或上次未清干净）
@@ -61,7 +41,7 @@ func forceRemoveAll(path string) error {
 			lastErr = os.RemoveAll(path)
 		}
 
-		if !FileExists(path) {
+		if _, err := os.Stat(path); err != nil {
 			return nil
 		}
 		// 目录仍在：可能被瞬时占用，退避后重试
@@ -94,7 +74,7 @@ func rmdirWindows(path string) error {
 
 	out, err := exec.Command("cmd", "/c", "rmdir", "/s", "/q", path).CombinedOutput()
 	if err != nil {
-		if !FileExists(path) {
+		if _, err := os.Stat(path); err != nil {
 			return nil // rmdir 对已删除路径也会报错，实际已删则视为成功
 		}
 		return fmt.Errorf("rmdir 失败: %v, 输出: %s", err, strings.TrimSpace(string(out)))
@@ -111,10 +91,10 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 	if oldAbs == newAbs {
 		return nil
 	}
-	if !DirExists(oldAbs) {
+	if info, err := os.Stat(oldAbs); err != nil || !info.IsDir() {
 		return fmt.Errorf("源目录不存在: %s", oldAbs)
 	}
-	if FileExists(newAbs) {
+	if _, err := os.Stat(newAbs); err == nil {
 		return fmt.Errorf("目标目录已存在: %s", newAbs)
 	}
 
@@ -138,7 +118,7 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 // Windows 下通过 PowerShell 调用 VB FileSystem 送入回收站并抑制确认对话框；
 // 其他平台回退为直接删除（os.RemoveAll）。
 func MoveToRecycleBin(path string) error {
-	if !FileExists(path) {
+	if _, err := os.Stat(path); err != nil {
 		return nil
 	}
 
@@ -169,7 +149,7 @@ func MoveToRecycleBin(path string) error {
 			return fmt.Errorf("送入回收站失败: %v (%s)", err, string(out))
 		}
 		// 回收站操作可能对被占用的子树静默跳过，校验是否真的删干净
-		if FileExists(path) {
+		if _, err := os.Stat(path); err == nil {
 			return fmt.Errorf("送回收站后原目录仍残留（可能 .git 被进程占用）: %s", path)
 		}
 		return nil
