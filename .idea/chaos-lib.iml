@@ -4,6 +4,7 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/chaos-knots/90-Sources" />
       <excludeFolder url="file://$MODULE_DIR$/chaos-knots/sources" />
     </content>
     <orderEntry type="inheritedJdk" />

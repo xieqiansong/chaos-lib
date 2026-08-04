@@ -16,4 +16,10 @@ WHERE t.status = 'active'
 ORDER BY t.started_at;
 
 
-SELECT * FROM file_links;
+-- PostgresSQL获取所有表
+SELECT table_name
+FROM information_schema.tables;
+
+select * from quick_edit_files;
+
+select CAST('1111111111' as INTEGER);
