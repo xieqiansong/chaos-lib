@@ -24,3 +24,6 @@ chaos-knots
 Awesome-Prompts
 
 mailmap.txt
+
+# IDE/AI 项目数据目录（本地状态，不提交）
+.codebuddy/

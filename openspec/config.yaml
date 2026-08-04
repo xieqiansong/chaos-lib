@@ -1,0 +1,31 @@
+schema: spec-driven
+
+context: |
+  后端模块名 chaos-go（Go 1.26.3），Gin + GORM，支持 PostgreSQL / SQLite 双数据库。
+  前端 chaos-ui：Vue 3 + TypeScript + Vite + pnpm（Element Plus / ECharts / Monaco）。
+  业务逻辑全在 internal/ 按功能分包：
+    taskplan（任务计划 + FSRS 间隔复习）、project（项目管理 + 回收站）、
+    proxy（浏览器历史 / SDK 切换 / DeepSeek / 天气）、envvar（环境变量 TOML 快照）、
+    filelink（Windows Junction）、portfwd（端口转发）、quickedit（文件快照 / 回滚）、
+    notify（Windows 通知 / WxPusher）。
+  基础设施层：config/（配置 + DB + 日志）、routes/（SetupRouter）、scheduler/（后台调度）、cmd/（入口）。
+
+  代码层面硬规则：
+  - DB 用 config.GetDB() 单例，不搞依赖注入
+  - GORM 模型只加必要标签，不写 gorm:"column:xxx"，列名自动推断为 snake_case
+  - 软删除：字段统一 IsDeleted bool，查询手动加 WHERE is_deleted = ?
+  - 后台任务在各自包 init() 中 scheduler.Register(name, interval, fn)
+  - envvar 与 quickedit 互相调用，通过 main.go 里的回调注入解循环依赖
+  - 路由在 routes.SetupRouter(webFS embed.FS) 注册，统一前缀 /api，SPA 经 NoRoute 回退
+  - 配置用 -env=dev|prod 或 APP_ENV 切换，.env 模板见 chaos-go/CONFIG.md
+  - Windows 特有能力（Junction / 注册表 / 通知）仅 Windows 平台
+
+rules:
+  tasks:
+    - 新模块放 internal/ 下建包，模型 + handler 同包
+    - 涉及 DB 的改动必须在 cmd/server/main.go 的 AutoMigrate() 登记模型
+    - 需要后台周期任务时在包 init() 中 scheduler.Register()
+    - 提交前必须 go build ./... 无编译错误
+  proposal:
+    - 明确区分功能规格（做什么）与技术实现（怎么写）
+    - 涉及现有模块时引用 internal/ 下对应包

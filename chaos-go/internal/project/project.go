@@ -390,7 +390,7 @@ func MoveProject(c *gin.Context) {
 
 	if moved {
 		if err := MoveProjectFolder(oldAbs, newAbs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "复制文件夹失败: " + err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "移动文件夹失败: " + err.Error()})
 			return
 		}
 	}
@@ -410,18 +410,12 @@ func MoveProject(c *gin.Context) {
 	}
 	tx.Commit()
 
-	var recycleErr error
-	if moved {
-		recycleErr = MoveToRecycleBin(oldAbs)
-	}
+	// 源目录已随 MoveProjectFolder 移动走，无需额外清理
 
 	config.GetDB().First(&project, id)
 	resp := gin.H{
 		"message": "移动成功", "moved": moved, "project": project,
 		"oldAbsPath": oldAbs, "newAbsPath": newAbs,
-	}
-	if recycleErr != nil {
-		resp["recycleWarning"] = "原目录未能送入回收站，请手动清理: " + recycleErr.Error()
 	}
 	c.JSON(http.StatusOK, resp)
 }
@@ -500,13 +494,7 @@ func DeleteProject(c *gin.Context) {
 	}
 	tx.Commit()
 
-	oldAbs := project.AbsolutePath
-	if err := RemoveDirSafe(oldAbs); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "已移入回收站，但原目录未能删除", "recycleWarning": err.Error(), "newAbsPath": newAbs,
-		})
-		return
-	}
+	// 源目录已随 MoveProjectFolder 移动进回收站目录，无需额外删除
 
 	config.GetDB().First(&project, id)
 	c.JSON(http.StatusOK, gin.H{

@@ -78,10 +78,16 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 			return fmt.Errorf("创建目标父目录失败: %v", mkErr)
 		}
 	}
+	// 同卷优先原子移动（O(1)，不复制数据）
+	if err := os.Rename(oldAbs, newAbs); err == nil {
+		return nil
+	}
+	// 跨卷回退：复制 + 删源
 	if cerr := copyDir(oldAbs, newAbs); cerr != nil {
 		_ = RemoveDirSafe(newAbs)
-		return fmt.Errorf("复制目录失败: %v", cerr)
+		return fmt.Errorf("移动目录失败: %v", cerr)
 	}
+	_ = RemoveDirSafe(oldAbs)
 	return nil
 }
 
