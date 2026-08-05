@@ -4,16 +4,18 @@ withDefaults(defineProps<{
   title?: string
   prompt?: string
   flat?: boolean
+  hideTitlebar?: boolean
 }>(), {
   title: 'chaos',
   prompt: 'user@chaos',
   flat: false,
+  hideTitlebar: false,
 })
 </script>
 
 <template>
   <div class="term-frame" :class="{ 'term-frame--flat': flat }">
-    <div class="term-titlebar">
+    <div v-if="!hideTitlebar" class="term-titlebar">
       <span class="term-dots">
         <span class="term-dot red"></span>
         <span class="term-dot amber"></span>

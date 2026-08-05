@@ -165,7 +165,7 @@ onUnmounted(() => {
   </div>
   <div v-else class="app-layout">
     <aside class="app-sidebar app-sidebar--frame">
-      <TerminalFrame title="nav" prompt="chaos@nav">
+      <TerminalFrame title="nav" prompt="chaos@nav" hide-titlebar>
         <div class="sidebar-header">
           <span class="text-sm font-mono text-primary">{{ now }}</span>
         </div>
@@ -180,7 +180,7 @@ onUnmounted(() => {
       </TerminalFrame>
     </aside>
     <div class="app-main">
-      <TerminalFrame :title="activeMenuLabel || 'main'" prompt="chaos@main">
+      <TerminalFrame :title="activeMenuLabel || 'main'" prompt="chaos@main" hide-titlebar>
         <header class="app-header">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item></el-breadcrumb-item>
@@ -199,7 +199,7 @@ onUnmounted(() => {
       </TerminalFrame>
     </div>
     <aside class="app-sidebar app-sidebar--frame">
-      <TerminalFrame title="todo" prompt="chaos@queue">
+      <TerminalFrame title="todo" prompt="chaos@queue" hide-titlebar>
         <div class="sidebar-header">
           <span class="text-sm font-mono text-primary">待办任务</span>
           <el-tag v-if="pendingTaskCount > 0" size="small" type="primary" class="ml-sm">{{ pendingTaskCount }}</el-tag>
