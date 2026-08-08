@@ -300,8 +300,8 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #1f1f1f;
+  background: var(--board-bg);
+  color: var(--board-fg);
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -316,9 +316,9 @@ onUnmounted(() => {
   height: 48px;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.06);
-  color: #1f1f1f;
-  font-size: 24px;
+  background: var(--board-surface);
+  color: var(--board-fg);
+  font-size: var(--board-back-size);
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -328,7 +328,7 @@ onUnmounted(() => {
 }
 
 .back-btn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--board-surface-hover);
 }
 
 .fs-btn {
@@ -339,9 +339,9 @@ onUnmounted(() => {
   padding: 0 16px;
   border: none;
   border-radius: 24px;
-  background: rgba(0, 0, 0, 0.06);
-  color: #1f1f1f;
-  font-size: 16px;
+  background: var(--board-surface);
+  color: var(--board-fg);
+  font-size: var(--board-btn-size);
   line-height: 1;
   cursor: pointer;
   display: flex;
@@ -351,7 +351,7 @@ onUnmounted(() => {
 }
 
 .fs-btn:hover {
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--board-surface-hover);
 }
 
 .clock-time {
@@ -362,7 +362,7 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: 0.02em;
-  color: #000000;
+  color: var(--board-fg-strong);
   text-shadow: none;
 }
 
@@ -379,7 +379,7 @@ onUnmounted(() => {
 .clock-date {
   margin-top: 1.5vh;
   font-size: min(4.5vw, 5.5vh);
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--board-fg-muted);
 }
 
 .stat-row {
@@ -396,31 +396,31 @@ onUnmounted(() => {
   flex-wrap: nowrap;
   padding: 2vh 4vw;
   border-radius: 16px;
-  background: rgba(64, 158, 255, 0.1);
+  background: var(--board-weather-bg);
   white-space: nowrap;
 }
 
 .w-region {
   font-size: min(4vw, 5vh);
-  color: rgba(0, 0, 0, 0.55);
+  color: var(--board-fg-soft);
   cursor: pointer;
-  text-decoration: underline dotted rgba(0, 0, 0, 0.3);
+  text-decoration: underline dotted var(--board-underline);
   text-underline-offset: 4px;
 }
 
 .w-region:hover {
-  color: rgba(0, 0, 0, 0.8);
+  color: var(--board-fg-bright);
 }
 
 .w-set {
   font-size: min(3.4vw, 4vh);
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--board-fg-faint);
   cursor: pointer;
   margin-left: -1.6vw;
 }
 
 .w-set:hover {
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--board-fg-hover);
 }
 
 .w-temp {
@@ -432,12 +432,12 @@ onUnmounted(() => {
 
 .w-desc {
   font-size: min(4vw, 5vh);
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--board-fg-hover);
 }
 
 .w-hum {
   font-size: min(3.4vw, 4.2vh);
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--board-fg-mid);
 }
 
 .rotate-hint {
@@ -450,7 +450,7 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   font-size: min(2.8vw, 3.2vh);
-  color: rgba(0, 0, 0, 0.3);
+  color: var(--board-fg-subtle);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -463,7 +463,7 @@ onUnmounted(() => {
     position: absolute;
     bottom: 24px;
     font-size: 4vw;
-    color: rgba(0, 0, 0, 0.35);
+    color: var(--board-fg-subtle);
   }
 }
 </style>

@@ -339,7 +339,7 @@ onMounted(() => {
 }
 .sdk-type {
     font-weight: 600;
-    font-size: 16px;
+    font-size: var(--font-md);
 }
 .sources {
     margin-bottom: 12px;
@@ -349,7 +349,7 @@ onMounted(() => {
     align-items: center;
     gap: 8px;
     margin-bottom: 6px;
-    font-size: 13px;
+    font-size: var(--font-sm);
 }
 .source-root {
     color: var(--term-green-faint);
@@ -371,7 +371,7 @@ onMounted(() => {
 }
 .empty-hint {
     color: var(--term-green-faint);
-    font-size: 13px;
+    font-size: var(--font-sm);
 }
 .manage-toolbar {
     margin-bottom: 12px;
@@ -383,7 +383,7 @@ onMounted(() => {
     margin-bottom: 4px;
 }
 .def-root {
-    font-size: 13px;
+    font-size: var(--font-sm);
     color: var(--el-text-color-secondary);
 }
 .source-form-list {

@@ -986,7 +986,7 @@ onMounted(async () => {
 .expand-icon {
   cursor: pointer;
   user-select: none;
-  font-size: 0.75rem;
+  font-size: var(--font-xs);
   color: var(--el-text-color-secondary);
   width: 1rem;
   display: inline-block;

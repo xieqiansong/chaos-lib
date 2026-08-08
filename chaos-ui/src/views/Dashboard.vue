@@ -12,6 +12,16 @@ const isBalanceNum = computed(() => !isNaN(Number(balance.value)) && balance.val
 const MAX_VISUAL = 99
 type CappedItem = { visual: number; raw: number }
 
+// 从 :root 读取主题色，避免图表内游离硬编码
+const cssVar = (name: string) =>
+  getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+const COLOR_GREEN = cssVar('--term-green')
+const COLOR_RED = cssVar('--term-red')
+const COLOR_AMBER = cssVar('--term-amber')
+const AREA_TOP = cssVar('--term-area-top')
+const AREA_BOTTOM = cssVar('--term-area-bottom')
+
 function capValues(counts: number[]): CappedItem[] {
   return counts.map(c => ({visual: Math.min(c, MAX_VISUAL), raw: c}))
 }
@@ -84,13 +94,13 @@ async function fetchDailyStats() {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                {offset: 0, color: 'rgba(51,255,102,0.25)'},
-                {offset: 1, color: 'rgba(51,255,102,0.02)'},
+                {offset: 0, color: AREA_TOP},
+                {offset: 1, color: AREA_BOTTOM},
               ],
             },
           },
-          lineStyle: {color: '#33ff66', width: 2},
-          itemStyle: {color: '#33ff66'},
+          lineStyle: {color: COLOR_GREEN, width: 2},
+          itemStyle: {color: COLOR_GREEN},
         },
       ],
       grid: {left: '4%', right: '2%', top: '16%', bottom: '8%'},
@@ -132,7 +142,7 @@ async function fetchActiveStats() {
           data: capped.map((c, i) => ({
             value: c.visual,
             itemStyle: {
-              color: data[i].date < today ? '#ff5f56' : '#ffb000',
+              color: data[i].date < today ? COLOR_RED : COLOR_AMBER,
             },
           })),
           barMaxWidth: 20,

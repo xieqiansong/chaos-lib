@@ -37,8 +37,8 @@ withDefaults(defineProps<{
   height: 100%;
   background: var(--term-bg);
   border: 1px solid var(--term-border);
-  box-shadow: 0 0 0 1px rgba(51, 255, 102, 0.06),
-  inset 0 0 18px rgba(51, 255, 102, 0.04);
+  box-shadow: 0 0 0 1px var(--term-shadow-soft),
+  inset 0 0 18px var(--term-scanline);
   overflow: hidden;
 }
 

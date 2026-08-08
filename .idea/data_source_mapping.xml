@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourcePerFileMappings">
+    <file url="file://$PROJECT_DIR$/chaos-go/scripts/task_plans.go" value="d625cd27-8244-4255-92f2-b646d17e6fbd" />
     <file url="file://$PROJECT_DIR$/chaos-go/sql/chaos_postgres_update.sql" value="d625cd27-8244-4255-92f2-b646d17e6fbd" />
   </component>
 </project>

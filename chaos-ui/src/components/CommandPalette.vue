@@ -101,7 +101,7 @@ function onKey(e: KeyboardEvent) {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(3, 6, 3, 0.72);
+  background: var(--term-mask);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -113,7 +113,7 @@ function onKey(e: KeyboardEvent) {
   width: min(560px, 92vw);
   background: var(--term-bg);
   border: 1px solid var(--term-border);
-  box-shadow: 0 0 24px rgba(51, 255, 102, 0.18);
+  box-shadow: 0 0 24px var(--term-shadow-strong);
 }
 
 .cmdpalette__input-row {
@@ -132,7 +132,7 @@ function onKey(e: KeyboardEvent) {
   outline: none;
   color: var(--term-green);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: var(--font-base);
 }
 
 .cmdpalette__input::placeholder { color: var(--term-green-faint); opacity: 0.5; }
@@ -155,7 +155,7 @@ function onKey(e: KeyboardEvent) {
 }
 
 .cmdpalette__item.active {
-  background: rgba(51, 255, 102, 0.1);
+  background: var(--term-active-bg);
   color: var(--term-green);
 }
 
@@ -176,7 +176,7 @@ function onKey(e: KeyboardEvent) {
 
 .cmdpalette__hint {
   padding: var(--space-xs) var(--space-lg);
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   color: var(--term-green-faint);
   opacity: 0.6;
   border-top: 1px solid var(--term-border);

@@ -296,7 +296,7 @@ onUnmounted(() => {
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
-  font-size: 0.72rem;
+  font-size: var(--font-xs);
   padding: 2px 8px;
   cursor: pointer;
   border-radius: 2px;
