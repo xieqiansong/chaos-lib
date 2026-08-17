@@ -74,6 +74,12 @@ html.dark {
   --term-area-top: rgba(51, 255, 102, 0.25);
   --term-area-bottom: rgba(51, 255, 102, 0.02);
 
+  /* 标题栏渐变 / 荧光环（dark 用绿色调） */
+  --term-titlebar-a: #0e150e;
+  --term-titlebar-b: #0a0e0a;
+  --term-ring: rgba(51, 255, 102, 0.08);
+  --term-inner: rgba(51, 255, 102, 0.06);
+
   /* 字号阶梯（1.2 比例模数刻度，统一 rem，层级分明） */
   --font-xs:   0.7rem;   /* 11.2px 极小：提示、角标、操作图标 */
   --font-sm:   0.84rem;  /* 13.4px 小字：描述、次要文本 */
@@ -100,6 +106,91 @@ html.dark {
   /* 大屏看板固定字号 */
   --board-back-size: 24px;
   --board-btn-size: 16px;
+}
+
+/* ===== 浅黄护眼主题（paper） ===== */
+html.paper {
+  /* 背景层级 */
+  --el-bg-color: #f8f3e6;
+  --el-bg-color-page: #f1ead7;
+  --el-bg-color-overlay: #fdf9ee;
+  --el-fill-color-blank: #f8f3e6;
+  --el-fill-color: #efe8d2;
+  --el-fill-color-light: #e9e0c4;
+  --el-fill-color-lighter: #f4eede;
+  --el-fill-color-extra-light: #f9f5ea;
+
+  /* 文字：深棕，低对比 */
+  --el-text-color-primary: #4a3f2d;
+  --el-text-color-regular: #5c4f38;
+  --el-text-color-secondary: #7d6f52;
+  --el-text-color-placeholder: #a29578;
+  --el-text-color-disabled: #b7ab8e;
+
+  /* 边框 */
+  --el-border-color: #d6c9a8;
+  --el-border-color-light: #ded2b4;
+  --el-border-color-lighter: #e6dcc2;
+  --el-border-color-extra-light: #ede4cf;
+
+  /* 主色：低饱和橄榄/棕 */
+  --el-color-primary: #8a7a45;
+  --el-color-primary-light-3: #a2935f;
+  --el-color-primary-light-5: #b7aa7d;
+  --el-color-primary-light-7: #cdc2a0;
+  --el-color-primary-light-8: #dbd3b7;
+  --el-color-primary-light-9: #eae4ce;
+  --el-color-primary-dark-2: #6f6134;
+
+  /* 语义色（低饱和暖色系） */
+  --el-color-success: #7a8a45;
+  --el-color-warning: #c9952f;
+  --el-color-danger: #b5653f;
+  --el-color-error: #b5653f;
+  --el-color-info: #8a7f63;
+
+  /* 表格 */
+  --el-table-text-color: var(--el-text-color-regular);
+  --el-table-header-text-color: var(--el-text-color-secondary);
+  --el-table-row-hover-bg-color: rgba(138, 122, 69, 0.08);
+  --el-table-current-row-bg-color: rgba(138, 122, 69, 0.12);
+  --el-table-header-bg-color: var(--el-fill-color);
+  --el-table-tr-bg-color: var(--el-bg-color);
+
+  /* 字体 */
+  --el-font-family: 'CaskaydiaMono Nerd Font Mono', 'Microsoft YaHei', 'Consolas', 'Courier New', 'monospace';
+
+  /* 终端自有变量：暖米黄 + 深棕 + 橄榄强调 */
+  --term-bg: #f8f3e6;
+  --term-bg-deep: #f1ead7;
+  --term-green: #7a8a45;
+  --term-green-dim: #6f6134;
+  --term-green-faint: #5c4f38;
+  --term-amber: #c9952f;
+  --term-red: #b5653f;
+  --term-cyan: #4a7f7f;
+  --term-border: #d6c9a8;
+  --term-glow: rgba(138, 122, 69, 0.3);
+  --term-scanline: rgba(138, 122, 69, 0.03);
+
+  /* 终端光晕/遮罩派生（paper 用暖棕调） */
+  --term-mask: rgba(248, 243, 230, 0.72);
+  --term-shadow-soft: rgba(138, 122, 69, 0.08);
+  --term-shadow-strong: rgba(138, 122, 69, 0.18);
+  --term-active-bg: rgba(138, 122, 69, 0.1);
+  --term-area-top: rgba(122, 138, 69, 0.25);
+  --term-area-bottom: rgba(122, 138, 69, 0.02);
+
+  /* 标题栏渐变 / 荧光环（paper 用暖色调） */
+  --term-titlebar-a: #efe8d2;
+  --term-titlebar-b: #e9e0c4;
+  --term-ring: rgba(138, 122, 69, 0.1);
+  --term-inner: rgba(138, 122, 69, 0.06);
+}
+
+/* 护眼主题关闭 CRT 扫描线/闪烁/暗角 */
+html.paper body::after {
+  display: none;
 }
 
 /* 全局等宽字体 */
@@ -154,8 +245,8 @@ body.no-crt::after {
 
 .term-glow {
   border: 1px solid var(--term-border);
-  box-shadow: 0 0 0 1px rgba(51, 255, 102, 0.08),
-  inset 0 0 18px rgba(51, 255, 102, 0.06);
+  box-shadow: 0 0 0 1px var(--term-ring),
+  inset 0 0 18px var(--term-inner);
 }
 
 .term-titlebar {
@@ -166,7 +257,7 @@ body.no-crt::after {
   padding: 0 var(--space-md);
   font-size: 0.75rem;
   color: var(--term-green-faint);
-  background: linear-gradient(180deg, #0e150e, #0a0e0a);
+  background: linear-gradient(180deg, var(--term-titlebar-a), var(--term-titlebar-b));
   border-bottom: 1px solid var(--term-border);
   white-space: nowrap;
   overflow: hidden;

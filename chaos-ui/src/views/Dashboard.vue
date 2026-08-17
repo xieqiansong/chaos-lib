@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
+import {theme} from '../theme'
 
 const balance = ref<string>('')
 const loading = ref(false)
@@ -12,15 +13,19 @@ const isBalanceNum = computed(() => !isNaN(Number(balance.value)) && balance.val
 const MAX_VISUAL = 99
 type CappedItem = { visual: number; raw: number }
 
-// 从 :root 读取主题色，避免图表内游离硬编码
+// 从当前主题读取主题色，避免图表内游离硬编码（随主题切换实时取色）
 const cssVar = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
-const COLOR_GREEN = cssVar('--term-green')
-const COLOR_RED = cssVar('--term-red')
-const COLOR_AMBER = cssVar('--term-amber')
-const AREA_TOP = cssVar('--term-area-top')
-const AREA_BOTTOM = cssVar('--term-area-bottom')
+function themeColors() {
+  return {
+    green: cssVar('--term-green'),
+    red: cssVar('--term-red'),
+    amber: cssVar('--term-amber'),
+    areaTop: cssVar('--term-area-top'),
+    areaBottom: cssVar('--term-area-bottom'),
+  }
+}
 
 function capValues(counts: number[]): CappedItem[] {
   return counts.map(c => ({visual: Math.min(c, MAX_VISUAL), raw: c}))
@@ -63,6 +68,7 @@ async function fetchDailyStats() {
     const res = await fetch('/api/tasks/dailyStats')
     const data: { date: string; count: number }[] = await res.json()
     const capped = capValues(data.map(d => d.count))
+    const colors = themeColors()
 
     chartOption.value = {
       tooltip: {trigger: 'axis', formatter: capTooltip('完成', capped)},
@@ -94,13 +100,13 @@ async function fetchDailyStats() {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                {offset: 0, color: AREA_TOP},
-                {offset: 1, color: AREA_BOTTOM},
+                {offset: 0, color: colors.areaTop},
+                {offset: 1, color: colors.areaBottom},
               ],
             },
           },
-          lineStyle: {color: COLOR_GREEN, width: 2},
-          itemStyle: {color: COLOR_GREEN},
+          lineStyle: {color: colors.green, width: 2},
+          itemStyle: {color: colors.green},
         },
       ],
       grid: {left: '4%', right: '2%', top: '16%', bottom: '8%'},
@@ -120,6 +126,7 @@ async function fetchActiveStats() {
 
     const today = new Date().toISOString().slice(0, 10)
     const capped = capValues(data.map(d => d.count))
+    const colors = themeColors()
 
     activeChartOption.value = {
       tooltip: {
@@ -142,7 +149,7 @@ async function fetchActiveStats() {
           data: capped.map((c, i) => ({
             value: c.visual,
             itemStyle: {
-              color: data[i].date < today ? COLOR_RED : COLOR_AMBER,
+              color: data[i].date < today ? colors.red : colors.amber,
             },
           })),
           barMaxWidth: 20,
@@ -171,6 +178,12 @@ function goBoard() {
 
 onMounted(() => {
   fetchBalance()
+  fetchDailyStats()
+  fetchActiveStats()
+})
+
+watch(theme, () => {
+  // 主题切换时重新拉取统计，使图表随主题取色
   fetchDailyStats()
   fetchActiveStats()
 })

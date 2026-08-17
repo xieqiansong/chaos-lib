@@ -32,6 +32,21 @@ type FileLinkResponse struct {
 
 // ── 辅助 ──────────────────────────────────────────────────────────
 
+// normalizeLinkPath 去掉 os.Readlink 返回的卷命名空间前缀（\??\ 或 \\?\），
+// 还原为普通盘符路径，便于与源路径比较。
+func normalizeLinkPath(p string) string {
+	if strings.HasPrefix(p, `\\?\UNC\`) {
+		return `\\` + p[len(`\\?\UNC\`):]
+	}
+	if strings.HasPrefix(p, `\??\UNC\`) {
+		return `\\` + p[len(`\??\UNC\`):]
+	}
+	if strings.HasPrefix(p, `\??\`) || strings.HasPrefix(p, `\\?\`) {
+		return p[4:]
+	}
+	return p
+}
+
 func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 	_, err := os.Lstat(targetPath)
 	if err != nil {
@@ -45,7 +60,7 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 	}
 	actualTarget, err := os.Readlink(targetPath)
 	if err == nil {
-		absActual, _ := filepath.Abs(actualTarget)
+		absActual, _ := filepath.Abs(normalizeLinkPath(actualTarget))
 		absSource, _ := filepath.Abs(sourcePath)
 		if strings.EqualFold(absActual, absSource) {
 			return "normal"

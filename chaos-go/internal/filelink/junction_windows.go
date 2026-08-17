@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
-	"unsafe"
+	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
 )
@@ -38,14 +39,17 @@ func CreateJunction(target, junction string) error {
 	}
 	defer windows.CloseHandle(handle)
 
-	substituteName := []byte(`\??\` + target)
-	reparseBuf := makeReparseBuffer(substituteName)
+	substituteName, err := makeReparseBuffer(target)
+	if err != nil {
+		_ = os.Remove(junction)
+		return fmt.Errorf("构造 junction reparse 数据失败: %v", err)
+	}
 	var bytesReturned uint32
 	err = windows.DeviceIoControl(
 		handle,
 		windows.FSCTL_SET_REPARSE_POINT,
-		&reparseBuf[0],
-		uint32(len(reparseBuf)),
+		&substituteName[0],
+		uint32(len(substituteName)),
 		nil, 0,
 		&bytesReturned,
 		nil,
@@ -143,38 +147,54 @@ func IsJunction(path string) bool {
 	return true
 }
 
-// mountPointReparseBuffer 是 MountPointReparseBuffer 的原始布局
-type mountPointReparseBuffer struct {
-	SubstituteNameOffset uint16
-	SubstituteNameLength uint16
-	PrintNameOffset      uint16
-	PrintNameLength      uint16
-	PathBuffer           [1]uint16
-}
-
-type reparseDataBuffer struct {
-	ReparseTag        uint32
-	ReparseDataLength uint16
-	Reserved          uint16
-	MountPoint        mountPointReparseBuffer
-}
-
-func makeReparseBuffer(substituteName []byte) []byte {
-	var buf [windows.MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
-	rd := (*reparseDataBuffer)(unsafe.Pointer(&buf[0]))
-	rd.ReparseTag = windows.IO_REPARSE_TAG_MOUNT_POINT
-	subLen := uint16(len(substituteName))
-	printLen := subLen
-	if printLen > 0 {
-		printLen -= 2
+// makeReparseBuffer 构造 MOUNT_POINT 类型的 REPARSE_DATA_BUFFER。
+// SubstituteName 必须以 "\??\" 前缀开头，PrintName 为可读路径。
+// PathBuffer 中的两个宽字符串均以 null 结尾，Length 字段不含 null。
+func makeReparseBuffer(target string) ([]byte, error) {
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return nil, err
 	}
-	rd.MountPoint.SubstituteNameLength = subLen
-	rd.MountPoint.SubstituteNameOffset = 0
-	rd.MountPoint.PrintNameLength = printLen
-	rd.MountPoint.PrintNameOffset = subLen + 2
-	pathBufOffset := unsafe.Offsetof(rd.MountPoint.PathBuffer)
-	copy(buf[pathBufOffset:], substituteName)
-	copy(buf[pathBufOffset+uintptr(subLen)+2:], substituteName[4:])
-	dataLen := uint32(pathBufOffset) + uint32(subLen+2) + uint32(len(substituteName)-4)
-	return buf[:dataLen]
+	// 统一使用反斜杠，并去掉尾部分隔符，保证与读取时一致。
+	absTarget = strings.ReplaceAll(filepath.Clean(absTarget), "/", "\\")
+
+	substitute := `\??\` + absTarget
+	printName := absTarget
+
+	subUTF16 := utf16.Encode([]rune(substitute))
+	printUTF16 := utf16.Encode([]rune(printName))
+
+	subLen := len(subUTF16) * 2 // 不含 null 终止符的字节数
+	printLen := len(printUTF16) * 2
+
+	// PathBuffer 总长（含两个 null 终止符各 2 字节）。
+	pathLen := subLen + 2 + printLen + 2
+	// ReparseDataLength 为 Reserved 之后的数据长度：
+	// 4 个 uint16 字段(8 字节) + PathBuffer(pathLen)。
+	reparseDataLength := uint16(8 + pathLen)
+
+	buf := make([]byte, 8+int(reparseDataLength))
+
+	binary.LittleEndian.PutUint32(buf[0:4], windows.IO_REPARSE_TAG_MOUNT_POINT)
+	binary.LittleEndian.PutUint16(buf[4:6], reparseDataLength)
+	binary.LittleEndian.PutUint16(buf[6:8], 0) // Reserved
+
+	// MountPointReparseBuffer 字段
+	binary.LittleEndian.PutUint16(buf[8:10], 0)                 // SubstituteNameOffset
+	binary.LittleEndian.PutUint16(buf[10:12], uint16(subLen))   // SubstituteNameLength（不含 null）
+	binary.LittleEndian.PutUint16(buf[12:14], uint16(subLen+2)) // PrintNameOffset（跳过 sub + null）
+	binary.LittleEndian.PutUint16(buf[14:16], uint16(printLen)) // PrintNameLength（不含 null）
+
+	// PathBuffer: subUTF16 + null + printUTF16 + null
+	off := 16
+	for i, v := range subUTF16 {
+		binary.LittleEndian.PutUint16(buf[off+i*2:], v)
+	}
+	base := off + subLen + 2 // 跳过 sub 及其 null 终止符（已为 0）
+	for i, v := range printUTF16 {
+		binary.LittleEndian.PutUint16(buf[base+i*2:], v)
+	}
+	// printUTF16 之后的 null 终止符由 buf 默认零值保证
+
+	return buf, nil
 }

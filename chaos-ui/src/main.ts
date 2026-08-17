@@ -6,6 +6,9 @@ import './style.css';
 import './plugins/echarts';
 import App from './App.vue';
 import VChart from 'vue-echarts';
+import {initTheme} from './theme';
+
+initTheme();
 
 const app = createApp(App);
 app.use(ElementPlus);

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { theme } from '../theme'
 
 declare const monaco: any
 
@@ -64,10 +65,50 @@ function defineTerminalTheme() {
   })
 }
 
+function definePaperTheme() {
+  monaco.editor.defineTheme('chaos-paper', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: '', foreground: '5c4f38', background: 'f8f3e6' },
+      { token: 'comment', foreground: 'a29578', fontStyle: 'italic' },
+      { token: 'keyword', foreground: '7a8a45', fontStyle: 'bold' },
+      { token: 'identifier', foreground: '4a3f2d' },
+      { token: 'string', foreground: 'c9952f' },
+      { token: 'number', foreground: '4a7f7f' },
+      { token: 'operator', foreground: '7a8a45' },
+    ],
+    colors: {
+      'editor.background': '#f8f3e6',
+      'editor.foreground': '#5c4f38',
+      'editorLineNumber.foreground': '#a29578',
+      'editorLineNumber.activeForeground': '#7a8a45',
+      'editor.selectionBackground': '#d6c9a866',
+      'editor.lineHighlightBackground': '#efe8d2',
+      'editorCursor.foreground': '#7a8a45',
+      'editor.inactiveSelectionBackground': '#d6c9a844',
+      'editorSuggestWidget.background': '#fdf9ee',
+      'editorSuggestWidget.border': '#d6c9a8',
+      'editorSuggestWidget.foreground': '#5c4f38',
+      'editorSuggestWidget.highlightForeground': '#7a8a45',
+      'editorSuggestWidget.selectedBackground': '#e6dcc2',
+      'diffEditor.insertedTextBackground': '#7a8a4522',
+      'diffEditor.removedTextBackground': '#b5653f22',
+      'diffEditor.insertedLineBackground': '#eae4ce',
+      'diffEditor.removedLineBackground': '#f0ddd3',
+    },
+  })
+}
+
+function currentEditorTheme() {
+  return theme.value === 'paper' ? 'chaos-paper' : 'chaos-terminal'
+}
+
 function createEditor() {
   if (!containerRef.value) return
 
   defineTerminalTheme()
+  definePaperTheme()
 
   const lang = props.language || 'plaintext'
 
@@ -83,7 +124,7 @@ function createEditor() {
     lineNumbers: 'on',
     renderSideBySide: true,
     fontSize: 13,
-    theme: 'chaos-terminal',
+    theme: currentEditorTheme(),
     wordWrap: 'on',
   })
 
@@ -123,6 +164,12 @@ watch(() => props.language, (lang) => {
   const l = lang || 'plaintext'
   if (originalModel) monaco.editor.setModelLanguage(originalModel, l)
   if (modifiedModel) monaco.editor.setModelLanguage(modifiedModel, l)
+})
+
+watch(theme, () => {
+  if (diffEditor) {
+    diffEditor.updateOptions({theme: currentEditorTheme()})
+  }
 })
 
 onUnmounted(() => {

@@ -15,6 +15,8 @@ import MobileBoard from './views/MobileBoard.vue'
 import PendingTasks from './components/PendingTasks.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import {Moon, Sunny} from '@element-plus/icons-vue'
+import {theme, toggleTheme} from './theme'
 
 // 终端风格：命令面板开关 + 全局热键
 const CMD_ALIAS: Record<string, string> = {
@@ -189,6 +191,16 @@ onUnmounted(() => {
           <div class="search-wrapper">
             <Search @search-change="handleSearchChange"/>
           </div>
+          <button
+              class="cmdpalette-hint theme-toggle"
+              :title="theme === 'paper' ? '切换到终端暗色' : '切换到浅黄护眼'"
+              @click="toggleTheme"
+          >
+            <el-icon :size="14">
+              <Moon v-if="theme === 'paper'"/>
+              <Sunny v-else/>
+            </el-icon>
+          </button>
           <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
             <span class="term-prompt">$</span> ⌘K
           </button>
@@ -324,5 +336,15 @@ html.dark .el-table td.el-table__cell .cell {
 html.dark .el-table th.el-table__cell,
 html.dark .el-table th.el-table__cell .cell {
   color: var(--term-green-faint) !important;
+}
+
+html.paper .el-table td.el-table__cell,
+html.paper .el-table td.el-table__cell .cell {
+  color: var(--el-text-color-regular) !important;
+}
+
+html.paper .el-table th.el-table__cell,
+html.paper .el-table th.el-table__cell .cell {
+  color: var(--el-text-color-secondary) !important;
 }
 </style>
