@@ -18,6 +18,7 @@ chaos-ui/dist/
 .DS_Store
 # 一次性批处理脚本（含硬编码密码/路径，禁止提交）
 chaos-go/tools/task_plans.go
+chaos-go/scripts/task_plans.go
 
 # 文件连接
 chaos-knots
