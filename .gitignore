@@ -1,7 +1,5 @@
 **/logs/*
 **/*.exe
-chaos-go/cmd/server/web/
-chaos-ui/dist/
 # 配置文件（含密码，坚决不提交）
 **/.env
 **/.env.*
@@ -16,8 +14,6 @@ chaos-ui/dist/
 *.swo
 *~
 .DS_Store
-# 一次性批处理脚本（含硬编码密码/路径，禁止提交）
-chaos-go/cmd/test/*
 
 # 文件连接
 chaos-knots

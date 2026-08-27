@@ -501,10 +501,19 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
+	// 源目录可能已被用户手动删除（磁盘已不存在），此时跳过物理复制/删除，
+	// 仅更新数据库元数据，将记录移入回收站，保证删除操作仍可正常完成。
+	sourceExists := true
+	if info, statErr := os.Stat(project.AbsolutePath); statErr != nil || !info.IsDir() {
+		sourceExists = false
+	}
+
 	// 第 1 步：物理复制到回收站目录（不删源），失败则原目录保持不动
-	if err := tools.MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "移入回收站失败: " + err.Error()})
-		return
+	if sourceExists {
+		if err := tools.MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "移入回收站失败: " + err.Error()})
+			return
+		}
 	}
 
 	// 第 2 步：更新元数据（事务）
@@ -518,30 +527,38 @@ func DeleteProject(c *gin.Context) {
 	}).Error; err != nil {
 		tx.Rollback()
 		// 元数据失败：清理已复制的副本，源目录保留（安全）
-		_ = tools.RemoveDirSafe(newAbs)
+		if sourceExists {
+			_ = tools.RemoveDirSafe(newAbs)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
 		return
 	}
 	tx.Commit()
 
 	// 第 3 步：DB 更新成功后删除原目录；失败仅警告（数据已安全落入回收站）
-	oldAbs := project.AbsolutePath
-	if err := tools.RemoveDirSafe(oldAbs); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message":        "已移入回收站，但原目录未能删除",
-			"recycleWarning": err.Error(),
-			"newAbsPath":     newAbs,
-		})
-		return
+	if sourceExists {
+		oldAbs := project.AbsolutePath
+		if err := tools.RemoveDirSafe(oldAbs); err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"message":        "已移入回收站，但原目录未能删除",
+				"recycleWarning": err.Error(),
+				"newAbsPath":     newAbs,
+			})
+			return
+		}
 	}
 
 	config.GetDB().First(&project, id)
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"message":    "已移入回收站",
 		"recycled":   true,
 		"project":    project,
 		"newAbsPath": newAbs,
-	})
+	}
+	if !sourceExists {
+		resp["dirMissingWarning"] = "物理目录不存在（可能已被手动删除），仅更新了数据库记录"
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // RestoreProject 从回收站还原项目。

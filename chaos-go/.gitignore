@@ -1,0 +1,21 @@
+# 编译产物（go build 输出）
+bin/
+**/*.exe
+
+# 服务内嵌的前端构建产物（由 chaos-ui 构建，不在此仓库提交）
+cmd/server/web/
+
+# 一次性批处理/测试脚本（可能含硬编码密码/路径，禁止提交）
+cmd/test/*
+
+# 运行日志
+logs/
+data/logs/
+
+# 本地数据库文件
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# 一次性批处理/测试脚本（可能含硬编码密码/路径，禁止提交）
+cmd/test/*
