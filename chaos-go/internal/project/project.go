@@ -471,6 +471,16 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
+	// 源目录不存在（已被手动/并发删除）：磁盘上已无内容，无需移入回收站，直接清理数据库记录
+	if info, statErr := os.Stat(project.AbsolutePath); statErr != nil || !info.IsDir() {
+		if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "已删除（原目录不存在，已直接清理记录）", "recycled": false})
+		return
+	}
+
 	newAbs, newRel, err := resolveRecycleTarget(recycleGroup, project)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

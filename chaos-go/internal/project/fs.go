@@ -68,7 +68,9 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 		return nil
 	}
 	if info, err := os.Stat(oldAbs); err != nil || !info.IsDir() {
-		return fmt.Errorf("源目录不存在: %s", oldAbs)
+		// 源目录不存在（可能已被手动/并发删除）：幂等返回成功，
+		// 使删除/移动流程可继续完成数据库元数据更新，避免接口报错
+		return nil
 	}
 	if _, err := os.Stat(newAbs); err == nil {
 		return fmt.Errorf("目标目录已存在: %s", newAbs)

@@ -152,8 +152,11 @@ func TestMoveProjectFolder_SourceMissing(t *testing.T) {
 	base := t.TempDir()
 	oldAbs := filepath.Join(base, "ghost")
 	newAbs := filepath.Join(base, "dst")
-	if err := MoveProjectFolder(oldAbs, newAbs); err == nil {
-		t.Fatal("源不存在时应报错")
+	if err := MoveProjectFolder(oldAbs, newAbs); err != nil {
+		t.Fatalf("源不存在时应幂等返回 nil（不报错），实际报错: %v", err)
+	}
+	if _, err := os.Stat(newAbs); err == nil {
+		t.Fatal("源不存在时不应创建目标目录")
 	}
 }
 
