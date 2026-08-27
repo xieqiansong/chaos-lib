@@ -62,6 +62,8 @@ func buildTaskPlanTree(plans []TaskPlan) []TaskPlanTree {
 	var build func(parent TaskPlan) TaskPlanTree
 	build = func(parent TaskPlan) TaskPlanTree {
 		node := TaskPlanTree{TaskPlan: parent}
+		node.HasLink = parent.Link != nil
+		node.Link = nil
 		for _, child := range childrenMap[parent.ID] {
 			node.Children = append(node.Children, build(child))
 		}
@@ -152,15 +154,15 @@ func buildTaskResponse(task Task) gin.H {
 
 func CreateTaskPlan(c *gin.Context) {
 	var req struct {
-		ParentID  *int        ``
-		Name      string      ``
+		ParentID  *int         ``
+		Name      string       ``
 		PlanType  TaskPlanType ``
-		CronExpr  *string     ``
-		OrderNum  *int        ``
-		Priority  *int        ``
-		Remark    *string     ``
-		Link      *string     ``
-		StartedAt *time.Time  ``
+		CronExpr  *string      ``
+		OrderNum  *int         ``
+		Priority  *int         ``
+		Remark    *string      ``
+		Link      *string      ``
+		StartedAt *time.Time   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -250,7 +252,7 @@ func ListTaskPlans(c *gin.Context) {
 
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []TaskPlan
-	if err := config.GetDB().Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
+	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "Priority", "Link").Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
 	}

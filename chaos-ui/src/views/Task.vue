@@ -319,7 +319,7 @@ function getProgress(row: TaskPlanTree): { completed: number; total: number; pct
   if (total === 0) return null
 
   const pct = total > 0 ? Math.round((completed / total) * 100) + '%' : '0%'
-  return { completed, total, pct }
+  return {completed, total, pct}
 }
 
 async function refreshAll() {
@@ -376,8 +376,12 @@ function resetForm() {
   }
 }
 
-function openLink(link: string) {
-  window.open(link, '_blank')
+function openLink(ID: string) {
+  sendMessage(`taskPlans/${ID}`, 'GET').then(res => {
+    if (res.Link) {
+      window.open(res.Link, '_blank')
+    }
+  })
 }
 
 async function createPlan() {
@@ -548,9 +552,9 @@ async function deletePlan(plan: TaskPlan) {
 async function suspendPlan(plan: TaskPlan) {
   try {
     await ElMessageBox.confirm(
-      `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
-      '提示',
-      {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
+        `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
+        '提示',
+        {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
     )
     await sendMessage(`taskPlans/${plan.ID}/suspend`, 'PATCH', {})
     await refreshAll()
@@ -566,9 +570,9 @@ async function suspendPlan(plan: TaskPlan) {
 async function resumePlan(plan: TaskPlan) {
   try {
     await ElMessageBox.confirm(
-      `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
-      '提示',
-      {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
+        `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
+        '提示',
+        {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
     )
     await sendMessage(`taskPlans/${plan.ID}/resume`, 'PATCH', {})
     await refreshAll()
@@ -733,7 +737,7 @@ onMounted(async () => {
             <div class="op-actions">
               <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
               <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
-              <el-button v-if="row.Link" size="small" text @click="openLink(row.Link!)">跳转</el-button>
+              <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
               <el-dropdown trigger="click" style="margin-left: 4px">
                 <el-button size="small" text>更多</el-button>
                 <template #dropdown>
@@ -741,7 +745,8 @@ onMounted(async () => {
                     <el-dropdown-item v-if="row.Status === 'created' && !isLeaf(row)" @click="startPlan(row)">开启</el-dropdown-item>
                     <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
                     <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
-                    <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起</el-dropdown-item>
+                    <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起
+                    </el-dropdown-item>
                     <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
                     <el-dropdown-item v-if="row.Status === 'completed'" @click="archivePlan(row)">归档</el-dropdown-item>
