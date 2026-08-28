@@ -252,7 +252,8 @@ func ListTaskPlans(c *gin.Context) {
 
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []TaskPlan
-	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "Link").Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
+	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link").
+		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
 	}
