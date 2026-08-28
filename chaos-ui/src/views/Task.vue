@@ -585,18 +585,20 @@ async function resumePlan(plan: TaskPlan) {
   }
 }
 
-function openEditDialog(plan: TaskPlan) {
-  editingPlan.value = plan
+async function openEditDialog(ID: string) {
+  let res = await sendMessage(`taskPlans/${ID}`, 'GET')
+
+  editingPlan.value = res
   formData.value = {
-    Name: plan.Name,
-    PlanType: plan.PlanType,
-    CronExpr: plan.CronExpr || '',
-    StartedAt: plan.StartedAt || '',
-    Remark: plan.Remark || '',
-    Link: plan.Link || '',
-    ParentId: plan.ParentID || null,
-    OrderNum: plan.OrderNum ?? null,
-    Priority: plan.Priority ?? null,
+    Name: res.Name,
+    PlanType: res.PlanType,
+    CronExpr: res.CronExpr || '',
+    StartedAt: res.StartedAt || '',
+    Remark: res.Remark || '',
+    Link: res.Link || '',
+    ParentId: res.ParentID || null,
+    OrderNum: res.OrderNum ?? null,
+    Priority: res.Priority ?? null,
   }
   showEditDialog.value = true
 }
@@ -743,7 +745,7 @@ onMounted(async () => {
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item v-if="row.Status === 'created' && !isLeaf(row)" @click="startPlan(row)">开启</el-dropdown-item>
-                    <el-dropdown-item @click="openEditDialog(row)">修改</el-dropdown-item>
+                    <el-dropdown-item @click="openEditDialog(row.ID)">修改</el-dropdown-item>
                     <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
                     <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起
                     </el-dropdown-item>
