@@ -302,7 +302,10 @@ function getProgress(row: TaskPlanTree): { completed: number; total: number; pct
         // 非叶子节点：继续向下递归，不纳入统计
         walk(grandchildren)
       } else {
-        // 叶子节点：纳入统计
+        // 叶子节点：已挂起的计划暂停统计，不计入进度
+        if (child.IsSuspended) {
+          continue
+        }
         total++
         if (child.Status === 'started' || child.Status === 'completed' || child.Status === 'archived') {
           completed++

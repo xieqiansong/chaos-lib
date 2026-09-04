@@ -252,7 +252,7 @@ func ListTaskPlans(c *gin.Context) {
 
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []TaskPlan
-	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link").
+	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended").
 		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
@@ -406,6 +406,11 @@ func StartTaskPlan(c *gin.Context) {
 
 	if plan.Status != TaskPlanStatusCreated && plan.Status != TaskPlanStatusStarted {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态不允许开启"})
+		return
+	}
+
+	if plan.IsSuspended {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "计划已挂起，请先恢复再开启"})
 		return
 	}
 
@@ -877,6 +882,9 @@ func CompleteTask(c *gin.Context) {
 	var nextTask *Task
 	switch plan.PlanType {
 	case TaskPlanTypeCron, TaskPlanTypeInterval:
+		if plan.IsSuspended {
+			break
+		}
 		generated, err := generateTask(&plan, now, rating)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成下一条任务失败: " + err.Error()})

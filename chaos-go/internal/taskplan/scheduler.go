@@ -27,8 +27,8 @@ func SweepScheduledTaskPlans() {
 func sweepCronPlans() {
 	db := config.GetDB()
 	var plans []TaskPlan
-	if err := db.Where("plan_type = ? AND status = ? AND is_deleted = ?",
-		TaskPlanTypeCron, TaskPlanStatusStarted, false).
+	if err := db.Where("plan_type = ? AND status = ? AND is_suspended = ? AND is_deleted = ?",
+		TaskPlanTypeCron, TaskPlanStatusStarted, false, false).
 		Find(&plans).Error; err != nil {
 		slog.Error("周期任务扫描失败", "err", err)
 		return
@@ -80,8 +80,8 @@ func sweepCronPlans() {
 func sweepIntervalPlans() {
 	db := config.GetDB()
 	var plans []TaskPlan
-	if err := db.Where("plan_type = ? AND status = ? AND is_deleted = ?",
-		TaskPlanTypeInterval, TaskPlanStatusStarted, false).
+	if err := db.Where("plan_type = ? AND status = ? AND is_suspended = ? AND is_deleted = ?",
+		TaskPlanTypeInterval, TaskPlanStatusStarted, false, false).
 		Find(&plans).Error; err != nil {
 		slog.Error("间隔任务扫描失败", "err", err)
 		return
