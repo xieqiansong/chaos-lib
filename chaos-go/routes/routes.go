@@ -82,7 +82,12 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			taskPlans.GET("/:id/tasks", taskplan.ListPlanTasks)
 			taskPlans.GET("/:id/raw", taskplan.GetTaskPlanRaw)
 			taskPlans.POST("/:id/review", taskplan.ReviewTaskPlan)
-		}
+			}
+
+			ai := api.Group("/ai")
+			{
+			ai.POST("/review-score", taskplan.AiReviewScore)
+			}
 
 		tasks := api.Group("/tasks")
 		{

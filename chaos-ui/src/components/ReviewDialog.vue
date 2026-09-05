@@ -26,6 +26,14 @@ const revealed = ref(false)
 const submitting = ref(false)
 const selectedRating = ref<number | null>(null)
 
+const aiLoading = ref(false)
+const aiError = ref('')
+const aiResult = ref<{
+  points: { text: string; covered: boolean; reason: string }[]
+  coverage: number
+  suggestedRating: number
+} | null>(null)
+
 const ratingOptions = [
   {value: 1, label: 'Again', desc: '完全想不起来', type: 'danger'},
   {value: 2, label: 'Hard', desc: '记得但很吃力', type: 'warning'},
@@ -47,6 +55,38 @@ function reset() {
   revealed.value = false
   selectedRating.value = null
   submitting.value = false
+  aiLoading.value = false
+  aiError.value = ''
+  aiResult.value = null
+}
+
+async function aiScore() {
+  if (!content.value.trim()) {
+    ElMessage.warning('尚无原文内容，无法评分')
+    return
+  }
+  aiLoading.value = true
+  aiError.value = ''
+  aiResult.value = null
+  try {
+    const res = await sendMessage('ai/review-score', 'POST', {
+      original: content.value,
+      answer: answer.value,
+    })
+    aiResult.value = {
+      points: res.points || [],
+      coverage: res.coverage ?? 0,
+      suggestedRating: res.suggestedRating ?? 3,
+    }
+  } catch (e: any) {
+    aiError.value = e?.message || 'AI 评分失败'
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function ratingLabel(v: number): string {
+  return ratingOptions.find(o => o.value === v)?.label || 'Good'
 }
 
 async function loadRaw() {
@@ -76,6 +116,7 @@ async function submit() {
     await sendMessage(`taskPlans/${props.planId}/review`, 'POST', {
       rating: selectedRating.value,
       answer: answer.value,
+      ai: aiResult.value,
     })
     ElMessage.success('复习完成')
     visible.value = false
@@ -129,19 +170,52 @@ async function submit() {
 
     <template #footer>
       <div class="review-footer">
-        <div class="rating-buttons">
-          <el-button
-              v-for="opt in ratingOptions"
-              :key="opt.value"
-              :type="opt.type"
-              :plain="selectedRating !== opt.value"
-              @click="selectedRating = opt.value"
-          >
-            {{ opt.label }}
-            <span class="rating-desc">{{ opt.desc }}</span>
-          </el-button>
+        <div class="rating-area">
+          <div class="ai-block" v-if="aiResult || aiLoading || aiError">
+            <div class="ai-head">
+              <span class="ai-title">AI 覆盖度评分</span>
+              <el-button
+                  size="small"
+                  :loading="aiLoading"
+                  @click="aiScore"
+              >重新评分</el-button>
+            </div>
+            <el-alert v-if="aiError" :title="aiError" type="error" show-icon :closable="false" />
+            <template v-else-if="aiResult">
+              <div class="ai-summary">
+                <span>覆盖度：<b>{{ aiResult.coverage }}%</b></span>
+                <span>建议：<b>{{ ratingLabel(aiResult.suggestedRating) }}</b></span>
+                <el-button size="small" type="primary" plain @click="selectedRating = aiResult!.suggestedRating">
+                  采纳建议
+                </el-button>
+              </div>
+              <ul class="ai-points">
+                <li v-for="(p, i) in aiResult.points" :key="i">
+                  <el-tag size="small" :type="p.covered ? 'success' : 'danger'">
+                    {{ p.covered ? '命中' : '遗漏' }}
+                  </el-tag>
+                  <span class="pt-text">{{ p.text }}</span>
+                  <span class="pt-reason">{{ p.reason }}</span>
+                </li>
+              </ul>
+            </template>
+          </div>
+
+          <div class="rating-buttons">
+            <el-button
+                v-for="opt in ratingOptions"
+                :key="opt.value"
+                :type="opt.type"
+                :plain="selectedRating !== opt.value"
+                @click="selectedRating = opt.value"
+            >
+              {{ opt.label }}
+              <span class="rating-desc">{{ opt.desc }}</span>
+            </el-button>
+          </div>
         </div>
         <div class="footer-actions">
+          <el-button :loading="aiLoading" @click="aiScore">AI 评分</el-button>
           <el-button @click="visible = false">关闭</el-button>
           <el-button type="primary" :loading="submitting" @click="submit">提交评分</el-button>
         </div>
@@ -248,5 +322,65 @@ async function submit() {
 .footer-actions {
   display: flex;
   gap: 8px;
+}
+
+.rating-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ai-block {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--el-border-radius-base);
+  padding: 10px 12px;
+  background: var(--el-fill-color-light);
+}
+
+.ai-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.ai-title {
+  font-weight: 600;
+}
+
+.ai-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ai-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-points li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pt-text {
+  font-weight: 500;
+}
+
+.pt-reason {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 </style>

@@ -2,6 +2,8 @@ package taskplan
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/deepseek"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -1177,6 +1179,7 @@ func ReviewTaskPlan(c *gin.Context) {
 	var req struct {
 		Rating int    `json:"rating"`
 		Answer string `json:"answer"`
+		AI     *reviewAIResult `json:"ai"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -1214,9 +1217,20 @@ func ReviewTaskPlan(c *gin.Context) {
 		task = *generated
 	}
 
-	// 持久化用户的回忆内容
-	ans := req.Answer
-	task.Remark = &ans
+	// 持久化用户的回忆内容 + AI 评分结果（JSON 格式写入 tasks.remark）
+	remarkObj := map[string]interface{}{
+		"answer": req.Answer,
+	}
+	if req.AI != nil {
+		remarkObj["ai"] = req.AI
+	}
+	if remarkBytes, merr := json.Marshal(remarkObj); merr == nil {
+		remarkStr := string(remarkBytes)
+		task.Remark = &remarkStr
+	} else {
+		ans := req.Answer
+		task.Remark = &ans
+	}
 
 	var rating *FsrsRating
 	if plan.PlanType == TaskPlanTypeInterval {
@@ -1244,4 +1258,113 @@ func ReviewTaskPlan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// reviewScoreSystemPrompt 是固定的角色与评分标准提示（每次调用相同，省 token）。
+const reviewScoreSystemPrompt = `你是一位严谨的「主动回忆(active recall)」学习评分员。用户会提供两段内容：
+1) 【原文】：需要学习/记忆的材料。
+2) 【我的回忆】：用户在未看原文情况下回忆写下的内容（关键词、要点或短句）。
+
+你的任务：
+- 从【原文】中提炼 3~5 个「必须记住的关键点」，覆盖核心概念、方法、结论或易错点；不要超过 5 个，尽量精炼。
+- 逐条判断【我的回忆】是否覆盖了该关键点（同义、要点到位即算命中，不要求字字对应）。
+- 计算覆盖度 coverage = 命中条数 / 总条数 * 100（整数）。
+- 给出建议评分 suggestedRating（1~4 整数）：
+  1=Again（几乎没想起来，覆盖度<40% 或关键结论错误）
+  2=Hard（想起一部分、有明显遗漏，覆盖度 40%~69%）
+  3=Good（基本完整、少量遗漏，覆盖度 70%~89%）
+  4=Easy（完整且准确，覆盖度>=90%）。
+
+只输出如下 JSON（不要任何额外文字、不要 markdown 代码块）：
+{
+  "points": [{"text":"关键点表述","covered":true,"reason":"一句简短说明命中/遗漏原因"}],
+  "coverage": 80,
+  "suggestedRating": 3
+}`
+
+// reviewAIResult 是前端回传的 AI 评分结果，亦用于落库到 tasks.remark。
+type reviewAIResult struct {
+	Points []struct {
+		Text    string `json:"text"`
+		Covered bool   `json:"covered"`
+		Reason  string `json:"reason"`
+	} `json:"points"`
+	Coverage        int `json:"coverage"`
+	SuggestedRating int `json:"suggestedRating"`
+}
+
+// AiReviewScore 用 DeepSeek 对「回忆答案」相对「原文」做覆盖度评分。
+// 入参：{ "original": 原文文本, "answer": 用户回忆文本 }（原文由前端已拉取的内容传入，密钥不出服务端）。
+// 出参：{ "points":[{text,covered,reason}], "coverage":int, "suggestedRating":1..4 }。
+func AiReviewScore(c *gin.Context) {
+	var req struct {
+		Original string `json:"original"`
+		Answer   string `json:"answer"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误: " + err.Error()})
+		return
+	}
+	original := strings.TrimSpace(req.Original)
+	answer := strings.TrimSpace(req.Answer)
+	if original == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少原文内容，无法评分"})
+		return
+	}
+
+	// 控制 token 规模，避免长文拖累延迟与费用
+	if len(original) > 4096 {
+		original = original[:4096] + "\n…（原文过长已截断）"
+	}
+	if len(answer) > 1024 {
+		answer = answer[:1024] + "\n…（答案过长已截断）"
+	}
+
+	userMsg := "【原文】\n" + original + "\n\n【我的回忆】\n" + answer
+
+	raw, err := deepseek.Chat(reviewScoreSystemPrompt, userMsg)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI 评分失败: " + err.Error()})
+		return
+	}
+
+	var result struct {
+		Points []struct {
+			Text    string `json:"text"`
+			Covered bool   `json:"covered"`
+			Reason  string `json:"reason"`
+		} `json:"points"`
+		Coverage        int `json:"coverage"`
+		SuggestedRating int `json:"suggestedRating"`
+	}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "AI 返回解析失败", "raw": raw})
+		return
+	}
+
+	if result.Coverage < 0 {
+		result.Coverage = 0
+	}
+	if result.Coverage > 100 {
+		result.Coverage = 100
+	}
+	// 规整建议档位到 FSRS 四档；异常时用覆盖度兜底映射
+	if result.SuggestedRating < 1 || result.SuggestedRating > 4 {
+		switch {
+		case result.Coverage >= 90:
+			result.SuggestedRating = 4
+		case result.Coverage >= 70:
+			result.SuggestedRating = 3
+		case result.Coverage >= 40:
+			result.SuggestedRating = 2
+		default:
+			result.SuggestedRating = 1
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"points":          result.Points,
+		"coverage":        result.Coverage,
+		"suggestedRating": result.SuggestedRating,
+	})
 }
