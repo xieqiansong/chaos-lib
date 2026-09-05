@@ -3,6 +3,7 @@ package taskplan
 import (
 	"chaos-go/config"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -252,7 +253,7 @@ func ListTaskPlans(c *gin.Context) {
 
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []TaskPlan
-	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended").
+	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended", "FsrsReps").
 		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
@@ -825,6 +826,39 @@ func GetPendingTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// finishTask 标记任务完成、驱动 FSRS（interval 类型）并生成下一条任务。
+// 返回生成的下一条任务（可能为 nil）。task、plan 需已加载且 plan 已包含在事务外。
+func finishTask(task *Task, plan *TaskPlan, rating *FsrsRating) (*Task, error) {
+	db := config.GetDB()
+	now := time.Now()
+	task.Status = TaskStatusDone
+	task.CompletedAt = &now
+	if err := db.Save(task).Error; err != nil {
+		return nil, err
+	}
+
+	var nextTask *Task
+	switch plan.PlanType {
+	case TaskPlanTypeCron, TaskPlanTypeInterval:
+		if plan.IsSuspended {
+			break
+		}
+		generated, err := generateTask(plan, now, rating)
+		if err != nil {
+			return nil, err
+		}
+		nextTask = generated
+	}
+
+	if plan.PlanType == TaskPlanTypeInterval && rating != nil {
+		if err := db.Save(plan).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	return nextTask, nil
+}
+
 func CompleteTask(c *gin.Context) {
 	id, ok := getTaskID(c)
 	if !ok {
@@ -869,36 +903,15 @@ func CompleteTask(c *gin.Context) {
 		rating = &r
 	}
 
-	now := time.Now()
-	task.Status = TaskStatusDone
-	task.CompletedAt = &now
-	if err := config.GetDB().Save(&task).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+	nextTask, err := finishTask(&task, &plan, rating)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "完成任务失败: " + err.Error()})
 		return
 	}
 
 	resp := buildTaskResponse(task)
-
-	var nextTask *Task
-	switch plan.PlanType {
-	case TaskPlanTypeCron, TaskPlanTypeInterval:
-		if plan.IsSuspended {
-			break
-		}
-		generated, err := generateTask(&plan, now, rating)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成下一条任务失败: " + err.Error()})
-			return
-		}
-		nextTask = generated
+	if nextTask != nil {
 		resp["nextTask"] = buildTaskResponse(*nextTask)
-	}
-
-	if plan.PlanType == TaskPlanTypeInterval && rating != nil {
-		if err := config.GetDB().Save(&plan).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新FSRS状态失败: " + err.Error()})
-			return
-		}
 	}
 
 	c.JSON(http.StatusOK, resp)
@@ -1101,6 +1114,134 @@ func CancelTask(c *gin.Context) {
 		return
 	}
 	resp["nextTask"] = buildTaskResponse(*nextTask)
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetTaskPlanRaw 读取计划关联的 raw_link 原文内容（服务端代理拉取，规避浏览器跨域）。
+func GetTaskPlanRaw(c *gin.Context) {
+	id, ok := getPlanID(c)
+	if !ok {
+		return
+	}
+
+	var plan TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		return
+	}
+
+	if plan.RawLink == nil || *plan.RawLink == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "该计划没有 raw_link，无法获取原文"})
+		return
+	}
+
+	content, err := fetchRawContent(*plan.RawLink)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "获取原文失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"rawLink": *plan.RawLink,
+		"content": content,
+	})
+}
+
+// fetchRawContent 拉取给定 URL 的文本内容（用于代理 chaos-knots 的 raw 接口）。
+func fetchRawContent(rawURL string) (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Get(rawURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("状态码 %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// ReviewTaskPlan 主动回忆式复习：先在前端隐藏原文、用户填写回忆，再提交评分。
+// 评分驱动 FSRS 调度（interval 类型），并把用户的回忆内容写入任务 remark 以便后续对比。
+func ReviewTaskPlan(c *gin.Context) {
+	id, ok := getPlanID(c)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Rating int    `json:"rating"`
+		Answer string `json:"answer"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Rating < int(RatingAgain) || req.Rating > int(RatingEasy) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy"})
+		return
+	}
+
+	var plan TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		return
+	}
+	if plan.Status == TaskPlanStatusCompleted || plan.Status == TaskPlanStatusArchived {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "已完成/已归档的计划不可复习"})
+		return
+	}
+
+	db := config.GetDB()
+	var task Task
+	err := db.Where("plan_id = ? AND status = ? AND is_deleted = ?", id, TaskStatusActive, false).First(&task).Error
+	if err != nil {
+		// 没有进行中的任务：按需生成一条（等价于"现在就复习一次"）
+		if plan.Status != TaskPlanStatusStarted && plan.Status != TaskPlanStatusCreated {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态无法发起复习"})
+			return
+		}
+		generated, gerr := generateTask(&plan, time.Now(), nil)
+		if gerr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成复习任务失败: " + gerr.Error()})
+			return
+		}
+		task = *generated
+	}
+
+	// 持久化用户的回忆内容
+	ans := req.Answer
+	task.Remark = &ans
+
+	var rating *FsrsRating
+	if plan.PlanType == TaskPlanTypeInterval {
+		r := FsrsRating(req.Rating)
+		rating = &r
+	}
+
+	nextTask, ferr := finishTask(&task, &plan, rating)
+	if ferr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "复习失败: " + ferr.Error()})
+		return
+	}
+
+	resp := gin.H{
+		"planId":         plan.ID,
+		"name":           plan.Name,
+		"fsrsState":      plan.FsrsState,
+		"fsrsStability":  plan.FsrsStability,
+		"fsrsDifficulty": plan.FsrsDifficulty,
+		"fsrsReps":       plan.FsrsReps,
+		"fsrsLapses":     plan.FsrsLapses,
+	}
+	if nextTask != nil && nextTask.StartedAt != nil {
+		resp["nextReviewAt"] = nextTask.StartedAt
+	}
 
 	c.JSON(http.StatusOK, resp)
 }

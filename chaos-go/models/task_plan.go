@@ -38,6 +38,7 @@ type TaskPlan struct {
 	ContentSize       int            `gorm:"default:0"`
 	Remark            *string        ``
 	Link              *string        ``
+	RawLink           *string        ``
 	CreatedAt         time.Time      `gorm:"default:CURRENT_TIMESTAMP"`
 	UpdatedAt         time.Time      `gorm:"default:CURRENT_TIMESTAMP"`
 	IsDeleted         bool           `gorm:"default:false"`

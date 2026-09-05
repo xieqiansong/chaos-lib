@@ -80,6 +80,8 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			taskPlans.PATCH("/:id/priority", taskplan.SetPriorityTaskPlan)
 			taskPlans.DELETE("/:id", taskplan.DeleteTaskPlan)
 			taskPlans.GET("/:id/tasks", taskplan.ListPlanTasks)
+			taskPlans.GET("/:id/raw", taskplan.GetTaskPlanRaw)
+			taskPlans.POST("/:id/review", taskplan.ReviewTaskPlan)
 		}
 
 		tasks := api.Group("/tasks")

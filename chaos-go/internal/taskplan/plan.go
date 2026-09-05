@@ -37,6 +37,7 @@ type TaskPlan struct {
 	Priority          int            `gorm:"default:5"`
 	OrderNum          int            `gorm:"default:0"`
 	Link              *string        ``
+	RawLink           *string        ``
 	Remark            *string        ``
 	ContentSize       *int           ``
 	CronExpr          *string        ``
