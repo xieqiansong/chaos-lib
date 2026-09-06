@@ -753,7 +753,6 @@ watch(taskPlansVersion, () => {
             <div class="op-actions">
               <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
               <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
-              <el-button v-if="row.HasLink && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
               <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
               <el-dropdown trigger="click" style="margin-left: 4px">
                 <el-button size="small" text>更多</el-button>
