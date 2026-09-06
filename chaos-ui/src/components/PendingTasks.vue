@@ -278,24 +278,21 @@ defineExpose({loadPendingTasks})
             <el-tag v-else size="small" type="primary">待处理</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="开始时间" width="110">
+        <el-table-column label="开始时间" width="120">
           <template #default="{ row }">
             {{ formatTime(row.StartedAt) }}
           </template>
         </el-table-column>
-        <el-table-column label="截止时间" width="110">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
-            {{ formatTime(row.Deadline) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
-          <template #default="{ row }">
+            <div class="row-actions">
             <el-button v-if="row.RawLink" size="small" type="info" text @click="openPreview(row)">预览</el-button>
-            <el-button v-if="row.Link && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
+            <el-button v-if="row.RawLink && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
             <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
             <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
             <el-button v-if="row.PlanType === 'todo' || row.PlanType === 'interval'" size="small" text @click="postponeTask(row)">延期</el-button>
             <el-button size="small" type="success" text @click="completeTask(row)">完成</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -362,6 +359,18 @@ defineExpose({loadPendingTasks})
 <style scoped>
 .pending-tasks-wrapper {
   height: 100%;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+}
+
+.row-actions :deep(.el-button) {
+  margin-left: 0;
+  padding: 2px 4px;
 }
 
 .pending-toolbar {
