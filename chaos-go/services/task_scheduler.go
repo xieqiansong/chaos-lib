@@ -12,7 +12,7 @@ import (
 
 const (
 	schedulerInterval = time.Minute // 后台扫描周期
-	cronLookahead     = 3           // 每个 cron 计划至少预排的未来任务数（同时作为预排窗口上限，防止高频 cron 爆量）
+	cronLookahead     = 1           // 每个 cron 计划至少预排的未来任务数（同时作为预排窗口上限，防止高频 cron 爆量）
 	cronSweepCap      = 50          // 单次扫描每个计划最多生成的任务数（安全阀）
 )
 
