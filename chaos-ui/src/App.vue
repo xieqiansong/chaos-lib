@@ -15,6 +15,10 @@ import MobileBoard from './views/MobileBoard.vue'
 import PendingTasks from './components/PendingTasks.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import CenterPreview from './components/CenterPreview.vue'
+import ReviewDialog from './components/ReviewDialog.vue'
+import {centerPanel, closeCenterPanel} from './utils/centerPanel'
+import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
 
@@ -66,6 +70,12 @@ const pendingTaskCount = ref(0)
 
 const handleSearchChange = (value: string) => {
   searchText.value = value
+}
+
+// 中心面板（预览 / 复习）完成后刷新待办并关闭
+function onCenterReviewDone() {
+  refreshPendingTasks()
+  closeCenterPanel()
 }
 
 interface MenuItem {
@@ -209,6 +219,31 @@ onUnmounted(() => {
           <component :is="currentComponent" :search-text="searchText" :key="activeKey"/>
         </main>
       </TerminalFrame>
+      <div v-if="centerPanel" class="center-panel">
+        <div class="center-panel-bar">
+          <span class="center-panel-title">
+            {{ centerPanel.type === 'preview' ? '预览原文' : '复习' }} — {{ centerPanel.planName }}
+          </span>
+          <button class="center-panel-close" title="关闭" @click="closeCenterPanel">✕</button>
+        </div>
+        <div class="center-panel-body">
+          <CenterPreview
+              v-if="centerPanel.type === 'preview'"
+              :key="centerPanel.planId"
+              :plan-id="centerPanel.planId"
+              :plan-name="centerPanel.planName"
+          />
+          <ReviewDialog
+              v-else
+              :key="centerPanel.planId"
+              :plan-id="centerPanel.planId"
+              :plan-name="centerPanel.planName"
+              :visible="true"
+              @update:visible="closeCenterPanel"
+              @done="onCenterReviewDone"
+          />
+        </div>
+      </div>
     </div>
     <aside class="app-sidebar app-sidebar--frame">
       <TerminalFrame title="todo" prompt="chaos@queue" hide-titlebar>
@@ -284,12 +319,66 @@ onUnmounted(() => {
 }
 
 .app-main {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
   padding: var(--space-xs);
+}
+
+.center-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color);
+}
+
+.center-panel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 2.05rem;
+  padding: 0 var(--space-lg);
+  border-bottom: 1px solid var(--term-border);
+  background: var(--el-bg-color);
+  flex-shrink: 0;
+}
+
+.center-panel-title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.center-panel-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  background: transparent;
+  border: 1px solid var(--term-border);
+  color: var(--term-green-faint);
+  font-family: inherit;
+  font-size: var(--font-xs);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.center-panel-close:hover {
+  color: var(--term-green);
+  border-color: var(--term-green-dim);
+}
+
+.center-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-xl);
+  overflow: hidden;
 }
 
 .search-wrapper {

@@ -4,7 +4,7 @@ import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format} from 'date-fns'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
-import ReviewDialog from './ReviewDialog.vue'
+import {openCenterPanel} from '@/utils/centerPanel'
 
 const props = withDefaults(defineProps<{
   view?: 'sidebar' | 'table'
@@ -26,6 +26,7 @@ interface PendingTask {
   Deadline: string | null
   Remark: string | null
   Link: string | null
+  RawLink: string | null
   ContentSize: number
   CreatedAt: string
   PlanName: string
@@ -46,19 +47,13 @@ const postponeTargetTask = ref<PendingTask | null>(null)
 const postponeDays = ref<number>(1)
 const postponePresets = [1, 3, 7]
 
-const reviewVisible = ref(false)
-const reviewPlanId = ref<number>(0)
-const reviewPlanName = ref('')
-
 function openReview(task: PendingTask) {
-  reviewPlanId.value = task.PlanID
-  reviewPlanName.value = task.PlanName
-  reviewVisible.value = true
+  openCenterPanel('review', task.PlanID, task.PlanName)
 }
 
-async function onReviewDone() {
-  refreshPendingTasks()
-  emit('refresh')
+function openPreview(task: PendingTask) {
+  if (!task.RawLink) return
+  openCenterPanel('preview', task.PlanID, task.PlanName)
 }
 
 const ratingOptions = [
@@ -244,6 +239,7 @@ defineExpose({loadPendingTasks})
             复习次数: {{ task.FsrsReps }}
           </span>
           <span class="pending-item-header-actions op-actions">
+            <el-button v-if="task.RawLink" size="small" type="info" text @click="openPreview(task)">预览</el-button>
             <el-button v-if="task.Link && task.FsrsReps > 0" size="small" type="warning" text @click="openReview(task)">复习</el-button>
             <el-button v-if="task.Link" size="small" type="primary" text @click="openLink(task.Link!)">跳转</el-button>
             <el-button v-if="task.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(task)">取消</el-button>
@@ -294,6 +290,7 @@ defineExpose({loadPendingTasks})
         </el-table-column>
         <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
+            <el-button v-if="row.RawLink" size="small" type="info" text @click="openPreview(row)">预览</el-button>
             <el-button v-if="row.Link && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
             <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
             <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
@@ -359,13 +356,6 @@ defineExpose({loadPendingTasks})
         <el-button type="primary" @click="submitPostponeDialog">确认延期</el-button>
       </template>
     </el-dialog>
-
-    <ReviewDialog
-        v-model:visible="reviewVisible"
-        :plan-id="reviewPlanId"
-        :plan-name="reviewPlanName"
-        @done="onReviewDone"
-    />
   </div>
 </template>
 

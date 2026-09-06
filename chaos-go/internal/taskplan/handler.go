@@ -789,11 +789,12 @@ func GetPendingTasks(c *gin.Context) {
 		PlanName    string       ``
 		PlanType    TaskPlanType ``
 		PlanLink    *string      ``
+		PlanRawLink *string      ``
 		ContentSize int          ``
 		FsrsReps    int          ``
 	}
 	query := config.GetDB().Table("tasks").
-		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.content_size, task_plans.fsrs_reps").
+		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.raw_link AS plan_raw_link, task_plans.content_size, task_plans.fsrs_reps").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", TaskStatusActive).
 		Where("tasks.is_deleted = ?", false).
@@ -818,6 +819,7 @@ func GetPendingTasks(c *gin.Context) {
 			PlanName:    row.PlanName,
 			PlanType:    row.PlanType,
 			Link:        row.PlanLink,
+			RawLink:     row.PlanRawLink,
 			ContentSize: row.ContentSize,
 			FsrsReps:    row.FsrsReps,
 			IsOverdue:   row.Deadline != nil && now.After(*row.Deadline),

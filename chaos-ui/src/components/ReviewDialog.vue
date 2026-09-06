@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import {ref, computed, watch} from 'vue'
+import {ref, computed, watch, onMounted} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage} from 'element-plus'
+import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 
 const props = defineProps<{
   visible: boolean
@@ -20,8 +22,22 @@ const visible = computed({
 })
 
 const loading = ref(false)
+const rawLink = ref('')
 const content = ref('')
 const answer = ref('')
+
+const md = new MarkdownIt({html: true, linkify: true, breaks: true})
+
+// raw_link 以 .md / .markdown 结尾时按 Markdown 渲染
+const isMarkdown = computed(() => {
+  const url = rawLink.value.split(/[?#]/)[0].toLowerCase()
+  return url.endsWith('.md') || url.endsWith('.markdown')
+})
+
+const renderedHtml = computed(() => {
+  if (!isMarkdown.value) return ''
+  return DOMPurify.sanitize(md.render(content.value || ''))
+})
 const revealed = ref(false)
 const submitting = ref(false)
 const selectedRating = ref<number | null>(null)
@@ -46,6 +62,12 @@ watch(() => props.visible, (v) => {
     reset()
     loadRaw()
   }
+})
+
+onMounted(() => {
+  // 内联模式下由父组件控制挂载生命周期：挂载即展示并加载原文
+  reset()
+  loadRaw()
 })
 
 function reset() {
@@ -93,6 +115,7 @@ async function loadRaw() {
   loading.value = true
   try {
     const res = await sendMessage(`taskPlans/${props.planId}/raw`, 'GET')
+    rawLink.value = res?.rawLink ?? ''
     content.value = res.content || ''
   } catch (e: any) {
     ElMessage.warning(e?.message || '获取原文失败')
@@ -130,23 +153,17 @@ async function submit() {
 </script>
 
 <template>
-  <el-dialog
-      v-model="visible"
-      :title="`复习 — ${planName}`"
-      width="92%"
-      top="4vh"
-      :close-on-click-modal="false"
-      class="review-dialog"
-  >
-    <div v-loading="loading" class="review-layout">
-      <div class="review-pane">
+  <div class="center-review" v-loading="loading">
+    <div class="review-layout">
+      <div class="review-pane pane-raw">
         <div class="pane-header">
           <span>原文</span>
           <el-tag v-if="revealed" size="small" type="success">已显示</el-tag>
           <el-tag v-else size="small" type="info">已隐藏</el-tag>
         </div>
         <div class="pane-body">
-          <pre class="raw-content" :class="{blurred: !revealed}">{{ content || '（无原文内容）' }}</pre>
+          <div v-if="isMarkdown" class="markdown-body" :class="{blurred: !revealed}" v-html="renderedHtml"></div>
+          <pre v-else class="raw-content" :class="{blurred: !revealed}">{{ content || '（无原文内容）' }}</pre>
           <div v-if="!revealed" class="mask" @click="reveal">
             <el-button type="primary" size="large" @click.stop="reveal">点击显示答案</el-button>
             <p class="mask-tip">先尽量回忆，再对照原文检查完整性</p>
@@ -154,81 +171,97 @@ async function submit() {
         </div>
       </div>
 
-      <div class="review-pane">
-        <div class="pane-header">我的回忆（关键词 / 要点）</div>
-        <div class="pane-body">
-          <el-input
-              v-model="answer"
-              type="textarea"
-              resize="none"
-              placeholder="写下你能回忆起的内容，可以是关键词、要点或短句…"
-              class="answer-input"
-          />
+      <div class="review-pane pane-answer">
+        <div class="pane-header">
+          <span>我的回忆（关键词 / 要点）</span>
+          <el-button
+              size="small"
+              :loading="aiLoading"
+              @click="aiScore"
+          >AI 评分</el-button>
+        </div>
+        <div class="pane-body review-answer-body">
+          <div class="answer-half">
+            <el-input
+                v-model="answer"
+                type="textarea"
+                resize="none"
+                placeholder="写下你能回忆起的内容，可以是关键词、要点或短句…"
+                class="answer-input"
+            />
+          </div>
+          <div class="ai-half">
+            <div class="ai-block" v-if="aiResult || aiLoading || aiError">
+              <div class="ai-head">
+                <span class="ai-title">AI 覆盖度评分</span>
+                <el-button
+                    size="small"
+                    :loading="aiLoading"
+                    @click="aiScore"
+                >重新评分</el-button>
+              </div>
+              <el-alert v-if="aiError" :title="aiError" type="error" show-icon :closable="false" />
+              <template v-else-if="aiResult">
+                <div class="ai-summary">
+                  <span>覆盖度：<b>{{ aiResult.coverage }}%</b></span>
+                  <span>建议：<b>{{ ratingLabel(aiResult.suggestedRating) }}</b></span>
+                  <el-button size="small" type="primary" plain @click="selectedRating = aiResult!.suggestedRating">
+                    采纳建议
+                  </el-button>
+                </div>
+                <ul class="ai-points">
+                  <li v-for="(p, i) in aiResult.points" :key="i">
+                    <el-tag size="small" :type="p.covered ? 'success' : 'danger'">
+                      {{ p.covered ? '命中' : '遗漏' }}
+                    </el-tag>
+                    <span class="pt-text">{{ p.text }}</span>
+                    <span class="pt-reason">{{ p.reason }}</span>
+                  </li>
+                </ul>
+              </template>
+            </div>
+            <div v-else class="ai-placeholder">点击「AI 评分」对照原文检查覆盖度</div>
+          </div>
         </div>
       </div>
     </div>
 
-    <template #footer>
-      <div class="review-footer">
-        <div class="rating-area">
-          <div class="ai-block" v-if="aiResult || aiLoading || aiError">
-            <div class="ai-head">
-              <span class="ai-title">AI 覆盖度评分</span>
-              <el-button
-                  size="small"
-                  :loading="aiLoading"
-                  @click="aiScore"
-              >重新评分</el-button>
-            </div>
-            <el-alert v-if="aiError" :title="aiError" type="error" show-icon :closable="false" />
-            <template v-else-if="aiResult">
-              <div class="ai-summary">
-                <span>覆盖度：<b>{{ aiResult.coverage }}%</b></span>
-                <span>建议：<b>{{ ratingLabel(aiResult.suggestedRating) }}</b></span>
-                <el-button size="small" type="primary" plain @click="selectedRating = aiResult!.suggestedRating">
-                  采纳建议
-                </el-button>
-              </div>
-              <ul class="ai-points">
-                <li v-for="(p, i) in aiResult.points" :key="i">
-                  <el-tag size="small" :type="p.covered ? 'success' : 'danger'">
-                    {{ p.covered ? '命中' : '遗漏' }}
-                  </el-tag>
-                  <span class="pt-text">{{ p.text }}</span>
-                  <span class="pt-reason">{{ p.reason }}</span>
-                </li>
-              </ul>
-            </template>
-          </div>
-
-          <div class="rating-buttons">
-            <el-button
-                v-for="opt in ratingOptions"
-                :key="opt.value"
-                :type="opt.type"
-                :plain="selectedRating !== opt.value"
-                @click="selectedRating = opt.value"
-            >
-              {{ opt.label }}
-              <span class="rating-desc">{{ opt.desc }}</span>
-            </el-button>
-          </div>
-        </div>
-        <div class="footer-actions">
-          <el-button :loading="aiLoading" @click="aiScore">AI 评分</el-button>
-          <el-button @click="visible = false">关闭</el-button>
-          <el-button type="primary" :loading="submitting" @click="submit">提交评分</el-button>
+    <div class="review-footer">
+      <div class="rating-area">
+        <div class="rating-buttons">
+          <el-button
+              v-for="opt in ratingOptions"
+              :key="opt.value"
+              :type="opt.type"
+              :plain="selectedRating !== opt.value"
+              @click="selectedRating = opt.value"
+          >
+            {{ opt.label }}
+            <span class="rating-desc">{{ opt.desc }}</span>
+          </el-button>
         </div>
       </div>
-    </template>
-  </el-dialog>
+      <div class="footer-actions">
+        <el-button @click="visible = false">关闭</el-button>
+        <el-button type="primary" :loading="submitting" @click="submit">提交评分</el-button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.center-review {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .review-layout {
   display: flex;
   gap: 16px;
-  height: 70vh;
+  flex: 1;
+  min-height: 0;
 }
 
 .review-pane {
@@ -236,6 +269,15 @@ async function submit() {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* 原文 : 答案 = 2 : 1 */
+.review-pane.pane-raw {
+  flex: 2;
+}
+
+.review-pane.pane-answer {
+  flex: 1;
 }
 
 .pane-header {
@@ -254,6 +296,37 @@ async function submit() {
   border-radius: var(--el-border-radius-base);
 }
 
+/* 答案 + AI 评分结果 共用同一区域，上下各占一半 */
+.review-answer-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.answer-half {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.ai-half {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding: 10px 12px;
+}
+
+.ai-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
 .raw-content {
   margin: 0;
   padding: 12px;
@@ -270,6 +343,98 @@ async function submit() {
 .raw-content.blurred {
   filter: blur(8px);
   user-select: none;
+}
+
+.markdown-body {
+  height: 100%;
+  overflow: auto;
+  padding: 12px;
+  box-sizing: border-box;
+  font-family: var(--el-font-family);
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+  text-align: left;
+}
+
+.markdown-body.blurred {
+  filter: blur(8px);
+  user-select: none;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  margin: 1.1em 0 0.5em;
+  line-height: 1.3;
+}
+
+.markdown-body :deep(h1) {
+  font-size: 1.5em;
+}
+
+.markdown-body :deep(h2) {
+  font-size: 1.3em;
+}
+
+.markdown-body :deep(h3) {
+  font-size: 1.15em;
+}
+
+.markdown-body :deep(p) {
+  margin: 0.5em 0;
+}
+
+.markdown-body :deep(a) {
+  color: var(--el-color-primary);
+}
+
+.markdown-body :deep(code) {
+  background: var(--el-fill-color-light);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.markdown-body :deep(pre) {
+  background: var(--el-fill-color-light);
+  padding: 12px;
+  border-radius: var(--el-border-radius-base);
+  overflow: auto;
+}
+
+.markdown-body :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body :deep(blockquote) {
+  margin: 0.5em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--el-border-color);
+  color: var(--el-text-color-secondary);
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid var(--el-border-color-lighter);
+  padding: 6px 10px;
+}
+
+.markdown-body :deep(img) {
+  max-width: 100%;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 1.4em;
 }
 
 .mask {
@@ -291,7 +456,8 @@ async function submit() {
 }
 
 .answer-input {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .answer-input :deep(.el-textarea),
