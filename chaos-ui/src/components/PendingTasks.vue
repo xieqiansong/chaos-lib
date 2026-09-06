@@ -236,11 +236,11 @@ defineExpose({loadPendingTasks})
             {{ task.ContentSize.toLocaleString() }} 字
           </span>
           <span v-if="task.PlanType === 'interval'" class="pending-item-size text-xs text-secondary">
-            复习次数: {{ task.FsrsReps }}
+            复习: {{ task.FsrsReps }}
           </span>
           <span class="pending-item-header-actions op-actions">
             <el-button v-if="task.RawLink" size="small" type="info" text @click="openPreview(task)">预览</el-button>
-            <el-button v-if="task.Link && task.FsrsReps > 0" size="small" type="warning" text @click="openReview(task)">复习</el-button>
+            <el-button v-if="task.RawLink && task.FsrsReps > 0" size="small" type="warning" text @click="openReview(task)">复习</el-button>
             <el-button v-if="task.Link" size="small" type="primary" text @click="openLink(task.Link!)">跳转</el-button>
             <el-button v-if="task.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(task)">取消</el-button>
             <el-button v-if="task.PlanType === 'todo' || task.PlanType === 'interval'" size="small" text @click="postponeTask(task)">延期</el-button>

@@ -431,8 +431,8 @@ html.dark .el-message-box {
 }
 
 .op-actions .el-button--small {
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 2px;
+  padding-right: 0px;
 }
 
 /* ===== 垂直对齐 ===== */
