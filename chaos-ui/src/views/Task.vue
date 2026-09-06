@@ -3,8 +3,9 @@ import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import PendingTasks from '../components/PendingTasks.vue'
-import ReviewDialog from '../components/ReviewDialog.vue'
+import {openCenterPanel} from '@/utils/centerPanel'
 import {refreshPendingTasks} from '@/utils/pendingTasksStore'
+import {taskPlansVersion} from '@/utils/taskPlansStore'
 
 const props = defineProps<{
   searchText: string
@@ -53,10 +54,6 @@ const ratingValue = ref<number | null>(3)
 const showPriorityDialog = ref(false)
 const priorityTargetPlan = ref<TaskPlan | null>(null)
 const priorityValue = ref<number>(5)
-
-const reviewVisible = ref(false)
-const reviewPlanId = ref<number>(0)
-const reviewPlanName = ref('')
 
 const pendingRef = ref<InstanceType<typeof PendingTasks> | null>(null)
 
@@ -135,14 +132,7 @@ async function submitPriorityDialog() {
 }
 
 function openReview(plan: TaskPlan) {
-  reviewPlanId.value = plan.ID
-  reviewPlanName.value = plan.Name
-  reviewVisible.value = true
-}
-
-async function onReviewDone() {
-  await refreshAll()
-  await refreshAllPlans()
+  openCenterPanel('review', plan.ID, plan.Name)
 }
 
 const formData = ref({
@@ -658,6 +648,11 @@ onMounted(async () => {
   await nextTick()
   console.log(`[perf] onMounted → nextTick render=${(performance.now() - t0).toFixed(0)}ms`)
 })
+
+// 监听全局复习完成信号：居中面板完成复习后刷新任务计划，使复习次数等字段及时更新
+watch(taskPlansVersion, () => {
+  fetchAllPlans()
+})
 </script>
 
 <template>
@@ -988,13 +983,6 @@ onMounted(async () => {
         <el-button type="primary" @click="submitPriorityDialog">确认</el-button>
       </template>
     </el-dialog>
-
-    <ReviewDialog
-        v-model:visible="reviewVisible"
-        :plan-id="reviewPlanId"
-        :plan-name="reviewPlanName"
-        @done="onReviewDone"
-    />
   </div>
 </template>
 

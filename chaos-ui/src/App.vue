@@ -19,6 +19,7 @@ import CenterPreview from './components/CenterPreview.vue'
 import ReviewDialog from './components/ReviewDialog.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
 import {refreshPendingTasks} from './utils/pendingTasksStore'
+import {refreshTaskPlans} from './utils/taskPlansStore'
 import {Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
 
@@ -75,6 +76,7 @@ const handleSearchChange = (value: string) => {
 // 中心面板（预览 / 复习）完成后刷新待办并关闭
 function onCenterReviewDone() {
   refreshPendingTasks()
+  refreshTaskPlans()
   closeCenterPanel()
 }
 
@@ -139,6 +141,7 @@ const treeProps = {
 const handleNodeClick = (data: any) => {
   if (data.id && menuItems.some(m => m.id === data.id)) {
     activeKey.value = data.id
+    closeCenterPanel()
   }
 }
 
