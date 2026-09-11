@@ -2,6 +2,7 @@ package quickedit
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/pagination"
 	"fmt"
 	"net/http"
 	"os"
@@ -300,18 +301,14 @@ func ListQuickEditSnapshots(c *gin.Context) {
 	if _, ok := findFileByID(c, id); !ok {
 		return
 	}
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	if page < 1 {
-		page = 1
-	}
-	if size < 1 || size > 200 {
-		size = 20
-	}
-	var total int64
-	config.GetDB().Model(&QuickEditSnapshot{}).Where("file_id = ?", id).Count(&total)
+	q := pagination.Parse(c)
 	var snaps []QuickEditSnapshot
-	if err := config.GetDB().Where("file_id = ?", id).Order("created_at DESC, id DESC").Limit(size).Offset((page - 1) * size).Find(&snaps).Error; err != nil {
+	total, err := pagination.Paginate(
+		config.GetDB().Where("file_id = ?", id).Order("created_at DESC, id DESC"),
+		&snaps,
+		q,
+	)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
 	}
@@ -319,7 +316,7 @@ func ListQuickEditSnapshots(c *gin.Context) {
 	for _, s := range snaps {
 		items = append(items, QuickEditSnapshotResponse{ID: s.ID, FileID: s.FileID, SizeBytes: s.SizeBytes, CreatedAt: s.CreatedAt})
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total, "page": page, "size": size})
+	c.JSON(http.StatusOK, pagination.New(items, total, q))
 }
 
 func GetQuickEditSnapshot(c *gin.Context) {
