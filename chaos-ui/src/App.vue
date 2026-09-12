@@ -25,6 +25,7 @@ const CMD_ALIAS: Record<string, string> = {
   projectManage: 'proj',
   sdk: 'sdk',
   fileLink: 'link',
+  portForward: 'fwd',
   quickEdit: 'edit',
   environment: 'env',
   board: 'board',

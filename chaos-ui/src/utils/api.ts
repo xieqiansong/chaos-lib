@@ -132,3 +132,96 @@ export function updateSdkDef(
 export function deleteSdkDef(name: string): Promise<any> {
     return sendMessage(`sdks/defs/${name}`, 'DELETE')
 }
+
+// ---- SSH 连接与端口转发 ----
+
+export type SshAuthType = 'password' | 'key'
+
+export interface SshConnection {
+    Id: number
+    Name: string
+    Host: string
+    Port: number
+    Username: string
+    AuthType: SshAuthType
+    Remark: string
+    /** 是否已配置凭据（后端不回传明文） */
+    HasPassword: boolean
+    HasPrivateKey: boolean
+    HasPassphrase: boolean
+}
+
+export interface SshConnectionPayload {
+    Name: string
+    Host: string
+    Port: number
+    Username: string
+    AuthType: SshAuthType
+    /** 为空表示保持原值（编辑时） */
+    Password?: string
+    PrivateKey?: string
+    Passphrase?: string
+    Remark?: string
+}
+
+export interface PortForward {
+    Id: number
+    Name: string
+    Port: number
+    TargetHost: string
+    TargetPort: number
+    SshConnectionId: number
+    /** 以内存实际运行状态为准 */
+    Status: boolean
+    LastError: string
+    Remark: string
+}
+
+export interface PortForwardPayload {
+    Name?: string
+    Port: number
+    TargetHost: string
+    TargetPort: number
+    SshConnectionId: number
+    Remark?: string
+}
+
+export function getSshConns(): Promise<SshConnection[]> {
+    return sendMessage('sshConns', 'GET')
+}
+
+export function createSshConn(payload: SshConnectionPayload): Promise<any> {
+    return sendMessage('sshConns', 'POST', payload)
+}
+
+export function updateSshConn(id: number, payload: Partial<SshConnectionPayload>): Promise<any> {
+    return sendMessage(`sshConns/${id}`, 'PATCH', payload)
+}
+
+export function deleteSshConn(id: number): Promise<any> {
+    return sendMessage(`sshConns/${id}`, 'DELETE')
+}
+
+export function testSshConn(id: number): Promise<any> {
+    return sendMessage(`sshConns/${id}/test`, 'POST', {})
+}
+
+export function getPortForwards(): Promise<PortForward[]> {
+    return sendMessage('portForwards', 'GET')
+}
+
+export function createPortForward(payload: PortForwardPayload): Promise<any> {
+    return sendMessage('portForwards', 'POST', payload)
+}
+
+export function updatePortForward(id: number, payload: Partial<PortForwardPayload>): Promise<any> {
+    return sendMessage(`portForwards/${id}`, 'PATCH', payload)
+}
+
+export function deletePortForward(id: number): Promise<any> {
+    return sendMessage(`portForwards/${id}`, 'DELETE')
+}
+
+export function updatePortForwardStatus(id: number, status: boolean): Promise<any> {
+    return sendMessage(`portForwards/${id}/status`, 'PATCH', {status})
+}

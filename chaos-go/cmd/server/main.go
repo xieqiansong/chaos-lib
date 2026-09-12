@@ -97,6 +97,7 @@ func main() {
 		&proxy.BrowserHistory{},
 		&proxy.BrowserHistoryVisit{},
 		&portfwd.PortForwarding{},
+		&portfwd.SshConnection{},
 		&filelink.FileLink{},
 		&quickedit.QuickEditFile{},
 		&quickedit.QuickEditSnapshot{},
@@ -107,6 +108,9 @@ func main() {
 
 	setupPprof(&cfg.Pprof)
 	slog.Info("Pprof 设置完成")
+
+	// 进程重启后内存中没有任何隧道，把库里遗留的「运行中」状态归零
+	portfwd.ResetStatusOnBoot()
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent

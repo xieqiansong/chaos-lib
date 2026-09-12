@@ -49,6 +49,12 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '文件连接', icon: 'Link'},
   },
   {
+    path: '/portForward',
+    name: 'portForward',
+    component: () => import('@/views/PortForward.vue'),
+    meta: {title: '端口转发', icon: 'Connection'},
+  },
+  {
     path: '/quickEdit',
     name: 'quickEdit',
     component: () => import('@/views/QuickEdit.vue'),

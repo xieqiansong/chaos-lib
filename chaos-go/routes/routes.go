@@ -4,6 +4,7 @@ import (
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	notifysvc "chaos-go/internal/notify"
+	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
@@ -128,6 +129,20 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
 		api.GET("/weather", proxy.GetWeather)
+
+		// SSH 连接信息（凭据仅后端使用，响应一律脱敏）
+		api.GET("/sshConns", portfwd.GetSshConnections)
+		api.POST("/sshConns", portfwd.CreateSshConnection)
+		api.PATCH("/sshConns/:id", portfwd.UpdateSshConnection)
+		api.DELETE("/sshConns/:id", portfwd.DeleteSshConnection)
+		api.POST("/sshConns/:id/test", portfwd.TestSshConnection)
+
+		// SSH 隧道端口转发规则
+		api.GET("/portForwards", portfwd.GetPortForwardings)
+		api.POST("/portForwards", portfwd.CreatePortForwarding)
+		api.PATCH("/portForwards/:id", portfwd.UpdatePortForwarding)
+		api.DELETE("/portForwards/:id", portfwd.DeletePortForwarding)
+		api.PATCH("/portForwards/:id/status", portfwd.UpdatePortForwardingStatus)
 	}
 
 	r.GET("/", func(c *gin.Context) {

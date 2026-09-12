@@ -23,3 +23,6 @@ mailmap.txt
 
 # IDE/AI 项目数据目录（本地状态，不提交）
 .codebuddy/
+
+# AI 临时产物（中间文件 / 一次性脚本，不进版本库）
+.scratch/
