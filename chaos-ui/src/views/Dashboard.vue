@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
+import {useRouter} from 'vue-router'
 import {theme} from '../theme'
+
+const router = useRouter()
 
 const balance = ref<string>('')
 const loading = ref(false)
@@ -173,7 +176,7 @@ async function fetchActiveStats() {
 }
 
 function goBoard() {
-  window.location.hash = 'board'
+  router.push('/board')
 }
 
 onMounted(() => {
@@ -233,7 +236,7 @@ watch(theme, () => {
 
 <style scoped>
 .dashboard {
-  max-width: 1200px;
+  max-width: 100%;
 }
 
 .api-balance {

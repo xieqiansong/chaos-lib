@@ -3,6 +3,9 @@ import {onMounted, onUnmounted, ref} from 'vue'
 import {format} from 'date-fns'
 import {zhCN} from 'date-fns/locale'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {useRouter} from 'vue-router'
+
+const router = useRouter()
 
 const now = ref(new Date())
 let timer: ReturnType<typeof setInterval>
@@ -13,7 +16,7 @@ let weatherTimer: ReturnType<typeof setInterval>
 const timeOffset = ref(0)
 
 function goBack() {
-  window.location.hash = 'dashboard'
+  router.push('/dashboard')
 }
 
 // ---- 全屏切换 ----

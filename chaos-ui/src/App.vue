@@ -1,17 +1,8 @@
 <script setup lang="ts">
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
 import {format} from 'date-fns'
 import Search from './views/Search.vue'
-import BrowserHistory from './views/BrowserHistory.vue'
-import Sdk from './views/Sdk.vue'
-import FileLink from './views/FileLink.vue'
-import Environment from './views/Environment.vue'
-import QuickEdit from './views/QuickEdit.vue'
-import Example from './views/Example.vue'
-import Task from './views/Task.vue'
-import Dashboard from './views/Dashboard.vue'
-import ProjectManage from './views/ProjectManage.vue'
-import MobileBoard from './views/MobileBoard.vue'
 import PendingTasks from './components/PendingTasks.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
@@ -22,6 +13,10 @@ import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
 import {Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
+import {buildMenu, flattenMenu} from './router'
+
+const route = useRoute()
+const router = useRouter()
 
 // 终端风格：命令面板开关 + 全局热键
 const CMD_ALIAS: Record<string, string> = {
@@ -35,14 +30,24 @@ const CMD_ALIAS: Record<string, string> = {
   board: 'board',
 }
 
+// 侧边菜单：完全由路由表自动生成（见 router/index.ts）
+const menuItems = computed(() => buildMenu())
+
+// 命令面板条目：菜单拍平 + shell 别名
+const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
+  key: m.path,
+  label: m.title,
+  alias: CMD_ALIAS[m.name] || m.name,
+})))
+
 const paletteVisible = ref(false)
 
 function togglePalette() {
   paletteVisible.value = !paletteVisible.value
 }
 
-function onPaletteSelect(key: string) {
-  activeKey.value = key
+function onPaletteSelect(path: string) {
+  router.push(path)
   paletteVisible.value = false
 }
 
@@ -63,7 +68,6 @@ function applyCrtPreference() {
 }
 
 const searchText = ref('')
-const activeKey = ref((window.location.hash.slice(1) || 'dashboard'))
 const now = ref(format(new Date(), 'MM-dd HH:mm:ss'))
 let timer: ReturnType<typeof setInterval>
 
@@ -73,6 +77,23 @@ const handleSearchChange = (value: string) => {
   searchText.value = value
 }
 
+// 当前路由：菜单高亮 / 标题 / 面包屑的唯一依据
+const activePath = computed(() => route.path)
+const currentTitle = computed(() => route.meta.title || 'main')
+
+// 面包屑：由 route.matched 的 meta.title 自动生成（支持多级路由）
+const breadcrumbs = computed(() =>
+    route.matched
+        .filter(r => r.meta?.title && r.path !== '/')
+        .map(r => ({path: r.path, title: r.meta.title as string}))
+)
+
+// 全屏路由（大屏看板）脱离常规布局
+const isFullscreen = computed(() => route.meta.fullscreen === true)
+
+// 切换路由时收起中心面板
+watch(activePath, () => closeCenterPanel())
+
 // 中心面板（预览 / 复习）完成后刷新待办并关闭
 function onCenterReviewDone() {
   refreshPendingTasks()
@@ -80,86 +101,7 @@ function onCenterReviewDone() {
   closeCenterPanel()
 }
 
-interface MenuItem {
-  id: string
-  label: string
-  children: any[]
-}
-
-const menuItems: MenuItem[] = [
-  {id: 'dashboard', label: '看板', children: []},
-  {id: 'task', label: '任务管理', children: []},
-  {id: 'projectManage', label: '项目管理', children: []},
-  // {id: 'browserHistory', label: '历史记录', children: []},
-  {id: 'sdk', label: 'SDK版本', children: []},
-  {id: 'fileLink', label: '文件连接', children: []},
-  {id: 'quickEdit', label: '快速编辑', children: []},
-  {id: 'environment', label: '环境变量', children: []},
-  // {id: 'example', label: '测试例子', children: []},
-]
-
-const activeMenuLabel = computed(() => {
-  const item = menuItems.find(m => m.id === activeKey.value)
-  return item?.label || ''
-})
-
-// 命令面板条目（基于 menuItems + shell 别名）
-const commandItems = computed(() => menuItems.map(m => ({
-  key: m.id,
-  label: m.label,
-  alias: CMD_ALIAS[m.id] || m.id,
-})))
-
-// 合法路由：菜单项 + 全屏小看板页（不显示在侧边栏）
-const validKeys = [...menuItems.map(m => m.id), 'board']
-
-const componentMap: Record<string, any> = {
-  dashboard: Dashboard,
-  browserHistory: BrowserHistory,
-  sdk: Sdk,
-  fileLink: FileLink,
-  environment: Environment,
-  quickEdit: QuickEdit,
-  example: Example,
-  task: Task,
-  projectManage: ProjectManage,
-  board: MobileBoard,
-}
-
-const currentComponent = computed(() => {
-  return componentMap[activeKey.value] || BrowserHistory
-})
-
-// 小看板页为全屏模式，脱离常规布局
-const isBoard = computed(() => activeKey.value === 'board')
-
-const treeProps = {
-  children: 'children',
-  label: 'label',
-}
-
-const handleNodeClick = (data: any) => {
-  if (data.id && menuItems.some(m => m.id === data.id)) {
-    activeKey.value = data.id
-    closeCenterPanel()
-  }
-}
-
-watch(activeKey, (val) => {
-  if (window.location.hash.slice(1) !== val) {
-    history.replaceState(null, '', `#${val}`)
-  }
-})
-
-function onHashChange() {
-  const hash = window.location.hash.slice(1)
-  if (hash && validKeys.includes(hash) && hash !== activeKey.value) {
-    activeKey.value = hash
-  }
-}
-
 onMounted(() => {
-  window.addEventListener('hashchange', onHashChange)
   window.addEventListener('keydown', onGlobalKey)
   applyCrtPreference()
   timer = setInterval(() => {
@@ -169,14 +111,13 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(timer)
-  window.removeEventListener('hashchange', onHashChange)
   window.removeEventListener('keydown', onGlobalKey)
 })
 </script>
 
 <template>
-  <div v-if="isBoard" class="board-layout">
-    <component :is="currentComponent" :key="activeKey"/>
+  <div v-if="isFullscreen" class="board-layout">
+    <router-view/>
   </div>
   <div v-else class="app-layout">
     <aside class="app-sidebar app-sidebar--frame">
@@ -184,22 +125,51 @@ onUnmounted(() => {
         <div class="sidebar-header">
           <span class="text-sm font-mono text-primary">{{ now }}</span>
         </div>
-        <el-tree
-            :data="menuItems"
-            :props="treeProps"
-            node-key="id"
-            :default-expanded-keys="[]"
-            class="sidebar-tree"
-            @node-click="handleNodeClick"
-        />
+        <el-menu
+            :default-active="activePath"
+            class="sidebar-menu"
+            router
+            unique-opened
+        >
+          <template v-for="item in menuItems" :key="item.path">
+            <el-sub-menu v-if="item.children.length" :index="item.path">
+              <template #title>
+                <el-icon v-if="item.icon">
+                  <component :is="item.icon"/>
+                </el-icon>
+                <span>{{ item.title }}</span>
+              </template>
+              <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+                <el-icon v-if="child.icon">
+                  <component :is="child.icon"/>
+                </el-icon>
+                <span>{{ child.title }}</span>
+              </el-menu-item>
+            </el-sub-menu>
+            <el-menu-item v-else :index="item.path">
+              <el-icon v-if="item.icon">
+                <component :is="item.icon"/>
+              </el-icon>
+              <span>{{ item.title }}</span>
+            </el-menu-item>
+          </template>
+        </el-menu>
+      </TerminalFrame>
+      <TerminalFrame title="todo" prompt="chaos@queue" hide-titlebar>
+        <div class="sidebar-scroll">
+          <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event"/>
+        </div>
       </TerminalFrame>
     </aside>
+
     <div class="app-main">
-      <TerminalFrame :title="activeMenuLabel || 'main'" prompt="chaos@main" hide-titlebar>
+      <TerminalFrame :title="currentTitle" prompt="chaos@main" hide-titlebar>
         <header class="app-header">
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item></el-breadcrumb-item>
-            <el-breadcrumb-item>{{ activeMenuLabel }}</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{path: '/dashboard'}">首页</el-breadcrumb-item>
+            <el-breadcrumb-item v-for="crumb in breadcrumbs" :key="crumb.path">
+              {{ crumb.title }}
+            </el-breadcrumb-item>
           </el-breadcrumb>
           <div class="search-wrapper">
             <Search @search-change="handleSearchChange"/>
@@ -219,7 +189,9 @@ onUnmounted(() => {
           </button>
         </header>
         <main class="app-content">
-          <component :is="currentComponent" :search-text="searchText" :key="activeKey"/>
+          <router-view v-slot="{Component}">
+            <component :is="Component" :search-text="searchText"/>
+          </router-view>
         </main>
       </TerminalFrame>
       <div v-if="centerPanel" class="center-panel">
@@ -248,17 +220,6 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-    <aside class="app-sidebar app-sidebar--frame">
-      <TerminalFrame title="todo" prompt="chaos@queue" hide-titlebar>
-        <div class="sidebar-header">
-          <span class="text-sm font-mono text-primary">待办任务</span>
-          <el-tag v-if="pendingTaskCount > 0" size="small" type="primary" class="ml-sm">{{ pendingTaskCount }}</el-tag>
-        </div>
-        <div class="sidebar-scroll">
-          <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event" />
-        </div>
-      </TerminalFrame>
-    </aside>
   </div>
 
   <CommandPalette
@@ -314,11 +275,34 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.sidebar-tree {
+.sidebar-menu {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-sm) 0;
   border-right: none;
+  background: transparent;
+  /* 终端风格：覆盖 Element Plus 菜单变量，随主题自动切换 */
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: var(--term-green-faint);
+  --el-menu-active-color: var(--term-green);
+  --el-menu-hover-bg-color: var(--term-active-bg);
+  --el-menu-hover-text-color: var(--term-green);
+  --el-menu-item-height: 2rem;
+  --el-menu-sub-item-height: 1.85rem;
+  --el-menu-base-level-padding: var(--space-lg);
+  --el-menu-level-padding: var(--space-lg);
+}
+
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  border-left: 2px solid transparent;
+}
+
+/* 当前路由高亮 */
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  color: var(--term-green);
+  background: var(--term-active-bg);
+  border-left-color: var(--term-green);
 }
 
 .app-main {

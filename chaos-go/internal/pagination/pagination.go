@@ -63,9 +63,18 @@ func New(items interface{}, total int64, q Query) Result {
 
 // Paginate 在已带 Where/Order 的查询 base 上执行 count + 分页查询。
 // base 不应自带 Limit/Offset；返回总条数与错误。
+//
+// count 依赖 Statement.Model 推导表名，而调用方传入的 base 通常只有
+// Where/Order，因此这里用 dest 的元素类型补上模型，否则 GORM 会把
+// &total 当成模型解析并报 unsupported data type / Table not set。
 func Paginate[T any](base *gorm.DB, dest *[]T, q Query) (int64, error) {
 	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	countTx := base
+	if countTx.Statement.Model == nil {
+		var model T
+		countTx = countTx.Model(&model)
+	}
+	if err := countTx.Count(&total).Error; err != nil {
 		return 0, err
 	}
 	// Session 克隆避免 Count 的 SELECT 子句污染后续 Find。
