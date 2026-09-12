@@ -2,6 +2,7 @@
 import {computed, onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {theme} from '../theme'
+import ContributionPanel from '../components/ContributionPanel.vue'
 
 const router = useRouter()
 
@@ -13,12 +14,22 @@ const activeChartLoading = ref(false)
 const activeChartOption = ref({})
 const isBalanceNum = computed(() => !isNaN(Number(balance.value)) && balance.value !== '')
 
+// GitHub 风格贡献图：近一年每日完成任务数（按「每日任务」下的子任务分别统计，可切换）
+const contributionLoading = ref(false)
+const contributionRoot = ref('每日任务')
+const contributionItems = ref<{
+  id: number
+  name: string
+  total: number
+  days: { date: string; count: number }[]
+}[]>([])
+
 const MAX_VISUAL = 99
 type CappedItem = { visual: number; raw: number }
 
 // 从当前主题读取主题色，避免图表内游离硬编码（随主题切换实时取色）
 const cssVar = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 function themeColors() {
   return {
@@ -175,6 +186,20 @@ async function fetchActiveStats() {
   }
 }
 
+async function fetchContribution() {
+  contributionLoading.value = true
+  try {
+    const res = await fetch('/api/tasks/contributionStats')
+    const data = await res.json()
+    contributionRoot.value = data.rootName || '每日任务'
+    contributionItems.value = data.items || []
+  } catch (e: any) {
+    console.error('获取贡献统计失败:', e)
+  } finally {
+    contributionLoading.value = false
+  }
+}
+
 function goBoard() {
   router.push('/board')
 }
@@ -183,6 +208,7 @@ onMounted(() => {
   fetchBalance()
   fetchDailyStats()
   fetchActiveStats()
+  fetchContribution()
 })
 
 watch(theme, () => {
@@ -204,15 +230,21 @@ watch(theme, () => {
             CNY
           </span>
           <span v-else>{{ balance }}</span>
-          <el-button
-              class="clock-jump-btn"
-              type="primary"
-              plain
-              size="small"
-              @click="goBoard"
-          >
+          <el-button class="clock-jump-btn" type="primary" plain size="small" @click="goBoard">
             全屏时钟
           </el-button>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16" class="mb-lg">
+      <el-col :span="24">
+        <div class="chart-section">
+          <div class="section-toolbar">
+            <span class="text-primary text-base section-title">任务贡献</span>
+          </div>
+          <div v-if="contributionLoading" class="contrib-placeholder">加载中...</div>
+          <ContributionPanel v-else :root-name="contributionRoot" :items="contributionItems"/>
         </div>
       </el-col>
     </el-row>
@@ -268,6 +300,14 @@ watch(theme, () => {
 .chart-placeholder {
   height: 22vh;
   min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--el-text-color-secondary);
+}
+
+.contrib-placeholder {
+  height: 9rem;
   display: flex;
   align-items: center;
   justify-content: center;
