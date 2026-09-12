@@ -42,6 +42,9 @@ const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
 
 const paletteVisible = ref(false)
 
+// 侧边栏待办区折叠开关
+const todoCollapsed = ref(false)
+
 function togglePalette() {
   paletteVisible.value = !paletteVisible.value
 }
@@ -124,39 +127,48 @@ onUnmounted(() => {
       <TerminalFrame title="nav" prompt="chaos@nav" hide-titlebar>
         <div class="sidebar-header">
           <span class="text-sm font-mono text-primary">{{ now }}</span>
+          <span class="sidebar-badge" title="待办任务数量">{{ pendingTaskCount }} 待办</span>
         </div>
-        <el-menu
-            :default-active="activePath"
-            class="sidebar-menu"
-            router
-            unique-opened
-        >
-          <template v-for="item in menuItems" :key="item.path">
-            <el-sub-menu v-if="item.children.length" :index="item.path">
-              <template #title>
+
+        <div class="sidebar-nav">
+          <el-menu
+              :default-active="activePath"
+              class="sidebar-menu"
+              router
+              unique-opened
+          >
+            <template v-for="item in menuItems" :key="item.path">
+              <el-sub-menu v-if="item.children.length" :index="item.path">
+                <template #title>
+                  <el-icon v-if="item.icon">
+                    <component :is="item.icon"/>
+                  </el-icon>
+                  <span>{{ item.title }}</span>
+                </template>
+                <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+                  <el-icon v-if="child.icon">
+                    <component :is="child.icon"/>
+                  </el-icon>
+                  <span>{{ child.title }}</span>
+                </el-menu-item>
+              </el-sub-menu>
+              <el-menu-item v-else :index="item.path">
                 <el-icon v-if="item.icon">
                   <component :is="item.icon"/>
                 </el-icon>
                 <span>{{ item.title }}</span>
-              </template>
-              <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
-                <el-icon v-if="child.icon">
-                  <component :is="child.icon"/>
-                </el-icon>
-                <span>{{ child.title }}</span>
               </el-menu-item>
-            </el-sub-menu>
-            <el-menu-item v-else :index="item.path">
-              <el-icon v-if="item.icon">
-                <component :is="item.icon"/>
-              </el-icon>
-              <span>{{ item.title }}</span>
-            </el-menu-item>
-          </template>
-        </el-menu>
-      </TerminalFrame>
-      <TerminalFrame title="todo" prompt="chaos@queue" hide-titlebar>
-        <div class="sidebar-scroll">
+            </template>
+          </el-menu>
+        </div>
+
+        <div class="sidebar-divider" @click="todoCollapsed = !todoCollapsed">
+          <span class="term-prompt">chaos@queue:~$</span>
+          <span class="sidebar-divider-label">待办任务</span>
+          <span class="sidebar-divider-fold">{{ todoCollapsed ? '▸' : '▾' }}</span>
+        </div>
+
+        <div v-show="!todoCollapsed" class="sidebar-todo">
           <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event"/>
         </div>
       </TerminalFrame>
@@ -249,10 +261,60 @@ onUnmounted(() => {
   padding: var(--space-xs);
 }
 
-.sidebar-scroll {
-  flex: 1;
-  overflow-y: auto;
+.sidebar-nav {
+  flex: 1 1 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-todo {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sidebar-divider {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-lg);
+  border-top: 1px solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
+  color: var(--term-green-faint);
+  cursor: pointer;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-xs);
+  user-select: none;
+}
+
+.sidebar-divider:hover {
+  color: var(--term-green);
+  background: var(--term-active-bg);
+}
+
+.sidebar-divider-label {
+  flex: 1;
+}
+
+.sidebar-divider-fold {
+  flex-shrink: 0;
+}
+
+.sidebar-badge {
+  margin-left: auto;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--term-border);
+  border-radius: 2px;
+  color: var(--term-green-faint);
+  font-size: var(--font-xs);
+  cursor: default;
+}
+
+.sidebar-badge:hover {
+  color: var(--term-green);
+  border-color: var(--term-green-dim);
 }
 
 .sidebar-header {
