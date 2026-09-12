@@ -28,6 +28,7 @@ type AppConfig struct {
 	Log         LogConfig
 	DeepSeek    DeepSeekConfig
 	Baidu       BaiduConfig
+	Supabase    SupabaseConfig
 }
 
 type ServerConfig struct {
@@ -69,6 +70,22 @@ type DeepSeekConfig struct {
 
 type BaiduConfig struct {
 	AK string
+}
+
+// SupabaseConfig 云端数据通道（Supabase Data API / PostgREST）配置。
+// SecretKey 为后端专用凭据，只进 .env，禁止写入任何被版本控制的文件。
+type SupabaseConfig struct {
+	URL            string   // 项目地址，形如 https://<project-ref>.supabase.co
+	SecretKey      string   // sb_secret_*：绕过 RLS，仅后端使用
+	PublishableKey string   // sb_publishable_*：受 RLS 约束，保留给将来的前端只读场景
+	Schema         string   // 目标 schema，缺省 public
+	TimeoutSec     int      // 单次请求超时秒数，缺省 15
+	Tables         []string // 允许访问的表名清单，空表示该通道不可用
+}
+
+// Available 判定云端数据通道是否可用：项目地址、后端凭据与表名清单缺一不可。
+func (c *SupabaseConfig) Available() bool {
+	return c.URL != "" && c.SecretKey != "" && len(c.Tables) > 0
 }
 
 var globalConfig *AppConfig
@@ -253,6 +270,20 @@ func setConfigValue(config *AppConfig, key, value string) {
 		config.DeepSeek.APIKey = value
 	case "BAIDU_AK":
 		config.Baidu.AK = value
+	case "SUPABASE_URL":
+		config.Supabase.URL = value
+	case "SUPABASE_SECRET_KEY":
+		config.Supabase.SecretKey = value
+	case "SUPABASE_PUBLISHABLE_KEY":
+		config.Supabase.PublishableKey = value
+	case "SUPABASE_SCHEMA":
+		config.Supabase.Schema = value
+	case "SUPABASE_TIMEOUT_SEC":
+		if v, err := strconv.Atoi(value); err == nil {
+			config.Supabase.TimeoutSec = v
+		}
+	case "SUPABASE_TABLES":
+		config.Supabase.Tables = parseCSV(value)
 	}
 }
 
@@ -301,12 +332,31 @@ func setDefaults(config *AppConfig) {
 		config.Log.ToConsole = true
 	}
 
+	if config.Supabase.Schema == "" {
+		config.Supabase.Schema = "public"
+	}
+	if config.Supabase.TimeoutSec == 0 {
+		config.Supabase.TimeoutSec = 15
+	}
+
 	config.Features.EnableFileLink = true
 }
 
 func parseBool(value string) bool {
 	lower := strings.ToLower(value)
 	return lower == "true" || lower == "1" || lower == "yes" || lower == "on"
+}
+
+// parseCSV 解析逗号分隔列表：去除每项两端空白，并丢弃空项。
+func parseCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if item := strings.TrimSpace(part); item != "" {
+			items = append(items, item)
+		}
+	}
+	return items
 }
 
 func (c *DatabaseConfig) GetDSN() string {

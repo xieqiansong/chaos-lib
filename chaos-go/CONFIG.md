@@ -146,6 +146,32 @@ if cfg.Features.EnableFileLink {
 }
 ```
 
+## Supabase 云端数据通道（Data API / PostgREST）
+
+用于把明确划归云端的数据读写到 Supabase，走纯 HTTPS（不依赖 Postgres 线协议，IPv4 网络即可工作）。
+实现见 `chaos-go/internal/supabase`；**不接 HTTP 路由**，因此不会出现在 `/api` 下。
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `SUPABASE_URL` | 项目地址，形如 `https://<project-ref>.supabase.co` | - |
+| `SUPABASE_SECRET_KEY` | `sb_secret_*`，后端专用，绕过 RLS | - |
+| `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_*`，受 RLS 约束；后端**不使用**，预留给将来的前端只读场景 | - |
+| `SUPABASE_SCHEMA` | 目标 schema | `public` |
+| `SUPABASE_TIMEOUT_SEC` | 单次请求超时（秒） | `15` |
+| `SUPABASE_TABLES` | 允许访问的表名清单，逗号分隔（空项自动丢弃） | - |
+
+**可用性判定**：`SUPABASE_URL`、`SUPABASE_SECRET_KEY`、`SUPABASE_TABLES` 三者同时非空，该通道才被视为可用；否则 `supabase.Get()` 返回 `nil`，调用方必须判空。
+
+### 注意事项
+
+- **凭据只放 `apikey` 请求头**。Supabase 新式凭据（`sb_publishable_*` / `sb_secret_*`）不是 JWT，放进 `Authorization: Bearer` 会被平台判为 `Invalid JWT`。
+- **后端读写必须用 secret key**。publishable key 等价于旧的 `anon`，受行级安全性（RLS）约束：RLS 启用且无策略时读取恒为空集、写入被拒（`42501`）。secret key 具备 `bypassrls`，只要请求不携带用户 access token 就绕过 RLS，无需为每张表编写策略。
+- **表名白名单**：不在 `SUPABASE_TABLES` 中的表名会在发出请求前被拒绝，不会产生任何外网请求。
+- **更新与删除必须带过滤条件**：`Update` / `Delete` 未携带过滤条件时直接返回错误，避免整表被改写或清空。
+- **非 `public` schema**：除在 `SUPABASE_SCHEMA` 指定外，还必须先在该项目的 Dashboard → API Settings 中把该 schema 加入 **Exposed schemas**，否则请求不会生效。
+- **安全**：`SUPABASE_SECRET_KEY` 只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略）。本仓库对外公开，禁止把 secret key 与真实 Project URL 写入任何被版本控制的文件。
+- **免费套餐项目会休眠**：冷启动时首个请求可能较慢或失败，此时由调用方重试；客户端不做自动重试（写操作重试有重复写入风险）。
+
 ## 配置文件优先级
 
 1. 环境变量 `APP_ENV` 决定加载哪个配置文件
