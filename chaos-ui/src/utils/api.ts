@@ -164,10 +164,17 @@ export interface SshConnectionPayload {
     Remark?: string
 }
 
+export type PortForwardDirection = 'local' | 'remote'
+
 export interface PortForward {
     Id: number
     Name: string
+    /** local = 本机监听（ssh -L）；remote = SSH 服务器侧监听（ssh -R） */
+    Direction: PortForwardDirection
+    /** 监听端口：local 为本机端口，remote 为服务器侧端口 */
     Port: number
+    /** 监听地址：local 缺省 0.0.0.0，remote 缺省 127.0.0.1 */
+    BindAddress: string
     TargetHost: string
     TargetPort: number
     SshConnectionId: number
@@ -179,7 +186,9 @@ export interface PortForward {
 
 export interface PortForwardPayload {
     Name?: string
+    Direction?: PortForwardDirection
     Port: number
+    BindAddress?: string
     TargetHost: string
     TargetPort: number
     SshConnectionId: number

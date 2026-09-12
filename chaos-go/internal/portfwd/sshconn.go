@@ -23,7 +23,7 @@ const (
 // SshConnection SSH 连接信息。
 // 凭据（Password / PrivateKey / Passphrase）只用于后端建连，一律不经 API 返回、不写入日志。
 type SshConnection struct {
-	Id         int    `gorm:"primaryKey"`
+	Id         int `gorm:"primaryKey"`
 	Name       string
 	Host       string
 	Port       int

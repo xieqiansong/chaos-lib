@@ -3,6 +3,8 @@ package portfwd
 import (
 	"chaos-go/config"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,11 +12,26 @@ import (
 
 // ── 模型 ──────────────────────────────────────────────────────────
 
-// PortForwarding 端口转发规则：本地监听端口 → 经 SSH 隧道 → 远端目标 host:port。
+const (
+	// DirectionLocal 本地转发（等价 ssh -L）：本机监听 → SSH 服务器侧解析目标
+	DirectionLocal = "local"
+	// DirectionRemote 远程转发（等价 ssh -R）：SSH 服务器侧监听 → 本机侧解析目标
+	DirectionRemote = "remote"
+
+	// DefaultLocalBindAddress 本地转发缺省监听地址（监听全部网卡，与既有行为一致）
+	DefaultLocalBindAddress = "0.0.0.0"
+	// DefaultRemoteBindAddress 远程转发缺省监听地址（与 OpenSSH ssh -R 不带 bind_address 一致）
+	DefaultRemoteBindAddress = "127.0.0.1"
+)
+
+// PortForwarding 端口转发规则。
+// Direction 决定「监听」发生在哪一侧：local 在本机监听，remote 在 SSH 服务器侧监听。
 type PortForwarding struct {
-	Id              int    `gorm:"primaryKey"`
+	Id              int `gorm:"primaryKey"`
 	Name            string
+	Direction       string
 	Port            int
+	BindAddress     string
 	TargetHost      string
 	TargetPort      int
 	SshConnectionId int
@@ -30,7 +47,9 @@ func (PortForwarding) TableName() string {
 type PortForwardingResponse struct {
 	Id              int
 	Name            string
+	Direction       string
 	Port            int
+	BindAddress     string
 	TargetHost      string
 	TargetPort      int
 	SshConnectionId int
@@ -39,16 +58,48 @@ type PortForwardingResponse struct {
 	Remark          string
 }
 
-// targetAddr 远端目标地址，由 SSH 服务器侧解析（等价 ssh -L 的目标段）。
+// normalize 补齐方向与监听地址：方向空值视为 local（兼容本次变更前的存量数据）。
+func (pf *PortForwarding) normalize() error {
+	switch pf.Direction {
+	case "":
+		pf.Direction = DirectionLocal
+	case DirectionLocal, DirectionRemote:
+	default:
+		return fmt.Errorf("转发方向不合法，只能为 %s 或 %s", DirectionLocal, DirectionRemote)
+	}
+	if strings.TrimSpace(pf.BindAddress) == "" {
+		if pf.Direction == DirectionRemote {
+			pf.BindAddress = DefaultRemoteBindAddress
+		} else {
+			pf.BindAddress = DefaultLocalBindAddress
+		}
+	}
+	pf.BindAddress = strings.TrimSpace(pf.BindAddress)
+	return nil
+}
+
+// listenAddr 监听地址：local 为本机监听地址，remote 为 SSH 服务器侧监听地址。
+func (pf *PortForwarding) listenAddr() string {
+	return net.JoinHostPort(pf.BindAddress, strconv.Itoa(pf.Port))
+}
+
+// targetAddr 目标地址：local 由 SSH 服务器侧解析，remote 由本机侧解析。
 func (pf *PortForwarding) targetAddr() string {
 	return fmt.Sprintf("%s:%d", pf.TargetHost, pf.TargetPort)
 }
 
+func (pf *PortForwarding) directionLabel() string {
+	if pf.Direction == DirectionRemote {
+		return "远端"
+	}
+	return "本地"
+}
+
 func (pf *PortForwarding) toResponse() PortForwardingResponse {
-	running, lastErr := GlobalPortForwarder.Status(pf.Port)
+	running, lastErr := GlobalPortForwarder.Status(pf.Id)
 	return PortForwardingResponse{
-		Id: pf.Id, Name: pf.Name, Port: pf.Port,
-		TargetHost: pf.TargetHost, TargetPort: pf.TargetPort,
+		Id: pf.Id, Name: pf.Name, Direction: pf.Direction, Port: pf.Port,
+		BindAddress: pf.BindAddress, TargetHost: pf.TargetHost, TargetPort: pf.TargetPort,
 		SshConnectionId: pf.SshConnectionId, Status: running,
 		LastError: lastErr, Remark: pf.Remark,
 	}
@@ -56,8 +107,14 @@ func (pf *PortForwarding) toResponse() PortForwardingResponse {
 
 // validate 校验规则字段；需关联已存在的 SSH 连接。
 func (pf *PortForwarding) validate() error {
+	if err := pf.normalize(); err != nil {
+		return err
+	}
 	if err := validatePort(pf.Port); err != nil {
-		return fmt.Errorf("本地监听端口不合法: %v", err)
+		return fmt.Errorf("%s监听端口不合法: %v", pf.directionLabel(), err)
+	}
+	if strings.ContainsAny(pf.BindAddress, " \t/") {
+		return fmt.Errorf("监听地址不合法: %s", pf.BindAddress)
 	}
 	if strings.TrimSpace(pf.TargetHost) == "" {
 		return fmt.Errorf("目标主机不能为空")
@@ -73,7 +130,11 @@ func (pf *PortForwarding) validate() error {
 		return fmt.Errorf("SSH 连接不存在")
 	}
 	if strings.TrimSpace(pf.Name) == "" {
-		pf.Name = fmt.Sprintf("%d → %s:%d", pf.Port, pf.TargetHost, pf.TargetPort)
+		if pf.Direction == DirectionRemote {
+			pf.Name = fmt.Sprintf("[R] %s → %s", pf.listenAddr(), pf.targetAddr())
+		} else {
+			pf.Name = fmt.Sprintf("[L] %s → %s", pf.listenAddr(), pf.targetAddr())
+		}
 	}
 	return nil
 }
@@ -85,6 +146,8 @@ func GetPortForwardings(c *gin.Context) {
 	config.GetDB().Order("id ASC").Find(&rules)
 	responses := make([]PortForwardingResponse, 0, len(rules))
 	for i := range rules {
+		// 存量行可能没有 direction，读路径同样按 local 兜底
+		_ = rules[i].normalize()
 		responses = append(responses, rules[i].toResponse())
 	}
 	c.JSON(200, responses)
@@ -115,13 +178,16 @@ func UpdatePortForwarding(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "端口转发不存在"})
 		return
 	}
-	if running, _ := GlobalPortForwarder.Status(rule.Port); running {
+	if running, _ := GlobalPortForwarder.Status(rule.Id); running {
 		c.JSON(400, gin.H{"error": "该转发正在运行，请先停止后再修改"})
 		return
 	}
+	_ = rule.normalize()
 	var req struct {
 		Name            *string
+		Direction       *string
 		Port            *int
+		BindAddress     *string
 		TargetHost      *string
 		TargetPort      *int
 		SshConnectionId *int
@@ -134,8 +200,14 @@ func UpdatePortForwarding(c *gin.Context) {
 	if req.Name != nil {
 		rule.Name = *req.Name
 	}
+	if req.Direction != nil {
+		rule.Direction = *req.Direction
+	}
 	if req.Port != nil {
 		rule.Port = *req.Port
+	}
+	if req.BindAddress != nil {
+		rule.BindAddress = *req.BindAddress
 	}
 	if req.TargetHost != nil {
 		rule.TargetHost = *req.TargetHost
@@ -167,8 +239,8 @@ func DeletePortForwarding(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "端口转发不存在"})
 		return
 	}
-	if running, _ := GlobalPortForwarder.Status(rule.Port); running {
-		if err := GlobalPortForwarder.RemoveForward(rule.Port); err != nil {
+	if running, _ := GlobalPortForwarder.Status(rule.Id); running {
+		if err := GlobalPortForwarder.RemoveForward(rule.Id); err != nil {
 			c.JSON(500, gin.H{"error": "停止端口转发失败: " + err.Error()})
 			return
 		}
@@ -187,6 +259,10 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "端口转发不存在"})
 		return
 	}
+	if err := rule.normalize(); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 	var req struct {
 		Status bool
 	}
@@ -194,7 +270,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	running, _ := GlobalPortForwarder.Status(rule.Port)
+	running, _ := GlobalPortForwarder.Status(rule.Id)
 	if req.Status {
 		if running {
 			c.JSON(400, gin.H{"error": "该端口转发已启动"})
@@ -215,7 +291,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 			c.JSON(400, gin.H{"error": "该端口转发未启动"})
 			return
 		}
-		if err := GlobalPortForwarder.RemoveForward(rule.Port); err != nil {
+		if err := GlobalPortForwarder.RemoveForward(rule.Id); err != nil {
 			c.JSON(500, gin.H{"error": "停止端口转发失败: " + err.Error()})
 			return
 		}

@@ -87,3 +87,19 @@ ALTER TABLE public.port_forwarding ADD COLUMN IF NOT EXISTS ssh_connection_id in
 ALTER TABLE public.port_forwarding ADD COLUMN IF NOT EXISTS remark text;
 COMMENT ON COLUMN public.port_forwarding.ssh_connection_id IS '关联的 SSH 连接 id（ssh_connections.id）';
 COMMENT ON COLUMN public.port_forwarding.remark IS '端口转发规则备注';
+
+-- ============================================================
+-- 2026-09-12: SSH 远程转发（ssh-remote-forward 变更）
+-- port_forwarding 增加 direction 与 bind_address 两列：
+--   direction = local：在本机监听（等价 ssh -L），bind_address 缺省 0.0.0.0；
+--   direction = remote：在 SSH 服务器侧监听（等价 ssh -R），bind_address 缺省 127.0.0.1。
+-- 方向为空的历史数据一律视为 local（本次回填显式化，读路径也做了兜底）。
+-- 对应模型：internal/portfwd.PortForwarding
+-- ============================================================
+
+ALTER TABLE public.port_forwarding ADD COLUMN IF NOT EXISTS direction text;
+ALTER TABLE public.port_forwarding ADD COLUMN IF NOT EXISTS bind_address text;
+COMMENT ON COLUMN public.port_forwarding.direction IS '转发方向：local（本机监听，等价 ssh -L）/ remote（SSH 服务器侧监听，等价 ssh -R）；空值视为 local';
+COMMENT ON COLUMN public.port_forwarding.bind_address IS '监听地址：local 为本机监听地址（缺省 0.0.0.0），remote 为 SSH 服务器侧监听地址（缺省 127.0.0.1）';
+
+UPDATE public.port_forwarding SET direction = 'local' WHERE direction IS NULL OR direction = '';

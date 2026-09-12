@@ -1,63 +1,4 @@
-# Spec: SSH Port Forward (SSH 端口转发)
-
-## Purpose
-
-让用户通过 Web 界面维护 SSH 连接信息（密码或私钥）与端口转发规则，并一键建立经 SSH 隧道的端口转发：既有本地转发（`ssh -L`，访问只有 SSH 服务器内网可达的服务），也有远程转发（`ssh -R`，把本机服务反向暴露给 SSH 服务器或其网络）。
-
-## Requirements
-
-### Requirement: SSH connection management
-系统 SHALL 支持对 SSH 连接信息进行创建、查询、更新与删除。单条 SSH 连接至少包含：名称、SSH 主机、SSH 端口（默认 22）、用户名、认证方式。
-
-#### Scenario: Create a password-auth connection
-- **WHEN** 提交一条认证方式为「密码」的 SSH 连接（含名称、主机、端口、用户名、密码）
-- **THEN** 系统持久化该连接并返回其 id
-
-#### Scenario: Create a key-auth connection
-- **WHEN** 提交一条认证方式为「私钥」的 SSH 连接（含私钥内容，可选私钥口令）
-- **THEN** 系统持久化该连接并返回其 id
-
-#### Scenario: Missing required fields rejected
-- **WHEN** 提交的 SSH 连接缺少主机、用户名，或端口不在 1-65535 之间
-- **THEN** 系统拒绝并返回明确的校验错误
-
-#### Scenario: Update a connection
-- **WHEN** 更新某条已存在连接的名称、主机或用户名
-- **THEN** 系统保存变更，后续使用该连接的转发规则采用新配置
-
-#### Scenario: Delete a connection in use is blocked
-- **WHEN** 删除一条仍被任意转发规则引用的 SSH 连接
-- **THEN** 系统拒绝删除并提示被引用的规则数量
-
-### Requirement: SSH credential persistence
-系统 SHALL 持久化 SSH 认证凭据，支持密码与私钥两种认证方式；私钥方式 MUST 支持可选的私钥口令（passphrase）。
-
-#### Scenario: Password authentication is used for the tunnel
-- **WHEN** 一条使用密码认证的连接被用于启动转发
-- **THEN** 系统以保存的密码完成 SSH 认证
-
-#### Scenario: Private key authentication is used for the tunnel
-- **WHEN** 一条使用私钥认证的连接被用于启动转发
-- **THEN** 系统以保存的私钥（及可选口令）完成 SSH 认证
-
-#### Scenario: Switch authentication method
-- **WHEN** 将一条连接从密码认证改为私钥认证并保存
-- **THEN** 后续认证仅使用私钥，且不再要求原密码
-
-### Requirement: Credential protection
-系统 SHALL NOT 在列表与详情接口的响应中返回 SSH 密码或私钥明文，且 MUST NOT 将密码、私钥及其口令写入日志。
-
-#### Scenario: Credentials not echoed by list API
-- **WHEN** 请求 SSH 连接列表或详情
-- **THEN** 响应中不含密码 / 私钥明文，仅可包含「是否已配置凭据」等布尔标记
-
-#### Scenario: Credentials not written to logs
-- **WHEN** 建立 SSH 连接失败或转发隧道异常
-- **THEN** 日志中只记录主机、端口、用户名与错误摘要，不含密码或私钥内容
-
-#### Scenario: Update without re-entering credential
-- **WHEN** 更新连接的名称 / 主机等非凭据字段且未提交密码或私钥
-- **THEN** 系统保留原凭据不变
+## MODIFIED Requirements
 
 ### Requirement: Port forwarding rule management
 系统 SHALL 支持端口转发规则的创建、查询、更新与删除。每条规则 MUST 关联一条已存在的 SSH 连接，并声明转发方向（`local` 本地转发 / `remote` 远程转发，缺省 `local`）、监听端口、可选监听地址、目标主机、目标端口、备注与启用状态。监听端口的含义随方向变化：`local` 时为本机监听端口，`remote` 时为 SSH 服务器侧监听端口。
@@ -148,17 +89,6 @@
 - **WHEN** 查询转发规则列表
 - **THEN** 每条规则返回其方向、监听端口、运行状态与最近一次错误信息（如有）
 
-### Requirement: SSH connectivity test
-系统 SHALL 提供 SSH 连接测试能力，在不启动端口转发的前提下验证主机可达性与凭据有效性。
-
-#### Scenario: Test succeeds
-- **WHEN** 对一条配置正确、主机可达的连接发起测试
-- **THEN** 系统返回成功及 SSH 服务器标识信息
-
-#### Scenario: Test fails with reason
-- **WHEN** 对主机不可达、端口错误或凭据错误的连接发起测试
-- **THEN** 系统返回失败及可读原因（如认证失败、连接超时）
-
 ### Requirement: Port forwarding management page
 系统 SHALL 在 Web 前端提供端口转发管理页面，用于维护 SSH 连接与转发规则（含转发方向与监听地址）、启停转发并查看运行状态。
 
@@ -181,6 +111,8 @@
 #### Scenario: Credentials masked in the form
 - **WHEN** 用户编辑一条已有 SSH 连接
 - **THEN** 密码 / 私钥输入框不回显明文，留空表示保持原凭据
+
+## ADDED Requirements
 
 ### Requirement: Remote port forwarding
 系统 SHALL 支持远程转发：在 SSH 服务器侧按规则的监听地址与监听端口建立监听，并把接入的连接经隧道回连到本机侧解析的目标主机:目标端口。监听地址缺省为 `127.0.0.1`；绑定非回环地址 MUST 由 SSH 服务器策略（如 `GatewayPorts`）允许，否则启动失败并返回可读原因。隧道因网络原因重连后，系统 MUST 重新在服务器侧建立该监听。
