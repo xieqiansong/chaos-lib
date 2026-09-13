@@ -1,15 +1,16 @@
 package config
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
+
+	envconfig "github.com/caarlos0/env/v11"
+	"github.com/joho/godotenv"
 )
 
 type Environment string
@@ -20,68 +21,84 @@ const (
 )
 
 type AppConfig struct {
-	Environment Environment
-	Server      ServerConfig
-	Database    DatabaseConfig
-	Pprof       PprofConfig
-	Features    FeatureConfig
-	Log         LogConfig
-	DeepSeek    DeepSeekConfig
-	Baidu       BaiduConfig
-	Supabase    SupabaseConfig
-	Mqtt        MqttConfig
+	Environment Environment     `env:"-"`
+	Server      ServerConfig    `envPrefix:"SERVER_"`
+	Database    DatabaseConfig  `envPrefix:"DB_"`
+	Pprof       PprofConfig     `envPrefix:"PPROF_"`
+	Features    FeatureConfig   `envPrefix:"FEATURE_"`
+	Log         LogConfig       `envPrefix:"LOG_"`
+	DeepSeek    DeepSeekConfig  `envPrefix:"DEEPSEEK_"`
+	Baidu       BaiduConfig     `envPrefix:"BAIDU_"`
+	Supabase    SupabaseConfig  `envPrefix:"SUPABASE_"`
+	Mqtt        MqttConfig      `envPrefix:"MQTT_"`
 }
 
 type ServerConfig struct {
-	Port int
-	Host string
+	Port int    `env:"PORT" envDefault:"8080"`
+	Host string `env:"HOST" envDefault:"0.0.0.0"`
 }
 
 type DatabaseConfig struct {
-	Type     string // 数据库类型：postgres / sqlite，默认 postgres
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-	SSLMode  string
-	Path     string // sqlite 模式下的数据库文件路径，默认 chaos.db
+	Type     string `env:"TYPE" envDefault:"postgres"` // 数据库类型：postgres / sqlite
+	Host     string `env:"HOST" envDefault:"localhost"`
+	Port     int    `env:"PORT" envDefault:"5432"`
+	User     string `env:"USER" envDefault:"postgres"`
+	Password string `env:"PASSWORD"`
+	DBName   string `env:"NAME" envDefault:"chaos"`
+	SSLMode  string `env:"SSLMODE" envDefault:"disable"`
+	Path     string `env:"PATH" envDefault:"chaos.db"` // sqlite 模式下的数据库文件路径
 }
 
 type PprofConfig struct {
-	Enabled bool
-	Port    int
-	Host    string
+	Enabled bool   `env:"ENABLED" envDefault:"false"`
+	Port    int    `env:"PORT" envDefault:"6060"`
+	Host    string `env:"HOST" envDefault:"localhost"`
 }
 
 type FeatureConfig struct {
-	EnableFileLink bool
+	EnableFileLink bool `env:"FILE_LINK" envDefault:"true"`
 }
 
 type LogConfig struct {
-	Level     string
-	FilePath  string
-	ToFile    bool
-	ToConsole bool
+	Level     string `env:"LEVEL" envDefault:"info"`
+	FilePath  string `env:"FILE_PATH" envDefault:"logs/app.log"`
+	ToFile    bool   `env:"TO_FILE"`
+	ToConsole bool   `env:"TO_CONSOLE"`
 }
 
 type DeepSeekConfig struct {
-	APIKey string
+	APIKey string `env:"API_KEY"`
 }
 
 type BaiduConfig struct {
-	AK string
+	AK string `env:"AK"`
 }
 
 // SupabaseConfig 云端数据通道（Supabase Data API / PostgREST）配置。
 // SecretKey 为后端专用凭据，只进 .env，禁止写入任何被版本控制的文件。
 type SupabaseConfig struct {
-	URL            string   // 项目地址，形如 https://<project-ref>.supabase.co
-	SecretKey      string   // sb_secret_*：绕过 RLS，仅后端使用
-	PublishableKey string   // sb_publishable_*：受 RLS 约束，保留给将来的前端只读场景
-	Schema         string   // 目标 schema，缺省 public
-	TimeoutSec     int      // 单次请求超时秒数，缺省 15
-	Tables         []string // 允许访问的表名清单，空表示该通道不可用
+	URL            string     `env:"URL"`             // 项目地址，形如 https://<project-ref>.supabase.co
+	SecretKey      string     `env:"SECRET_KEY"`      // sb_secret_*：绕过 RLS，仅后端使用
+	PublishableKey string     `env:"PUBLISHABLE_KEY"` // sb_publishable_*：受 RLS 约束，保留给将来的前端只读场景
+	Schema         string     `env:"SCHEMA" envDefault:"public"`     // 目标 schema，缺省 public
+	TimeoutSec     int        `env:"TIMEOUT_SEC" envDefault:"15"`    // 单次请求超时秒数，缺省 15
+	Tables         StringList `env:"TABLES"`          // 允许访问的表名清单（逗号分隔、自动去空白），空表示该通道不可用
+}
+
+// StringList 逗号分隔的字符串列表，解析时去除每项两端空白并丢弃空项。
+// 用于 SUPABASE_TABLES 等场景，等价于原 parseCSV 的行为。
+type StringList []string
+
+func (s *StringList) UnmarshalText(text []byte) error {
+	parts := strings.Split(string(text), ",")
+	items := make(StringList, 0, len(parts))
+	for _, part := range parts {
+		if item := strings.TrimSpace(part); item != "" {
+			items = append(items, item)
+		}
+	}
+	*s = items
+	return nil
 }
 
 // Available 判定云端数据通道是否可用：项目地址、后端凭据与表名清单缺一不可。
@@ -92,14 +109,14 @@ func (c *SupabaseConfig) Available() bool {
 // MqttConfig 多节点消息同步通道（基于公共 MQTT broker）配置。
 // Broker / Prefix 为公开信息；Username/Password 仅进 .env，禁止写入版本控制文件。
 type MqttConfig struct {
-	Enabled    bool   // 功能总开关，缺省 false
-	Broker     string // broker 地址，缺省 tcp://broker.emqx.io:1883
-	Prefix     string // 集群公共主题前缀，缺省 test/（个人值 xieqiansong@qq.com/ 写在 .env）
-	ClientID   string // 缺省 chaos-<nodeID>
-	Username   string // 公共 broker 多为匿名，留空
-	Password   string // 同上
-	Encrypt    bool   // 是否启用 AES-256-GCM 载荷加密
-	EncryptKey string // 32 字节共享密钥（hex 或 base64），仅进 .env，禁止入库/日志
+	Enabled    bool   `env:"ENABLED" envDefault:"false"`     // 功能总开关，缺省 false
+	Broker     string `env:"BROKER" envDefault:"tcp://broker.emqx.io:1883"` // broker 地址
+	Prefix     string `env:"PREFIX" envDefault:"test/"`      // 集群公共主题前缀，缺省 test/
+	ClientID   string `env:"CLIENT_ID"`                      // 缺省 chaos-<nodeID>
+	Username   string `env:"USERNAME"`                       // 公共 broker 多为匿名，留空
+	Password   string `env:"PASSWORD"`                       // 同上
+	Encrypt    bool   `env:"ENCRYPT" envDefault:"false"`     // 是否启用 AES-256-GCM 载荷加密
+	EncryptKey string `env:"ENCRYPT_KEY"`                    // 32 字节共享密钥（hex 或 base64），仅进 .env，禁止入库/日志
 }
 
 var globalConfig *AppConfig
@@ -117,12 +134,25 @@ func LoadConfig() *AppConfig {
 	configDir := getConfigDir()
 	configPath := resolveConfigPathFromDir(configDir, env)
 
-	config := &AppConfig{
-		Environment: env,
+	config := &AppConfig{}
+
+	if configPath != "" {
+		if err := godotenv.Load(configPath); err != nil {
+			slog.Warn("无法加载配置文件", "path", configPath, "err", err)
+		}
 	}
 
-	loadConfigFile(config, configPath)
-	setDefaults(config)
+	if err := envconfig.Parse(config); err != nil {
+		slog.Warn("解析配置失败", "err", err)
+	}
+
+	config.Environment = env
+
+	// 日志通道：两者都未显式开启时，默认全部开启（兼容旧逻辑）
+	if !config.Log.ToFile && !config.Log.ToConsole {
+		config.Log.ToFile = true
+		config.Log.ToConsole = true
+	}
 
 	globalConfig = config
 	slog.Info("配置加载成功", "env", env, "configDir", configDir)
@@ -200,201 +230,7 @@ func getConfigDir() string {
 	return "."
 }
 
-func loadConfigFile(config *AppConfig, path string) {
-	if path == "" {
-		return
-	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		slog.Warn("无法打开配置文件", "err", err)
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		value = strings.Trim(value, "\"'")
-
-		setConfigValue(config, key, value)
-	}
-
-	if err := scanner.Err(); err != nil {
-		slog.Warn("读取配置文件错误", "err", err)
-	}
-}
-
-func setConfigValue(config *AppConfig, key, value string) {
-	switch key {
-	case "SERVER_PORT":
-		if port, err := strconv.Atoi(value); err == nil {
-			config.Server.Port = port
-		}
-	case "SERVER_HOST":
-		config.Server.Host = value
-	case "DB_HOST":
-		config.Database.Host = value
-	case "DB_PORT":
-		if port, err := strconv.Atoi(value); err == nil {
-			config.Database.Port = port
-		}
-	case "DB_USER":
-		config.Database.User = value
-	case "DB_PASSWORD":
-		config.Database.Password = value
-	case "DB_NAME":
-		config.Database.DBName = value
-	case "DB_SSLMODE":
-		config.Database.SSLMode = value
-	case "DB_TYPE":
-		config.Database.Type = strings.ToLower(value)
-	case "DB_PATH":
-		config.Database.Path = value
-	case "PPROF_ENABLED":
-		config.Pprof.Enabled = parseBool(value)
-	case "PPROF_PORT":
-		if port, err := strconv.Atoi(value); err == nil {
-			config.Pprof.Port = port
-		}
-	case "PPROF_HOST":
-		config.Pprof.Host = value
-	case "FEATURE_FILE_LINK":
-		config.Features.EnableFileLink = parseBool(value)
-	case "LOG_LEVEL":
-		config.Log.Level = value
-	case "LOG_FILE_PATH":
-		config.Log.FilePath = value
-	case "LOG_TO_FILE":
-		config.Log.ToFile = parseBool(value)
-	case "LOG_TO_CONSOLE":
-		config.Log.ToConsole = parseBool(value)
-	case "DEEPSEEK_API_KEY":
-		config.DeepSeek.APIKey = value
-	case "BAIDU_AK":
-		config.Baidu.AK = value
-	case "SUPABASE_URL":
-		config.Supabase.URL = value
-	case "SUPABASE_SECRET_KEY":
-		config.Supabase.SecretKey = value
-	case "SUPABASE_PUBLISHABLE_KEY":
-		config.Supabase.PublishableKey = value
-	case "SUPABASE_SCHEMA":
-		config.Supabase.Schema = value
-	case "SUPABASE_TIMEOUT_SEC":
-		if v, err := strconv.Atoi(value); err == nil {
-			config.Supabase.TimeoutSec = v
-		}
-	case "SUPABASE_TABLES":
-		config.Supabase.Tables = parseCSV(value)
-	case "MQTT_ENABLED":
-		config.Mqtt.Enabled = parseBool(value)
-	case "MQTT_BROKER":
-		config.Mqtt.Broker = value
-	case "MQTT_PREFIX":
-		config.Mqtt.Prefix = value
-	case "MQTT_CLIENT_ID":
-		config.Mqtt.ClientID = value
-	case "MQTT_USERNAME":
-		config.Mqtt.Username = value
-	case "MQTT_PASSWORD":
-		config.Mqtt.Password = value
-	case "MQTT_ENCRYPT":
-		config.Mqtt.Encrypt = parseBool(value)
-	case "MQTT_ENCRYPT_KEY":
-		config.Mqtt.EncryptKey = value
-	}
-}
-
-func setDefaults(config *AppConfig) {
-	if config.Server.Port == 0 {
-		config.Server.Port = 8080
-	}
-	if config.Server.Host == "" {
-		config.Server.Host = "0.0.0.0"
-	}
-	if config.Database.Host == "" {
-		config.Database.Host = "localhost"
-	}
-	if config.Database.Port == 0 {
-		config.Database.Port = 5432
-	}
-	if config.Database.User == "" {
-		config.Database.User = "postgres"
-	}
-	if config.Database.DBName == "" {
-		config.Database.DBName = "chaos"
-	}
-	if config.Database.SSLMode == "" {
-		config.Database.SSLMode = "disable"
-	}
-	if config.Database.Type == "" {
-		config.Database.Type = "postgres"
-	}
-	if config.Database.Path == "" {
-		config.Database.Path = "chaos.db"
-	}
-	if config.Pprof.Port == 0 {
-		config.Pprof.Port = 6060
-	}
-	if config.Pprof.Host == "" {
-		config.Pprof.Host = "localhost"
-	}
-	if config.Log.Level == "" {
-		config.Log.Level = "info"
-	}
-	if config.Log.FilePath == "" {
-		config.Log.FilePath = "logs/app.log"
-	}
-	if !config.Log.ToFile && !config.Log.ToConsole {
-		config.Log.ToFile = true
-		config.Log.ToConsole = true
-	}
-
-	if config.Supabase.Schema == "" {
-		config.Supabase.Schema = "public"
-	}
-	if config.Supabase.TimeoutSec == 0 {
-		config.Supabase.TimeoutSec = 15
-	}
-
-	if config.Mqtt.Broker == "" {
-		config.Mqtt.Broker = "tcp://broker.emqx.io:1883"
-	}
-	if config.Mqtt.Prefix == "" {
-		config.Mqtt.Prefix = "test/"
-	}
-
-	config.Features.EnableFileLink = true
-}
-
-func parseBool(value string) bool {
-	lower := strings.ToLower(value)
-	return lower == "true" || lower == "1" || lower == "yes" || lower == "on"
-}
-
-// parseCSV 解析逗号分隔列表：去除每项两端空白，并丢弃空项。
-func parseCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	items := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if item := strings.TrimSpace(part); item != "" {
-			items = append(items, item)
-		}
-	}
-	return items
-}
 
 func (c *DatabaseConfig) GetDSN() string {
 	if c.Type == "sqlite" {
