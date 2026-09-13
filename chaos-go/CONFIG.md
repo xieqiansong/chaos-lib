@@ -2,38 +2,7 @@
 
 ## 概述
 
-项目使用基于环境变量的配置管理系统，支持开发和生产环境的配置分离。
-
-## 环境切换
-
-### 方式一：命令行参数（推荐）
-
-```bash
-# 开发环境
-go run cmd/server/main.go -env=dev
-
-# 生产环境
-go run cmd/server/main.go -env=prod
-
-# 构建后运行
-.\chaos-go.exe -env=prod
-```
-
-### 方式二：环境变量
-
-```bash
-# Windows PowerShell
-$env:APP_ENV="prod"
-go run cmd/server/main.go
-
-# Linux/Mac
-APP_ENV=prod go run cmd/server/main.go
-```
-
-### 方式三：默认行为
-
-- 未指定环境时，默认使用 `dev` 环境
-- 系统会自动加载对应的 `.env.dev` 或 `.env.prod` 文件
+项目使用基于环境变量的配置管理系统，统一从项目根目录的 `.env` 文件加载配置。
 
 ## 配置文件
 
@@ -41,8 +10,7 @@ APP_ENV=prod go run cmd/server/main.go
 
 配置文件位于项目根目录：
 
-- `.env.dev` - 开发环境配置
-- `.env.prod` - 生产环境配置
+- `.env` - 唯一配置文件，程序启动时默认加载（缺失则使用内置默认值）
 
 ### 配置项说明
 
@@ -77,7 +45,7 @@ APP_ENV=prod go run cmd/server/main.go
 ## 开发环境配置示例
 
 ```env
-# .env.dev
+# .env
 SERVER_PORT=8080
 DB_HOST=localhost
 DB_PORT=5432
@@ -94,7 +62,7 @@ LOG_LEVEL=debug
 ## 生产环境配置示例
 
 ```env
-# .env.prod
+# .env
 SERVER_PORT=8080
 DB_HOST=ubuntu.lan
 DB_PORT=30101
@@ -112,14 +80,12 @@ LOG_LEVEL=info
 
 如需添加新的配置项：
 
-1. 在 `config/env.go` 的对应配置结构体中添加字段
-2. 在 `setConfigValue()` 函数中添加解析逻辑
-3. 在 `setDefaults()` 函数中设置默认值
-4. 更新 `.env.example` 文件
+1. 在 `config/env.go` 的对应配置结构体中添加字段，并写好 `env:"KEY"` 与 `envDefault:"..."` tag
+2. 更新 `.env.example` 文件
 
 ## 安全注意事项
 
-- ⚠️ **不要**将 `.env.dev` 和 `.env.prod` 提交到版本库
+- ⚠️ **不要**将 `.env` 提交到版本库
 - ✅ 这些文件已在 `.gitignore` 中配置
 - ✅ 只提交 `.env.example` 作为配置模板
 - ⚠️ 生产环境密码应使用强密码并定期更换
@@ -141,7 +107,7 @@ dsn := cfg.Database.GetDSN()
 addr := cfg.Server.GetAddress()
 
 // 检查功能开关
-if cfg.Features.EnableFileLink {
+if cfg.FeatureFileLink {
 // 启用文件连接功能
 }
 ```
@@ -169,7 +135,7 @@ if cfg.Features.EnableFileLink {
 - **表名白名单**：不在 `SUPABASE_TABLES` 中的表名会在发出请求前被拒绝，不会产生任何外网请求。
 - **更新与删除必须带过滤条件**：`Update` / `Delete` 未携带过滤条件时直接返回错误，避免整表被改写或清空。
 - **非 `public` schema**：除在 `SUPABASE_SCHEMA` 指定外，还必须先在该项目的 Dashboard → API Settings 中把该 schema 加入 **Exposed schemas**，否则请求不会生效。
-- **安全**：`SUPABASE_SECRET_KEY` 只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略）。本仓库对外公开，禁止把 secret key 与真实 Project URL 写入任何被版本控制的文件。
+- **安全**：`SUPABASE_SECRET_KEY` 只写在 `.env`（已被 `.gitignore` 忽略）。本仓库对外公开，禁止把 secret key 与真实 Project URL 写入任何被版本控制的文件。
 - **免费套餐项目会休眠**：冷启动时首个请求可能较慢或失败，此时由调用方重试；客户端不做自动重试（写操作重试有重复写入风险）。
 
 ## MQTT 多节点消息同步（公共 broker）
@@ -199,12 +165,12 @@ if cfg.Features.EnableFileLink {
 ### 安全警示（重要）
 
 - ⚠️ **公共 broker + 共享前缀 = 任何知道前缀的人都能订阅该命名空间**。建议启用 AES-256-GCM 加密（`MQTT_ENCRYPT=true` + 所有节点相同的 `MQTT_ENCRYPT_KEY`）：启用后载荷为密文，无密钥者无法读取，且 GCM 校验会拒绝任何篡改 / 伪造注入。
-- ⚠️ **密钥即信任根**：`MQTT_ENCRYPT_KEY` 泄露等同全集群失效。务必只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略），禁止写入任何版本控制文件。生成：`openssl rand -hex 32`。
+- ⚠️ **密钥即信任根**：`MQTT_ENCRYPT_KEY` 泄露等同全集群失效。务必只写在 `.env`（已被 `.gitignore` 忽略），禁止写入任何版本控制文件。生成：`openssl rand -hex 32`。
 - ⚠️ **过渡期（部分节点未启用加密）仍可互通**：启用方会接受明文旧消息，但未启用方**无法读取**启用方发出的密文（会被丢弃）。建议集群内一次性全量启用。
 - ⚠️ `MQTT_USERNAME` / `MQTT_PASSWORD` 同样只进 `.env`，禁止写入版本控制文件。
 
-## 配置文件优先级
+## 配置来源
 
-1. 环境变量 `APP_ENV` 决定加载哪个配置文件
-2. 配置文件中的值覆盖默认值
-3. 未配置的值使用 `setDefaults()` 中的默认值
+1. 程序启动时默认加载项目根目录的 `.env` 文件
+2. 配置项值覆盖内置默认值（`envDefault`）
+3. `.env` 文件缺失时，全部使用内置默认值

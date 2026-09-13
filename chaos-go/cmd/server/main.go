@@ -4,13 +4,13 @@ import (
 	"chaos-go/config"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
+	mqttsync "chaos-go/internal/mqttsync"
 	_ "chaos-go/internal/notify"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/taskplan"
-	mqttsync "chaos-go/internal/mqttsync"
 	"chaos-go/routes"
 	"chaos-go/scheduler"
 	"embed"
@@ -125,7 +125,7 @@ func main() {
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
 
-	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress(), "env", cfg.Environment)
+	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	r := routes.SetupRouter(webFS)
 	go r.Run(cfg.Server.GetAddress())
 

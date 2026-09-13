@@ -12,7 +12,7 @@ import (
 const deepseekBalanceURL = "https://api.deepseek.com/user/balance"
 
 func GetDeepSeekBalance(c *gin.Context) {
-	apiKey := config.GetConfig().DeepSeek.APIKey
+	apiKey := config.GetConfig().DeepSeekAPIKey
 	if apiKey == "" {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "未配置 DEEPSEEK_API_KEY，请在服务端 .env 中设置"})
 		return
