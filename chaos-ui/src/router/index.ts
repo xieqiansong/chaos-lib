@@ -84,6 +84,12 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/MobileBoard.vue'),
     meta: {title: '全屏看板', icon: 'Monitor', hidden: true, fullscreen: true},
   },
+  {
+    path: '/mqttSync',
+    name: 'mqttSync',
+    component: () => import('@/views/MqttSync.vue'),
+    meta: {title: 'MQTT同步', icon: 'Connection'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

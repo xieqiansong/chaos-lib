@@ -29,6 +29,7 @@ type AppConfig struct {
 	DeepSeek    DeepSeekConfig
 	Baidu       BaiduConfig
 	Supabase    SupabaseConfig
+	Mqtt        MqttConfig
 }
 
 type ServerConfig struct {
@@ -86,6 +87,18 @@ type SupabaseConfig struct {
 // Available 判定云端数据通道是否可用：项目地址、后端凭据与表名清单缺一不可。
 func (c *SupabaseConfig) Available() bool {
 	return c.URL != "" && c.SecretKey != "" && len(c.Tables) > 0
+}
+
+// MqttConfig 多节点消息同步通道（基于公共 MQTT broker）配置。
+// Broker / Prefix 为公开信息；Username/Password 仅进 .env，禁止写入版本控制文件。
+type MqttConfig struct {
+	Enabled  bool   // 功能总开关，缺省 false
+	Broker   string // broker 地址，缺省 tcp://broker.emqx.io:1883
+	Prefix   string // 集群公共主题前缀，缺省 test/（个人值 xieqiansong@qq.com/ 写在 .env）
+	ClientID string // 缺省 chaos-<nodeID>
+	Username string // 公共 broker 多为匿名，留空
+	Password string // 同上
+	Encrypt  bool   // 占位开关，本期不实现加密
 }
 
 var globalConfig *AppConfig
@@ -284,6 +297,20 @@ func setConfigValue(config *AppConfig, key, value string) {
 		}
 	case "SUPABASE_TABLES":
 		config.Supabase.Tables = parseCSV(value)
+	case "MQTT_ENABLED":
+		config.Mqtt.Enabled = parseBool(value)
+	case "MQTT_BROKER":
+		config.Mqtt.Broker = value
+	case "MQTT_PREFIX":
+		config.Mqtt.Prefix = value
+	case "MQTT_CLIENT_ID":
+		config.Mqtt.ClientID = value
+	case "MQTT_USERNAME":
+		config.Mqtt.Username = value
+	case "MQTT_PASSWORD":
+		config.Mqtt.Password = value
+	case "MQTT_ENCRYPT":
+		config.Mqtt.Encrypt = parseBool(value)
 	}
 }
 
@@ -337,6 +364,13 @@ func setDefaults(config *AppConfig) {
 	}
 	if config.Supabase.TimeoutSec == 0 {
 		config.Supabase.TimeoutSec = 15
+	}
+
+	if config.Mqtt.Broker == "" {
+		config.Mqtt.Broker = "tcp://broker.emqx.io:1883"
+	}
+	if config.Mqtt.Prefix == "" {
+		config.Mqtt.Prefix = "test/"
 	}
 
 	config.Features.EnableFileLink = true

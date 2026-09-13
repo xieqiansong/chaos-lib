@@ -3,6 +3,7 @@ package routes
 import (
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
+	mqttsync "chaos-go/internal/mqttsync"
 	notifysvc "chaos-go/internal/notify"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
@@ -64,6 +65,14 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			envVars.PUT("/", envvar.PutEnvVariables)
 			envVars.POST("/sync", envvar.SyncEnvVariables)
 			envVars.GET("/snapshots/:snapshotId", envvar.GetEnvSnapshotDetail)
+		}
+
+		// MQTT 多节点消息同步（公共 broker）
+		mqttSync := api.Group("/mqttSync")
+		{
+			mqttSync.GET("/messages", mqttsync.ListMessages)
+			mqttSync.POST("/messages", mqttsync.SendMessage)
+			mqttSync.GET("/status", mqttsync.Status)
 		}
 
 		taskPlans := api.Group("/taskPlans")

@@ -172,6 +172,35 @@ if cfg.Features.EnableFileLink {
 - **安全**：`SUPABASE_SECRET_KEY` 只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略）。本仓库对外公开，禁止把 secret key 与真实 Project URL 写入任何被版本控制的文件。
 - **免费套餐项目会休眠**：冷启动时首个请求可能较慢或失败，此时由调用方重试；客户端不做自动重试（写操作重试有重复写入风险）。
 
+## MQTT 多节点消息同步（公共 broker）
+
+用于把部署在多台机器上的实例连成一个轻量集群：任一节点发送的消息被其它节点订阅、在界面展示并落库。实现见 `chaos-go/internal/mqttsync`；对外暴露 `/api/mqttSync/*` 路由。
+
+| 环境变量 | 说明 | 默认值 |
+|----------|------|--------|
+| `MQTT_ENABLED` | 功能总开关（true/false） | `false` |
+| `MQTT_BROKER` | broker 地址，如 `tcp://broker.emqx.io:1883` | `tcp://broker.emqx.io:1883` |
+| `MQTT_PREFIX` | 集群公共主题前缀（订阅 `prefix + "#"`，发布 `prefix + channel`） | `test/` |
+| `MQTT_CLIENT_ID` | MQTT 客户端 ID，缺省 `chaos-<nodeID>` | - |
+| `MQTT_USERNAME` | broker 用户名（公共 broker 多为匿名，留空） | - |
+| `MQTT_PASSWORD` | broker 密码 | - |
+| `MQTT_ENCRYPT` | 加密占位开关，**本期未实现**，置 `true` 仍按明文处理 | `false` |
+
+**可用性判定**：`MQTT_ENABLED=true` 且 `MQTT_BROKER` 非空，启动时才连接 broker；否则该通道不启用、不发起任何连接，且不影响其余功能启动与运行。
+
+### 行为要点
+
+- **订阅全部**：每个启用节点订阅 `MQTT_PREFIX + "#"`，集群内任意节点发出的消息都会被本节点收到。
+- **去重**：消息带全局唯一 `MsgID`；本机发出的消息在发布路径即时落库，订阅回调丢弃 `node_id == 本机` 的回声，并按 `MsgID` 去重，避免重复落库。
+- **界面只展示最新一条**：`GET /api/mqttSync/messages` 按 topic（channel）去重，仅返回每个 topic 最新一条；旧消息全部保留在数据库，不在列表重复出现。
+- **优雅降级**：broker 不可达 / 订阅失败仅记日志、不 panic、不阻塞启动；离线时发送仍本地落库，仅广播失败。
+
+### 安全警示（重要）
+
+- ⚠️ **明文 + 公共 broker + 共享前缀 = 任何知道前缀的人都能订阅并读取/注入内容**。`MQTT_PREFIX`（`test/` 或你的个人值）本质是公开的共享命名空间，本期 payload 为明文 JSON，**不要通过该通道发送任何敏感信息**。
+- ⚠️ 内容加密为后续变更（`MQTT_ENCRYPT` 仅占位）；正式多机部署前建议补充加密。
+- `MQTT_USERNAME` / `MQTT_PASSWORD` 只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略），禁止写入版本控制文件。
+
 ## 配置文件优先级
 
 1. 环境变量 `APP_ENV` 决定加载哪个配置文件

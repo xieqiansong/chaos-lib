@@ -10,6 +10,7 @@ import (
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/taskplan"
+	mqttsync "chaos-go/internal/mqttsync"
 	"chaos-go/routes"
 	"chaos-go/scheduler"
 	"embed"
@@ -102,12 +103,17 @@ func main() {
 		&quickedit.QuickEditFile{},
 		&quickedit.QuickEditSnapshot{},
 		&proxy.SdkSource{},
+		&mqttsync.MqttSyncMessage{},
+		&mqttsync.MqttSyncNode{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}
 
 	setupPprof(&cfg.Pprof)
 	slog.Info("Pprof 设置完成")
+
+	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
+	mqttsync.Start()
 
 	// 进程重启后内存中没有任何隧道，把库里遗留的「运行中」状态归零
 	portfwd.ResetStatusOnBoot()

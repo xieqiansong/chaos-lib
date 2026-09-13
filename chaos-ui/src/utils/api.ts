@@ -234,3 +234,35 @@ export function deletePortForward(id: number): Promise<any> {
 export function updatePortForwardStatus(id: number, status: boolean): Promise<any> {
     return sendMessage(`portForwards/${id}/status`, 'PATCH', {status})
 }
+
+// ---- MQTT 多节点同步 ----
+
+export interface MqttMessage {
+    msg_id: string
+    node_id: string
+    channel: string
+    payload: string
+    created_at: string
+    /** 是否为本机发出的消息 */
+    is_self: boolean
+}
+
+export interface MqttStatus {
+    enabled: boolean
+    connected: boolean
+    broker: string
+    prefix: string
+    node_id: string
+}
+
+export function getMqttMessages(): Promise<MqttMessage[]> {
+    return sendMessage('mqttSync/messages', 'GET')
+}
+
+export function sendMqttMessage(payload: string, channel?: string): Promise<MqttMessage> {
+    return sendMessage('mqttSync/messages', 'POST', { payload, channel })
+}
+
+export function getMqttStatus(): Promise<MqttStatus> {
+    return sendMessage('mqttSync/status', 'GET')
+}
