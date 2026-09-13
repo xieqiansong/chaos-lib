@@ -184,7 +184,8 @@ if cfg.Features.EnableFileLink {
 | `MQTT_CLIENT_ID` | MQTT 客户端 ID，缺省 `chaos-<nodeID>` | - |
 | `MQTT_USERNAME` | broker 用户名（公共 broker 多为匿名，留空） | - |
 | `MQTT_PASSWORD` | broker 密码 | - |
-| `MQTT_ENCRYPT` | 加密占位开关，**本期未实现**，置 `true` 仍按明文处理 | `false` |
+| `MQTT_ENCRYPT` | 是否启用 AES-256-GCM 载荷加密（true/false） | `false` |
+| `MQTT_ENCRYPT_KEY` | 32 字节共享密钥（hex 或 base64 均可），**所有节点必须相同**；缺失或无效时 `MQTT_ENCRYPT=true` 仍按明文运行并记错误日志 | - |
 
 **可用性判定**：`MQTT_ENABLED=true` 且 `MQTT_BROKER` 非空，启动时才连接 broker；否则该通道不启用、不发起任何连接，且不影响其余功能启动与运行。
 
@@ -197,9 +198,10 @@ if cfg.Features.EnableFileLink {
 
 ### 安全警示（重要）
 
-- ⚠️ **明文 + 公共 broker + 共享前缀 = 任何知道前缀的人都能订阅并读取/注入内容**。`MQTT_PREFIX`（`test/` 或你的个人值）本质是公开的共享命名空间，本期 payload 为明文 JSON，**不要通过该通道发送任何敏感信息**。
-- ⚠️ 内容加密为后续变更（`MQTT_ENCRYPT` 仅占位）；正式多机部署前建议补充加密。
-- `MQTT_USERNAME` / `MQTT_PASSWORD` 只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略），禁止写入版本控制文件。
+- ⚠️ **公共 broker + 共享前缀 = 任何知道前缀的人都能订阅该命名空间**。建议启用 AES-256-GCM 加密（`MQTT_ENCRYPT=true` + 所有节点相同的 `MQTT_ENCRYPT_KEY`）：启用后载荷为密文，无密钥者无法读取，且 GCM 校验会拒绝任何篡改 / 伪造注入。
+- ⚠️ **密钥即信任根**：`MQTT_ENCRYPT_KEY` 泄露等同全集群失效。务必只写在 `.env` / `.env.dev` / `.env.prod`（均已被 `.gitignore` 忽略），禁止写入任何版本控制文件。生成：`openssl rand -hex 32`。
+- ⚠️ **过渡期（部分节点未启用加密）仍可互通**：启用方会接受明文旧消息，但未启用方**无法读取**启用方发出的密文（会被丢弃）。建议集群内一次性全量启用。
+- ⚠️ `MQTT_USERNAME` / `MQTT_PASSWORD` 同样只进 `.env`，禁止写入版本控制文件。
 
 ## 配置文件优先级
 

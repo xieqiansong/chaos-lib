@@ -76,6 +76,10 @@ onUnmounted(() => {
           {{ status?.connected ? '已连接' : '离线' }}
         </el-tag>
         <span class="label">节点：</span><code>{{ status?.node_id || '-' }}</code>
+        <span class="label">加密：</span>
+        <el-tag :type="status?.encrypt ? 'success' : 'warning'">
+          {{ status?.encrypt ? '已加密' : '明文' }}
+        </el-tag>
       </div>
       <div class="status-row sub">
         <span class="label">Broker：</span><code>{{ status?.broker || '-' }}</code>
@@ -87,6 +91,13 @@ onUnmounted(() => {
         type="warning"
         :closable="false"
         title="MQTT 未连接：消息仅本地落库，无法广播给其它节点"
+      />
+      <el-alert
+        v-if="status?.enabled && !status?.encrypt"
+        class="alert"
+        type="warning"
+        :closable="false"
+        title="已启用但未加密：MQTT_ENCRYPT_KEY 缺失或无效，消息以明文广播"
       />
       <el-alert
         v-if="!status?.enabled"

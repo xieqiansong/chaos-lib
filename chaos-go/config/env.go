@@ -92,13 +92,14 @@ func (c *SupabaseConfig) Available() bool {
 // MqttConfig 多节点消息同步通道（基于公共 MQTT broker）配置。
 // Broker / Prefix 为公开信息；Username/Password 仅进 .env，禁止写入版本控制文件。
 type MqttConfig struct {
-	Enabled  bool   // 功能总开关，缺省 false
-	Broker   string // broker 地址，缺省 tcp://broker.emqx.io:1883
-	Prefix   string // 集群公共主题前缀，缺省 test/（个人值 xieqiansong@qq.com/ 写在 .env）
-	ClientID string // 缺省 chaos-<nodeID>
-	Username string // 公共 broker 多为匿名，留空
-	Password string // 同上
-	Encrypt  bool   // 占位开关，本期不实现加密
+	Enabled    bool   // 功能总开关，缺省 false
+	Broker     string // broker 地址，缺省 tcp://broker.emqx.io:1883
+	Prefix     string // 集群公共主题前缀，缺省 test/（个人值 xieqiansong@qq.com/ 写在 .env）
+	ClientID   string // 缺省 chaos-<nodeID>
+	Username   string // 公共 broker 多为匿名，留空
+	Password   string // 同上
+	Encrypt    bool   // 是否启用 AES-256-GCM 载荷加密
+	EncryptKey string // 32 字节共享密钥（hex 或 base64），仅进 .env，禁止入库/日志
 }
 
 var globalConfig *AppConfig
@@ -311,6 +312,8 @@ func setConfigValue(config *AppConfig, key, value string) {
 		config.Mqtt.Password = value
 	case "MQTT_ENCRYPT":
 		config.Mqtt.Encrypt = parseBool(value)
+	case "MQTT_ENCRYPT_KEY":
+		config.Mqtt.EncryptKey = value
 	}
 }
 

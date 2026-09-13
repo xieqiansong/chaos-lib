@@ -11,19 +11,19 @@ import (
 // MqttSyncMessage 是订阅/发布落库的消息记录。
 // 列名由 GORM 自动推断为 snake_case，不加 column 标签；软删除用 IsDeleted + 手动过滤。
 type MqttSyncMessage struct {
-	ID        uint      `gorm:"primaryKey"`
-	MsgID     string    `gorm:"uniqueIndex;size:64"` // 线上 JSON 的 id，全局唯一，用于去重
-	NodeID    string    `gorm:"size:64"`             // 发送方节点标识
-	Channel   string    `gorm:"size:64"`             // topic（不含前缀），如 broadcast
-	Payload   string    `gorm:"type:text"`
+	ID        uint   `gorm:"primaryKey"`
+	MsgID     string `gorm:"uniqueIndex;size:64"` // 线上 JSON 的 id，全局唯一，用于去重
+	NodeID    string `gorm:"size:64"`             // 发送方节点标识
+	Channel   string `gorm:"size:64"`             // topic（不含前缀），如 broadcast
+	Payload   string `gorm:"type:text"`
 	CreatedAt time.Time
 	IsDeleted bool `gorm:"default:false"`
 }
 
 // MqttSyncNode 保存本机节点标识；NodeID 在首次启动时生成并持久化，全程稳定。
 type MqttSyncNode struct {
-	ID        uint      `gorm:"primaryKey"`
-	NodeID    string    `gorm:"uniqueIndex;size:64"`
+	ID        uint   `gorm:"primaryKey"`
+	NodeID    string `gorm:"uniqueIndex;size:64"`
 	CreatedAt time.Time
 }
 
@@ -37,7 +37,8 @@ type MessageDTO struct {
 	IsSelf    bool      `json:"is_self"`
 }
 
-// wireMessage 是走 MQTT 的线上报文（明文 JSON，加密为后续变更）。
+// wireMessage 是走 MQTT 的业务报文（明文 JSON）。传输层由 mqtt.go 的 seal/open
+// 在 MQTT_ENCRYPT=true 时加密为 AES-256-GCM 信封；本地数据库仍存明文业务 JSON。
 type wireMessage struct {
 	ID      string `json:"id"`
 	NodeID  string `json:"node_id"`
@@ -161,10 +162,11 @@ func ListMessages(c *gin.Context) {
 func Status(c *gin.Context) {
 	cfg := config.GetConfig().Mqtt
 	c.JSON(200, gin.H{
-		"enabled":  cfg.Enabled,
+		"enabled":   cfg.Enabled,
 		"connected": IsConnected(),
-		"broker":   cfg.Broker,
-		"prefix":   cfg.Prefix,
-		"node_id":  NodeID(),
+		"broker":    cfg.Broker,
+		"prefix":    cfg.Prefix,
+		"node_id":   NodeID(),
+		"encrypt":   EffectiveEncrypt(),
 	})
 }

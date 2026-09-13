@@ -253,6 +253,7 @@ export interface MqttStatus {
     broker: string
     prefix: string
     node_id: string
+    encrypt: boolean
 }
 
 export function getMqttMessages(): Promise<MqttMessage[]> {
