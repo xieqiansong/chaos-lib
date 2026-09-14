@@ -178,7 +178,7 @@ function level(count: number): number {
 <style scoped>
 .contrib {
   /* 色阶：默认（终端暗色）与浅黄护眼分别给值 */
-  --contrib-cell-size: 11px;
+  --contrib-cell-size: 10px;
   --contrib-gap: 3px;
   --contrib-l0: var(--el-fill-color-light);
   --contrib-l1: rgba(51, 255, 102, 0.16);

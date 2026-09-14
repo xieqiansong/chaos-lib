@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
+import {format} from 'date-fns'
 import {theme} from '../theme'
 import ContributionPanel from '../components/ContributionPanel.vue'
 
@@ -88,7 +89,7 @@ async function fetchDailyStats() {
       tooltip: {trigger: 'axis', formatter: capTooltip('完成', capped)},
       xAxis: {
         type: 'category',
-        data: data.map(d => d.date.slice(5)),
+        data: data.map(d => format(new Date(d.date), 'MM.dd')),
         axisLabel: {rotate: 90, interval: 0, fontSize: 11},
       },
       yAxis: Object.assign(
@@ -123,7 +124,7 @@ async function fetchDailyStats() {
           itemStyle: {color: colors.green},
         },
       ],
-      grid: {left: '4%', right: '2%', top: '16%', bottom: '8%'},
+      grid: {left: '0', right: '0', top: '16%', bottom: '0'},
     }
   } catch (e: any) {
     console.error('获取任务统计失败:', e)
@@ -149,7 +150,7 @@ async function fetchActiveStats() {
       },
       xAxis: {
         type: 'category',
-        data: data.map(d => d.date.slice(5)),
+        data: data.map(d => format(new Date(d.date), 'MM.dd')),
         axisLabel: {rotate: 90, interval: 0, fontSize: 11},
       },
       yAxis: Object.assign(
@@ -177,7 +178,7 @@ async function fetchActiveStats() {
           },
         },
       ],
-      grid: {left: '4%', right: '2%', top: '16%', bottom: '8%'},
+      grid: {left: '0', right: '0', top: '16%', bottom: '0'},
     }
   } catch (e: any) {
     console.error('获取待办任务统计失败:', e)
@@ -237,19 +238,8 @@ watch(theme, () => {
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" class="mb-lg">
-      <el-col :span="24">
-        <div class="chart-section">
-          <div class="section-toolbar">
-            <span class="text-primary text-base section-title">任务贡献</span>
-          </div>
-          <div v-if="contributionLoading" class="contrib-placeholder">加载中...</div>
-          <ContributionPanel v-else :root-name="contributionRoot" :items="contributionItems"/>
-        </div>
-      </el-col>
-    </el-row>
 
-    <el-row :gutter="16">
+    <el-row :gutter="8" class="mb-sm">
       <el-col :span="12">
         <div class="chart-section">
           <div v-if="chartLoading" class="chart-placeholder">加载中...</div>
@@ -260,6 +250,15 @@ watch(theme, () => {
         <div class="chart-section">
           <div v-if="activeChartLoading" class="chart-placeholder">加载中...</div>
           <v-chart v-else :option="activeChartOption" class="chart-wrapper"/>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="8" class="mb-sm">
+      <el-col :span="12">
+        <div class="chart-section">
+          <div v-if="contributionLoading" class="contrib-placeholder">加载中...</div>
+          <ContributionPanel v-else :root-name="contributionRoot" :items="contributionItems"/>
         </div>
       </el-col>
     </el-row>

@@ -1322,8 +1322,8 @@ func ReviewTaskPlan(c *gin.Context) {
 	}
 
 	var req struct {
-		Rating int    `json:"rating"`
-		Answer string `json:"answer"`
+		Rating int             `json:"rating"`
+		Answer string          `json:"answer"`
 		AI     *reviewAIResult `json:"ai"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
