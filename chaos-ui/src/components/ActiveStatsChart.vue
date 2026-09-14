@@ -12,11 +12,9 @@ import {
 } from './chartHelpers'
 
 // 近一年每日待办任务数的直方图：过期（早于今天）标红，未过期标琥珀
-const loading = ref(false)
 const chartOption = ref({})
 
 async function fetchStats() {
-  loading.value = true
   try {
     const res = await fetch('/api/tasks/activeStats')
     const data: { date: string; count: number }[] = await res.json()
@@ -26,6 +24,7 @@ async function fetchStats() {
     const colors = themeColors()
 
     chartOption.value = {
+      animation: false,
       tooltip: {
         trigger: 'axis',
         formatter: capTooltip('待办', capped),
@@ -64,8 +63,6 @@ async function fetchStats() {
     }
   } catch (e: any) {
     console.error('获取待办任务统计失败:', e)
-  } finally {
-    loading.value = false
   }
 }
 
@@ -76,22 +73,12 @@ watch(theme, fetchStats)
 </script>
 
 <template>
-  <div v-if="loading" class="chart-placeholder">加载中...</div>
-  <v-chart v-else :option="chartOption" class="chart-wrapper"/>
+  <v-chart :option="chartOption" class="chart-wrapper"/>
 </template>
 
 <style scoped>
 .chart-wrapper {
   height: 22vh;
   min-height: 180px;
-}
-
-.chart-placeholder {
-  height: 22vh;
-  min-height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--el-text-color-secondary);
 }
 </style>
