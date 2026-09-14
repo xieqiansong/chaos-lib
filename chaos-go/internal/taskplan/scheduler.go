@@ -11,7 +11,7 @@ import (
 
 const (
 	schedulerInterval = time.Minute
-	cronLookahead     = 3
+	cronLookahead     = 1
 	cronSweepCap      = 50
 )
 
