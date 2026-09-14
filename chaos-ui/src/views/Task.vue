@@ -344,9 +344,10 @@ async function fetchAllPlans() {
   const t0 = performance.now()
 
   const expandedIds = captureExpandedIds()
+  const searchParam = props.searchText.trim()
+  const isSearch = !!searchParam
 
   try {
-    const searchParam = props.searchText.trim()
     const result = await sendMessage('taskPlans/tree', 'GET', searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
@@ -358,10 +359,16 @@ async function fetchAllPlans() {
   } finally {
     treeLoading.value = false
   }
-  if (!error.value && expandedIds.size > 0) {
-    await nextTick()
-    resetLazyLoadedState(expandedIds)
-    await restoreExpansion(expandedIds)
+  if (!error.value) {
+    // 搜索结果较少时，直接展开所有树节点，方便查看
+    if (isSearch && countAllNodes(allPlans.value) < 5) {
+      await nextTick()
+      await expandAllNodes()
+    } else if (expandedIds.size > 0) {
+      await nextTick()
+      resetLazyLoadedState(expandedIds)
+      await restoreExpansion(expandedIds)
+    }
   }
 }
 
@@ -369,6 +376,32 @@ async function refreshAllPlans() {
   if (activeTab.value === 'all') {
     await fetchAllPlans()
   }
+}
+
+// 统计整棵树（含子节点）的节点总数，用于判断搜索结果条数。
+function countAllNodes(nodes: TaskPlanTree[]): number {
+  let count = 0
+  for (const node of nodes) {
+    count++
+    const children = childrenMap.value.get(node.ID)
+    if (children && children.length > 0) {
+      count += countAllNodes(children)
+    }
+  }
+  return count
+}
+
+// 展开所有树节点：收集顶层节点与 childrenMap 中记录的所有节点 ID，统一恢复展开。
+async function expandAllNodes() {
+  const ids = new Set<number>()
+  for (const node of allPlans.value) ids.add(node.ID)
+  for (const id of childrenMap.value.keys()) ids.add(id)
+  if (ids.size === 0) return
+  // 先重置懒加载状态：el-table 的 treeData 按 ID 缓存且不会随 data 替换而清空，
+  // 若不将 loaded 置回 false，展开时不会重新触发 loadChildren，会残留上一次搜索的旧子树。
+  await nextTick()
+  resetLazyLoadedState(ids)
+  await restoreExpansion(ids)
 }
 
 function resetForm() {
