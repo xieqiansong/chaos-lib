@@ -1,18 +1,14 @@
 <script setup lang="ts">
-import {computed, onMounted, ref, watch} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
-import {format} from 'date-fns'
-import {theme} from '../theme'
 import ContributionPanel from '../components/ContributionPanel.vue'
+import DailyStatsChart from '../components/DailyStatsChart.vue'
+import ActiveStatsChart from '../components/ActiveStatsChart.vue'
 
 const router = useRouter()
 
 const balance = ref<string>('')
 const loading = ref(false)
-const chartLoading = ref(false)
-const chartOption = ref({})
-const activeChartLoading = ref(false)
-const activeChartOption = ref({})
 const isBalanceNum = computed(() => !isNaN(Number(balance.value)) && balance.value !== '')
 
 // GitHub 风格贡献图：近一年每日完成任务数（按「每日任务」下的子任务分别统计，可切换）
@@ -24,40 +20,6 @@ const contributionItems = ref<{
   total: number
   days: { date: string; count: number }[]
 }[]>([])
-
-const MAX_VISUAL = 99
-type CappedItem = { visual: number; raw: number }
-
-// 从当前主题读取主题色，避免图表内游离硬编码（随主题切换实时取色）
-const cssVar = (name: string) =>
-    getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-
-function themeColors() {
-  return {
-    green: cssVar('--term-green'),
-    red: cssVar('--term-red'),
-    amber: cssVar('--term-amber'),
-    areaTop: cssVar('--term-area-top'),
-    areaBottom: cssVar('--term-area-bottom'),
-  }
-}
-
-function capValues(counts: number[]): CappedItem[] {
-  return counts.map(c => ({visual: Math.min(c, MAX_VISUAL), raw: c}))
-}
-
-function capYAxis() {
-  return {max: MAX_VISUAL, axisLabel: {formatter: (v: number) => (v >= MAX_VISUAL ? `${MAX_VISUAL}+` : v)}}
-}
-
-function capTooltip(prefix: string, capped: CappedItem[]) {
-  return (params: any) => {
-    const d = params[0]
-    const item = capped[d.dataIndex]
-    const extra = item && item.raw > MAX_VISUAL ? `（实际: ${item.raw}）` : ''
-    return `${d.name}<br/>${d.marker} ${prefix}: ${d.value}${extra}`
-  }
-}
 
 async function fetchBalance() {
   loading.value = true
@@ -74,116 +36,6 @@ async function fetchBalance() {
     balance.value = `请求失败: ${e.message}`
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchDailyStats() {
-  chartLoading.value = true
-  try {
-    const res = await fetch('/api/tasks/dailyStats')
-    const data: { date: string; count: number }[] = await res.json()
-    const capped = capValues(data.map(d => d.count))
-    const colors = themeColors()
-
-    chartOption.value = {
-      tooltip: {trigger: 'axis', formatter: capTooltip('完成', capped)},
-      xAxis: {
-        type: 'category',
-        data: data.map(d => format(new Date(d.date), 'MM.dd')),
-        axisLabel: {rotate: 90, interval: 0, fontSize: 11},
-      },
-      yAxis: Object.assign(
-          {type: 'value', minInterval: 1, name: '完成数'},
-          capYAxis(),
-      ),
-      series: [
-        {
-          name: '完成数',
-          type: 'line',
-          data: capped.map(c => c.visual),
-          smooth: true,
-          label: {
-            show: true,
-            position: 'top',
-            formatter: (p: any) => {
-              const item = capped[p.dataIndex]
-              return item && item.raw > MAX_VISUAL ? `${MAX_VISUAL}+` : ''
-            },
-          },
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                {offset: 0, color: colors.areaTop},
-                {offset: 1, color: colors.areaBottom},
-              ],
-            },
-          },
-          lineStyle: {color: colors.green, width: 2},
-          itemStyle: {color: colors.green},
-        },
-      ],
-      grid: {left: '0', right: '0', top: '16%', bottom: '0'},
-    }
-  } catch (e: any) {
-    console.error('获取任务统计失败:', e)
-  } finally {
-    chartLoading.value = false
-  }
-}
-
-async function fetchActiveStats() {
-  activeChartLoading.value = true
-  try {
-    const res = await fetch('/api/tasks/activeStats')
-    const data: { date: string; count: number }[] = await res.json()
-
-    const today = new Date().toISOString().slice(0, 10)
-    const capped = capValues(data.map(d => d.count))
-    const colors = themeColors()
-
-    activeChartOption.value = {
-      tooltip: {
-        trigger: 'axis',
-        formatter: capTooltip('待办', capped),
-      },
-      xAxis: {
-        type: 'category',
-        data: data.map(d => format(new Date(d.date), 'MM.dd')),
-        axisLabel: {rotate: 90, interval: 0, fontSize: 11},
-      },
-      yAxis: Object.assign(
-          {type: 'value', minInterval: 1, name: '任务数'},
-          capYAxis(),
-      ),
-      series: [
-        {
-          name: '待办',
-          type: 'bar',
-          data: capped.map((c, i) => ({
-            value: c.visual,
-            itemStyle: {
-              color: data[i].date < today ? colors.red : colors.amber,
-            },
-          })),
-          barMaxWidth: 20,
-          label: {
-            show: true,
-            position: 'top',
-            formatter: (p: any) => {
-              const item = capped[p.dataIndex]
-              return item && item.raw > MAX_VISUAL ? `${MAX_VISUAL}+` : ''
-            },
-          },
-        },
-      ],
-      grid: {left: '0', right: '0', top: '16%', bottom: '0'},
-    }
-  } catch (e: any) {
-    console.error('获取待办任务统计失败:', e)
-  } finally {
-    activeChartLoading.value = false
   }
 }
 
@@ -207,15 +59,7 @@ function goBoard() {
 
 onMounted(() => {
   fetchBalance()
-  fetchDailyStats()
-  fetchActiveStats()
   fetchContribution()
-})
-
-watch(theme, () => {
-  // 主题切换时重新拉取统计，使图表随主题取色
-  fetchDailyStats()
-  fetchActiveStats()
 })
 </script>
 
@@ -242,14 +86,12 @@ watch(theme, () => {
     <el-row :gutter="8" class="mb-sm">
       <el-col :span="12">
         <div class="chart-section">
-          <div v-if="chartLoading" class="chart-placeholder">加载中...</div>
-          <v-chart v-else ref="chartRef" :option="chartOption" class="chart-wrapper"/>
+          <DailyStatsChart/>
         </div>
       </el-col>
       <el-col :span="12">
         <div class="chart-section">
-          <div v-if="activeChartLoading" class="chart-placeholder">加载中...</div>
-          <v-chart v-else :option="activeChartOption" class="chart-wrapper"/>
+          <ActiveStatsChart/>
         </div>
       </el-col>
     </el-row>
@@ -289,20 +131,6 @@ watch(theme, () => {
   border-radius: var(--el-border-radius-base);
   padding: var(--space-lg);
   border: 1px solid var(--el-border-color-lighter);
-}
-
-.chart-wrapper {
-  height: 22vh;
-  min-height: 180px;
-}
-
-.chart-placeholder {
-  height: 22vh;
-  min-height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--el-text-color-secondary);
 }
 
 .contrib-placeholder {

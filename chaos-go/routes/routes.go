@@ -138,6 +138,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
 		api.GET("/weather", proxy.GetWeather)
+		api.GET("/hostname", proxy.GetHostname)
 
 		// SSH 连接信息（凭据仅后端使用，响应一律脱敏）
 		api.GET("/sshConns", portfwd.GetSshConnections)

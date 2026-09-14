@@ -267,3 +267,14 @@ export function sendMqttMessage(payload: string, channel?: string): Promise<Mqtt
 export function getMqttStatus(): Promise<MqttStatus> {
     return sendMessage('mqttSync/status', 'GET')
 }
+
+// ---- 主机名（用作浏览器标签标题） ----
+
+export interface HostnameInfo {
+    hostname: string
+    username: string
+}
+
+export function getHostname(): Promise<HostnameInfo> {
+    return sendMessage('hostname', 'GET')
+}
