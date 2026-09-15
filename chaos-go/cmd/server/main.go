@@ -11,6 +11,7 @@ import (
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	_ "chaos-go/internal/stunsync"
+	_ "chaos-go/internal/stunpf"
 	"chaos-go/internal/taskplan"
 	"chaos-go/routes"
 	"chaos-go/scheduler"

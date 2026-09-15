@@ -35,6 +35,10 @@ type AppConfig struct {
 	// 仅当 MQTT 启用且已配置 LUCKY_OPEN_TOKEN 时，后台任务才会启动。
 	LuckyOpenToken       string `env:"LUCKY_OPEN_TOKEN"`                 // Lucky 服务的 openToken，用于请求 stunrulelist 接口
 	LuckySyncIntervalSec int    `env:"LUCKY_SYNC_INTERVAL_SEC" envDefault:"60"` // 同步间隔（秒），缺省 60
+
+	// STUN 公网地址同步到端口转发目标的定时任务配置。
+	// 仅当 MQTT 启用时，后台任务才会启动。
+	StunPortForwardSyncIntervalSec int `env:"STUN_PORT_FORWARD_SYNC_INTERVAL_SEC" envDefault:"30"` // 同步间隔（秒），缺省 30
 }
 
 type ServerConfig struct {

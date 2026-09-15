@@ -151,5 +151,7 @@ func run() {
 		}
 		sent++
 	}
-	slog.Info("stun 规则列表已拆分发布到 MQTT", "topic", baseTopic+"/*", "total", len(resp.List), "sent", sent)
+	if sent > 0 {
+		slog.Info("stun 规则列表已拆分发布到 MQTT", "topic", baseTopic+"/*", "total", len(resp.List), "sent", sent)
+	}
 }

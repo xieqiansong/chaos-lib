@@ -81,16 +81,26 @@ func saveMessage(m wireMessage) (MqttSyncMessage, error) {
 // ListLatestPerChannel 返回每个 channel 的最新一条消息（按 created_at 倒序），无分页。
 // 旧消息全部保留在数据库，仅界面展示最新一条。
 func ListLatestPerChannel() ([]MessageDTO, error) {
+	return ListLatestPerChannelLike("")
+}
+
+// ListLatestPerChannelLike 返回 channel 匹配指定前缀的每个 channel 最新一条消息。
+// prefix 为空时等价于 ListLatestPerChannel（全部 channel）。
+func ListLatestPerChannelLike(prefix string) ([]MessageDTO, error) {
 	db := config.GetDB()
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
+	sub := db.Table("mqtt_sync_messages").
+		Select("MAX(id)").
+		Where("is_deleted = ?", false).
+		Group("channel")
+	if prefix != "" {
+		sub = sub.Where("channel LIKE ?", prefix+"%")
+	}
 	var msgs []MqttSyncMessage
 	err := db.
-		Where("id IN (?)", db.Table("mqtt_sync_messages").
-			Select("MAX(id)").
-			Where("is_deleted = ?", false).
-			Group("channel")).
+		Where("id IN (?)", sub).
 		Where("is_deleted = ?", false).
 		Order("created_at DESC").
 		Find(&msgs).Error
