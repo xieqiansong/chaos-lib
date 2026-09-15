@@ -1,8 +1,10 @@
 <template>
-    <div class="sdk-container">
-        <div class="sdk-header">
-          <span class="text-primary text-base section-title">SDK 版本管理</span>
-          <el-button type="primary" :icon="Setting" size="small" @click="openManage">管理来源</el-button>
+    <div>
+        <div class="section-toolbar">
+            <span class="text-primary text-base section-title">SDK 版本管理</span>
+            <div class="section-actions">
+                <el-button type="primary" :icon="Setting" size="small" @click="openManage">管理来源</el-button>
+            </div>
         </div>
 
         <el-alert
@@ -323,15 +325,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.sdk-container {
-    padding: 16px;
-}
-.sdk-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
 .card-header {
     display: flex;
     align-items: center;

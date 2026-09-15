@@ -24,6 +24,5 @@ const current = ref(original.value)
 <style scoped>
 .example-container {
   height: 70vh;
-  padding: 1.25rem;
 }
 </style>

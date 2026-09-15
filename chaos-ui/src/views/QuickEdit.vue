@@ -324,8 +324,8 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="quickedit-toolbar">
-      <span class="text-primary text-base quickedit-title">快速编辑</span>
+    <div class="section-toolbar">
+      <span class="text-primary text-base section-title">快速编辑</span>
       <el-skeleton v-if="loading" :rows="1" animated class="quickedit-loading"/>
       <template v-else-if="filteredFiles.length > 0">
         <el-tag
@@ -342,7 +342,7 @@ onMounted(() => {
         </el-tag>
       </template>
       <span v-else class="text-secondary text-xs">暂无登记文件</span>
-      <div class="quickedit-actions">
+      <div class="section-actions">
         <el-button size="small" @click="fetchFiles" :loading="loading" plain>刷新</el-button>
         <el-button size="small" type="primary" @click="showCreateModal = true">+ 登记</el-button>
       </div>
@@ -451,31 +451,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.quickedit-toolbar {
-  margin-bottom: var(--space-md);
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.quickedit-title {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 .quickedit-loading {
   width: 7.5rem;
 }
 
 .quickedit-file-tag {
   cursor: pointer;
-}
-
-.quickedit-actions {
-  margin-left: auto;
-  display: flex;
-  gap: var(--space-05);
 }
 
 .quickedit-empty {

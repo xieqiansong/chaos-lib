@@ -140,10 +140,9 @@ onUnmounted(() => {
 
 <style scoped>
 .mqtt-container {
-  padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-lg);
 }
 .status-row {
   display: flex;
