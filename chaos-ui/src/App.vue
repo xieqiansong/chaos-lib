@@ -29,6 +29,7 @@ const CMD_ALIAS: Record<string, string> = {
   quickEdit: 'edit',
   environment: 'env',
   board: 'board',
+  polyform: 'conv',
 }
 
 // 侧边菜单：完全由路由表自动生成（见 router/index.ts）

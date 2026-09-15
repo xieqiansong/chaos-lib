@@ -90,6 +90,12 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/MqttSync.vue'),
     meta: {title: 'MQTT同步', icon: 'Connection'},
   },
+  {
+    path: '/polyform',
+    name: 'polyform',
+    component: () => import('@/views/Polyform.vue'),
+    meta: {title: '格式转换', icon: 'Sort'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

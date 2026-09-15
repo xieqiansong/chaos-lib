@@ -10,6 +10,10 @@ import router from './router';
 import * as ElementPlusIconsVue from '@element-plus/icons-vue';
 import {initTheme} from './theme';
 import {getHostname} from './utils/api';
+import {Buffer} from 'buffer';
+
+// polyform-tools 的 CSV 解析器依赖 Buffer（浏览器无内置），在此注入浏览器实现
+;(window as any).Buffer = Buffer;
 
 initTheme();
 
