@@ -1,7 +1,7 @@
 /**
  * polyform-tools 前端封装
  *
- * - 统一注册五个格式插件（json / yaml / csv / xml / cbor）
+ * - 统一注册格式插件（内置 json / yaml / csv / xml / cbor + 自定义 ini）
  * - 屏蔽插件注册表的全局性：每次转换前按当前选项重新注册
  * - 处理二进制格式（CBOR）与 HEX 文本的互转，便于在文本框中编辑
  */
@@ -11,8 +11,9 @@ import {yaml} from 'polyform-tools/formats/yaml'
 import {csv} from 'polyform-tools/formats/csv'
 import {xml} from 'polyform-tools/formats/xml'
 import {cbor} from 'polyform-tools/formats/cbor'
+import {defaultIniOptions, ini, type IniOptions} from '@/utils/polyformCustom'
 
-export type FormatId = 'json' | 'yaml' | 'csv' | 'xml' | 'cbor'
+export type FormatId = 'json' | 'yaml' | 'csv' | 'xml' | 'cbor' | 'ini'
 
 export interface FormatMeta {
   id: FormatId
@@ -29,6 +30,7 @@ export const FORMAT_META: Record<FormatId, FormatMeta> = {
   csv: {id: 'csv', label: 'CSV', ext: 'csv', binary: false, hint: '对象数组 ↔ 二维表'},
   xml: {id: 'xml', label: 'XML', ext: 'xml', binary: false, hint: '对象根最佳；数组根会生成 <0>/<1> 数字标签'},
   cbor: {id: 'cbor', label: 'CBOR', ext: 'cbor', binary: true, hint: '二进制，界面用 HEX 承载'},
+  ini: {id: 'ini', label: 'INI', ext: 'ini', binary: false, hint: '自定义插件范例：两级结构（section）'},
 }
 
 export const FORMAT_LIST: FormatMeta[] = [
@@ -37,6 +39,7 @@ export const FORMAT_LIST: FormatMeta[] = [
   FORMAT_META.csv,
   FORMAT_META.xml,
   FORMAT_META.cbor,
+  FORMAT_META.ini,
 ]
 
 export interface JsonOptions {
@@ -70,6 +73,7 @@ export interface PolyformOptions {
   yaml: YamlOptions
   csv: CsvOptions
   xml: XmlOptions
+  ini: IniOptions
 }
 
 export function defaultOptions(): PolyformOptions {
@@ -78,6 +82,7 @@ export function defaultOptions(): PolyformOptions {
     yaml: {version: '1.2', indent: 2, lineWidth: 0},
     csv: {delimiter: ',', hasHeaders: true, quote: '"', escape: '"', recordDelimiter: '\n', escapeFormulas: true},
     xml: {attributePrefix: '@_', format: true, ignoreDeclaration: false, ignoreAttributes: false},
+    ini: defaultIniOptions(),
   }
 }
 
@@ -104,6 +109,7 @@ function registerPlugins(options: PolyformOptions) {
     ignoreAttributes: options.xml.ignoreAttributes,
   }))
   use(cbor())
+  use(ini(options.ini))
 }
 
 export interface ConvertResult {
@@ -230,10 +236,23 @@ const SAMPLE_XML = `<root>
 </root>
 `
 
+const SAMPLE_INI = `name = chaos
+version = 1.0.0
+enabled = true
+scores = 9.5,8.5,7.5
+
+[json]
+score = 9.5
+
+[yaml]
+score = 8.5
+`
+
 export const SAMPLE: Record<FormatId, string> = {
   json: SAMPLE_JSON,
   yaml: SAMPLE_YAML,
   csv: SAMPLE_CSV,
   xml: SAMPLE_XML,
   cbor: '',
+  ini: SAMPLE_INI,
 }

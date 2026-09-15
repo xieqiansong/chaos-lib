@@ -274,6 +274,25 @@ onBeforeUnmount(() => {
             </el-form-item>
           </div>
 
+          <div v-if="from === 'ini' || to === 'ini'" class="pf-opt-block">
+            <div class="pf-opt-title">INI</div>
+            <el-form-item label="数组分隔符">
+              <el-input v-model="options.ini.delimiter" size="small" class="pf-opt-xs"/>
+            </el-form-item>
+            <el-form-item label="数组写法">
+              <el-select v-model="options.ini.arrayMode" size="small" class="pf-opt-s">
+                <el-option label="一行拼齐" value="join"/>
+                <el-option label="重复键" value="repeat"/>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="类型推断">
+              <el-switch v-model="options.ini.inferTypes" size="small"/>
+            </el-form-item>
+            <el-form-item label="段前空行">
+              <el-switch v-model="options.ini.blankLineBeforeSection" size="small"/>
+            </el-form-item>
+          </div>
+
           <div v-if="from === 'cbor' || to === 'cbor'" class="pf-opt-block">
             <div class="pf-opt-title">CBOR</div>
             <span class="text-secondary text-xs">二进制格式，界面以每 16 字节一行的 HEX 展示；无附加选项</span>
