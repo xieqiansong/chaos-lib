@@ -10,6 +10,7 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
+	_ "chaos-go/internal/stunsync"
 	"chaos-go/internal/taskplan"
 	"chaos-go/routes"
 	"chaos-go/scheduler"

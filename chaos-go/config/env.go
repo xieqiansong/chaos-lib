@@ -30,6 +30,11 @@ type AppConfig struct {
 
 	DeepSeekAPIKey string `env:"DEEPSEEK_API_KEY"`
 	BaiduAK        string `env:"BAIDU_AK"`
+
+	// Lucky STUN 规则列表定时同步到 MQTT 的相关配置。
+	// 仅当 MQTT 启用且已配置 LUCKY_OPEN_TOKEN 时，后台任务才会启动。
+	LuckyOpenToken       string `env:"LUCKY_OPEN_TOKEN"`                 // Lucky 服务的 openToken，用于请求 stunrulelist 接口
+	LuckySyncIntervalSec int    `env:"LUCKY_SYNC_INTERVAL_SEC" envDefault:"60"` // 同步间隔（秒），缺省 60
 }
 
 type ServerConfig struct {

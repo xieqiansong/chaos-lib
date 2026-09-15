@@ -329,3 +329,35 @@ func Publish(m wireMessage) error {
 	token.Wait()
 	return token.Error()
 }
+
+// Prefix 返回已规范化的公共主题前缀（末尾带 "/"），供业务拼接完整 topic。
+func Prefix() string {
+	return normalizePrefix(config.GetConfig().Mqtt.Prefix)
+}
+
+// PublishLocal 本地落库后立即广播（与 SendMessage 行为一致）：本地可见、对端可收。
+// 本机订阅回声因 node_id 一致会被 onMessage 静默丢弃，故不会重复落库，也不会触发告警。
+func PublishLocal(m wireMessage) error {
+	if _, err := saveMessage(m); err != nil {
+		slog.Error("MQTT 消息本地落库失败", "channel", m.Channel, "err", err)
+	}
+	if err := Publish(m); err != nil {
+		// broker 离线：本地已落库，仅记日志，不回滚
+		slog.Warn("MQTT 发布失败（本地已落库）", "channel", m.Channel, "err", err)
+		return err
+	}
+	return nil
+}
+
+// NewWireMessage 构造一条本机发出的业务报文（自动填充 id / node_id / ts）。
+// 用于把外部数据封装进 wireMessage 后通过 Publish 广播；本机订阅因 node_id 一致会被
+// 静默丢弃（onMessage 的回声过滤），从而不会触发「报文缺少 id」之类的告警。
+func NewWireMessage(channel, payload string) wireMessage {
+	return wireMessage{
+		ID:      newID(),
+		NodeID:  NodeID(),
+		Channel: channel,
+		Payload: payload,
+		Ts:      time.Now().UTC().Format(time.RFC3339),
+	}
+}
