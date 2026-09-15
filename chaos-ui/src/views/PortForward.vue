@@ -223,13 +223,29 @@ const showForwardModal = ref(false)
 const forwardForm = ref<ForwardForm>(emptyForwardForm())
 const isEditForward = computed(() => forwardForm.value.Id > 0)
 const isRemoteForm = computed(() => forwardForm.value.Direction === 'remote')
+const isDirectForm = computed(() => forwardForm.value.Direction === 'direct')
 
-/** 远程转发绑定非回环地址时的风险提示 */
+/** 远程转发绑定非回环地址时的风险提示（直接转发本机监听非回环属正常行为，不提示） */
 const bindAddressRisk = computed(() => {
   if (!isRemoteForm.value) return ''
   const addr = forwardForm.value.BindAddress.trim()
   if (!addr || addr === '127.0.0.1' || addr === '::1') return ''
   return '监听地址非回环：SSH 服务器需开启 GatewayPorts，且会把本机服务暴露给服务器网络'
+})
+
+/** 监听端口标签：remote 在服务器侧，local/direct 在本地 */
+const listenPortLabel = computed(() => (isRemoteForm.value ? '远端监听端口' : '本地监听端口'))
+const listenSideHint = computed(() => (isRemoteForm.value ? '在 SSH 服务器侧监听的端口' : '在本机监听的端口'))
+const bindAddressPlaceholder = computed(() =>
+  isRemoteForm.value ? '留空默认 127.0.0.1（服务器侧）' : '留空默认 0.0.0.0（本机全网卡）')
+const targetHostPlaceholder = computed(() => {
+  if (isRemoteForm.value) return '由本机侧解析，如 127.0.0.1'
+  return '由本机侧解析，如 127.0.0.1 或 mysql.internal'
+})
+const targetHostHint = computed(() => {
+  if (isRemoteForm.value) return '远程转发：服务器上接入的流量会回连到本机的该地址'
+  if (isDirectForm.value) return '直接转发：本机接入的流量会直连到该地址（纯 TCP，不经 SSH 隧道）'
+  return '本地转发：目标地址由 SSH 服务器侧解析'
 })
 
 function onDirectionChange() {
@@ -238,10 +254,6 @@ function onDirectionChange() {
 }
 
 function openCreateForward() {
-  if (sshConns.value.length === 0) {
-    ElMessage.warning('请先创建一条 SSH 连接')
-    return
-  }
   forwardForm.value = emptyForwardForm()
   showForwardModal.value = true
 }
@@ -249,7 +261,7 @@ function openCreateForward() {
 function openEditForward(rule: PortForward) {
   forwardForm.value = {
     Id: rule.Id, Name: rule.Name,
-    Direction: rule.Direction === 'remote' ? 'remote' : 'local',
+    Direction: rule.Direction,
     Port: rule.Port, BindAddress: rule.BindAddress || '',
     TargetHost: rule.TargetHost,
     TargetPort: rule.TargetPort, SshConnectionId: rule.SshConnectionId, Remark: rule.Remark,
@@ -260,7 +272,7 @@ function openEditForward(rule: PortForward) {
 async function submitForward() {
   const form = forwardForm.value
   const portLabel = form.Direction === 'remote' ? '远端监听端口' : '本地监听端口'
-  if (!form.SshConnectionId) {
+  if (form.Direction !== 'direct' && !form.SshConnectionId) {
     ElMessage.warning('请选择 SSH 连接')
     return
   }
@@ -279,7 +291,9 @@ async function submitForward() {
   const payload = {
     Name: form.Name.trim(), Direction: form.Direction, Port: form.Port,
     BindAddress: form.BindAddress.trim(), TargetHost: form.TargetHost.trim(),
-    TargetPort: form.TargetPort, SshConnectionId: form.SshConnectionId, Remark: form.Remark,
+    TargetPort: form.TargetPort,
+    SshConnectionId: form.Direction === 'direct' ? 0 : form.SshConnectionId,
+    Remark: form.Remark,
   }
   try {
     if (form.Id) {
@@ -391,7 +405,7 @@ onMounted(() => {
 
     <div class="section-toolbar mt-lg">
       <span class="text-primary text-base section-title">转发规则管理</span>
-      <span class="text-secondary text-xs">本地转发（ssh -L）/ 远程转发（ssh -R）双向 SSH 隧道</span>
+      <span class="text-secondary text-xs">本地转发（ssh -L）/ 远程转发（ssh -R）/ 直接转发（纯 TCP）三种方式</span>
       <div class="section-actions">
         <el-button size="small" type="primary" @click="openCreateForward">+ 新建规则</el-button>
       </div>
@@ -407,8 +421,8 @@ onMounted(() => {
       <el-table-column prop="Name" label="名称" min-width="140"/>
       <el-table-column label="方向" width="100">
         <template #default="{row}">
-          <el-tag :type="row.Direction === 'remote' ? 'warning' : 'info'">
-            {{ row.Direction === 'remote' ? '远程 -R' : '本地 -L' }}
+          <el-tag :type="row.Direction === 'remote' ? 'warning' : row.Direction === 'direct' ? 'success' : 'info'">
+            {{ row.Direction === 'remote' ? '远程 -R' : row.Direction === 'direct' ? '直接转发' : '本地 -L' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -427,7 +441,8 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="SSH 连接" min-width="140">
         <template #default="{row}">
-          {{ connNameById[row.SshConnectionId] || `#${row.SshConnectionId}` }}
+          <span v-if="row.Direction === 'direct'">-</span>
+          <span v-else>{{ connNameById[row.SshConnectionId] || `#${row.SshConnectionId}` }}</span>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90">
@@ -520,9 +535,10 @@ onMounted(() => {
           <el-radio-group v-model="forwardForm.Direction" @change="onDirectionChange">
             <el-radio-button value="local">本地转发 -L</el-radio-button>
             <el-radio-button value="remote">远程转发 -R</el-radio-button>
+            <el-radio-button value="direct">直接转发</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="SSH 连接">
+        <el-form-item v-if="forwardForm.Direction !== 'direct'" label="SSH 连接">
           <el-select v-model="forwardForm.SshConnectionId" placeholder="请选择" style="width: 100%">
             <el-option
                 v-for="conn in sshConns"
@@ -531,26 +547,24 @@ onMounted(() => {
                 :value="conn.Id"/>
           </el-select>
         </el-form-item>
-        <el-form-item :label="isRemoteForm ? '远端监听端口' : '本地监听端口'">
+        <el-form-item :label="listenPortLabel">
           <el-input-number v-model="forwardForm.Port" :min="1" :max="65535" controls-position="right"/>
           <div class="text-secondary text-xs mt-05">
-            {{ isRemoteForm ? '在 SSH 服务器侧监听的端口' : '在本机监听的端口' }}
+            {{ listenSideHint }}
           </div>
         </el-form-item>
         <el-form-item label="监听地址">
           <el-input
               v-model="forwardForm.BindAddress"
-              :placeholder="isRemoteForm ? '留空默认 127.0.0.1（服务器侧）' : '留空默认 0.0.0.0（本机全网卡）'"/>
+              :placeholder="bindAddressPlaceholder"/>
           <div v-if="bindAddressRisk" class="text-secondary text-xs mt-05">{{ bindAddressRisk }}</div>
         </el-form-item>
         <el-form-item label="目标主机">
           <el-input
               v-model="forwardForm.TargetHost"
-              :placeholder="isRemoteForm ? '由本机侧解析，如 127.0.0.1' : '由 SSH 服务器侧解析，如 127.0.0.1 或 mysql.internal'"/>
+              :placeholder="targetHostPlaceholder"/>
           <div class="text-secondary text-xs mt-05">
-            {{ isRemoteForm
-              ? '远程转发：服务器上接入的流量会回连到本机的该地址'
-              : '本地转发：目标地址由 SSH 服务器侧解析' }}
+            {{ targetHostHint }}
           </div>
         </el-form-item>
         <el-form-item label="目标端口">

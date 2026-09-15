@@ -105,6 +105,18 @@ COMMENT ON COLUMN public.port_forwarding.bind_address IS '监听地址：local �
 UPDATE public.port_forwarding SET direction = 'local' WHERE direction IS NULL OR direction = '';
 
 -- ============================================================
+-- 2026-09-15: 直接转发（direct 方向）
+-- port_forwarding.direction 新增取值 direct：
+--   直接转发 = 本机监听（监听地址缺省 0.0.0.0），接入流量经纯 TCP 直连目标（host:port），不经 SSH 隧道；
+--   因此 direct 规则不关联 ssh_connection_id（无对应连接时本列存 0），其余字段含义与 local 一致。
+-- 列结构无需变更（direction 已是 text），此处仅补充取值说明，便于人工维护。
+-- 对应模型：internal/portfwd.PortForwarding
+-- ============================================================
+
+COMMENT ON COLUMN public.port_forwarding.direction IS '转发方向：local（本机监听，等价 ssh -L）/ remote（SSH 服务器侧监听，等价 ssh -R）/ direct（本机监听直连目标，纯 TCP，不经 SSH）；空值视为 local';
+
+
+-- ============================================================
 -- 2026-09-13: MQTT 多节点消息同步（mqtt-cluster-sync 变更）
 -- 新增 mqtt_sync_messages（订阅/发布落库的消息，payload 明文）与 mqtt_sync_node（本机节点标识）。
 -- 界面仅展示每个 channel 最新一条（按 MAX(id) 取），旧消息全部保留。

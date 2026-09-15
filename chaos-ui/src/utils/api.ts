@@ -164,19 +164,20 @@ export interface SshConnectionPayload {
     Remark?: string
 }
 
-export type PortForwardDirection = 'local' | 'remote'
+export type PortForwardDirection = 'local' | 'remote' | 'direct'
 
 export interface PortForward {
     Id: number
     Name: string
-    /** local = 本机监听（ssh -L）；remote = SSH 服务器侧监听（ssh -R） */
+    /** local = 本机监听（ssh -L）；remote = SSH 服务器侧监听（ssh -R）；direct = 本机监听直连目标（纯 TCP） */
     Direction: PortForwardDirection
-    /** 监听端口：local 为本机端口，remote 为服务器侧端口 */
+    /** 监听端口：local/direct 为本机端口，remote 为服务器侧端口 */
     Port: number
-    /** 监听地址：local 缺省 0.0.0.0，remote 缺省 127.0.0.1 */
+    /** 监听地址：local/direct 缺省 0.0.0.0，remote 缺省 127.0.0.1 */
     BindAddress: string
     TargetHost: string
     TargetPort: number
+    /** direct 方向无需 SSH 连接，此字段为 0 */
     SshConnectionId: number
     /** 以内存实际运行状态为准 */
     Status: boolean
@@ -191,6 +192,7 @@ export interface PortForwardPayload {
     BindAddress?: string
     TargetHost: string
     TargetPort: number
+    /** direct 方向传 0 或不传 */
     SshConnectionId: number
     Remark?: string
 }

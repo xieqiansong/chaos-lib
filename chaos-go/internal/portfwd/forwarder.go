@@ -81,8 +81,11 @@ func NewPortForwarder() *PortForwarder {
 	return &PortForwarder{forwards: make(map[int]*ForwardTask), ctx: ctx, cancel: cancel}
 }
 
-// AddForward 建立 SSH 隧道并按方向完成监听。
-// 先完成 SSH 认证再监听：认证失败或监听失败都不留下半启动状态。
+// AddForward 按方向建立转发任务并完成监听。
+//   - 本地转发（local）/ 远程转发（remote）：先完成 SSH 认证再监听；
+//   - 直接转发（direct）：不经 SSH 隧道，直接在本机监听并拨向目标。
+//
+// 认证失败或监听失败都不留下半启动状态。
 func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection) error {
 	if err := rule.normalize(); err != nil {
 		return err
@@ -94,11 +97,12 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	if exists {
 		return fmt.Errorf("该端口转发已启动")
 	}
-	// 本机监听端口由本机独占：同一 (方向, 监听地址) 已被其他规则占用时提前给出明确错误
-	if rule.Direction == DirectionLocal {
+	// 本机侧监听端口由本机独占：local 与 direct 都在本机监听，
+	// 同一 (方向, 监听地址) 已被其他规则占用时提前给出明确错误。
+	if isLocalSideListen(rule.Direction) {
 		pf.mu.RLock()
 		for _, other := range pf.forwards {
-			if other.direction == DirectionLocal && other.listenAddr == rule.listenAddr() {
+			if isLocalSideListen(other.direction) && other.listenAddr == rule.listenAddr() {
 				pf.mu.RUnlock()
 				return fmt.Errorf("本机端口 %d 已在其他转发中使用", rule.Port)
 			}
@@ -106,9 +110,16 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		pf.mu.RUnlock()
 	}
 
-	client, err := sshConn.dial()
-	if err != nil {
-		return fmt.Errorf("SSH 连接失败: %v", err)
+	var client *ssh.Client
+	if rule.Direction != DirectionDirect {
+		if sshConn == nil {
+			return fmt.Errorf("请选择 SSH 连接")
+		}
+		var err error
+		client, err = sshConn.dial()
+		if err != nil {
+			return fmt.Errorf("SSH 连接失败: %v", err)
+		}
 	}
 
 	taskCtx, taskCancel := context.WithCancel(pf.ctx)
@@ -125,15 +136,20 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		listener, err := client.Listen("tcp", task.listenAddr)
 		if err != nil {
 			taskCancel()
-			client.Close()
+			if client != nil {
+				client.Close()
+			}
 			return fmt.Errorf("在 SSH 服务器侧监听 %s 失败: %v", task.listenAddr, err)
 		}
 		task.setListener(listener)
 	} else {
+		// local 与 direct 都在本机监听
 		listener, err := net.Listen("tcp", task.listenAddr)
 		if err != nil {
 			taskCancel()
-			client.Close()
+			if client != nil {
+				client.Close()
+			}
 			return fmt.Errorf("监听本机端口 %d 失败: %v", rule.Port, err)
 		}
 		task.setListener(listener)
@@ -144,7 +160,9 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		pf.mu.Unlock()
 		taskCancel()
 		task.closeListener()
-		client.Close()
+		if client != nil {
+			client.Close()
+		}
 		return fmt.Errorf("该端口转发已启动")
 	}
 	pf.forwards[rule.Id] = task
@@ -155,11 +173,18 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	} else {
 		go pf.localAcceptLoop(task)
 	}
-	go pf.keepAliveLoop(task)
+	// 直接转发无 SSH 隧道，无需保活探测
+	if rule.Direction != DirectionDirect {
+		go pf.keepAliveLoop(task)
+	}
 
-	slog.Info("SSH 端口转发已启动",
+	sshAddr := ""
+	if sshConn != nil {
+		sshAddr = sshConn.sshAddr()
+	}
+	slog.Info("端口转发已启动",
 		"ruleId", rule.Id, "direction", rule.Direction, "listen", task.listenAddr,
-		"sshAddr", sshConn.sshAddr(), "target", task.targetAddr)
+		"sshAddr", sshAddr, "target", task.targetAddr)
 	return nil
 }
 
@@ -185,7 +210,7 @@ func (pf *PortForwarder) RemoveForward(ruleId int) error {
 	}
 	task.connsMu.Unlock()
 
-	slog.Info("SSH 端口转发已停止", "ruleId", ruleId, "direction", task.direction, "listen", task.listenAddr)
+	slog.Info("端口转发已停止", "ruleId", ruleId, "direction", task.direction, "listen", task.listenAddr)
 	return nil
 }
 
@@ -214,10 +239,14 @@ func (pf *PortForwarder) ListForwards() []ForwardStatus {
 	statuses := make([]ForwardStatus, 0, len(tasks))
 	for _, task := range tasks {
 		task.clientMu.Lock()
+		sshAddr := ""
+		if task.sshConn != nil {
+			sshAddr = task.sshConn.sshAddr()
+		}
 		statuses = append(statuses, ForwardStatus{
 			RuleId: task.ruleId, Direction: task.direction, Port: task.port,
 			Listen: task.listenAddr, Target: task.targetAddr,
-			SshAddr: task.sshConn.sshAddr(), LastError: task.lastErr,
+			SshAddr: sshAddr, LastError: task.lastErr,
 		})
 		task.clientMu.Unlock()
 	}
@@ -437,17 +466,18 @@ func (pf *PortForwarder) handleConnection(task *ForwardTask, listenConn net.Conn
 }
 
 // dialOtherSide 按方向选择对端连接方式：
-// local —— 远端目标由 SSH 服务器侧解析（等价 ssh -L）；
-// remote —— 目标在本机侧解析（等价 ssh -R）。
+// local —— 远端目标由 SSH 服务器侧解析（等价 ssh -L，经 SSH 通道）；
+// remote —— 目标在本机侧解析（等价 ssh -R，本机直连）；
+// direct —— 直接转发，目标在本机侧解析（纯 TCP 直连）。
 func (task *ForwardTask) dialOtherSide() (net.Conn, error) {
-	if task.direction == DirectionRemote {
-		return task.dialLocalTarget()
+	if task.direction == DirectionLocal {
+		return task.dialTargetViaSSH()
 	}
-	return task.dialTargetViaSSH()
+	return task.dialDirectTarget()
 }
 
-// dialLocalTarget 远程转发的对端：本机直连目标服务（目标地址在本机解析）。
-func (task *ForwardTask) dialLocalTarget() (net.Conn, error) {
+// dialDirectTarget 目标在本机侧解析（远程转发与直接转发共用）：本机直连目标服务。
+func (task *ForwardTask) dialDirectTarget() (net.Conn, error) {
 	deadline := time.Now().Add(connectRetry)
 	lastErr := error(errTunnelClosed)
 	for {

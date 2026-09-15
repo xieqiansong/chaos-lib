@@ -17,12 +17,21 @@ const (
 	DirectionLocal = "local"
 	// DirectionRemote 远程转发（等价 ssh -R）：SSH 服务器侧监听 → 本机侧解析目标
 	DirectionRemote = "remote"
+	// DirectionDirect 直接转发：本机监听 → 直接（纯 TCP）拨向目标，不经 SSH 隧道
+	DirectionDirect = "direct"
 
 	// DefaultLocalBindAddress 本地转发缺省监听地址（监听全部网卡，与既有行为一致）
 	DefaultLocalBindAddress = "0.0.0.0"
 	// DefaultRemoteBindAddress 远程转发缺省监听地址（与 OpenSSH ssh -R 不带 bind_address 一致）
 	DefaultRemoteBindAddress = "127.0.0.1"
+	// DefaultDirectBindAddress 直接转发缺省监听地址（监听全部网卡）
+	DefaultDirectBindAddress = "0.0.0.0"
 )
+
+// isLocalSideListen 该方向是否在本机监听（本地转发与直接转发都在本机侧监听）。
+func isLocalSideListen(direction string) bool {
+	return direction == DirectionLocal || direction == DirectionDirect
+}
 
 // PortForwarding 端口转发规则。
 // Direction 决定「监听」发生在哪一侧：local 在本机监听，remote 在 SSH 服务器侧监听。
@@ -63,14 +72,17 @@ func (pf *PortForwarding) normalize() error {
 	switch pf.Direction {
 	case "":
 		pf.Direction = DirectionLocal
-	case DirectionLocal, DirectionRemote:
+	case DirectionLocal, DirectionRemote, DirectionDirect:
 	default:
-		return fmt.Errorf("转发方向不合法，只能为 %s 或 %s", DirectionLocal, DirectionRemote)
+		return fmt.Errorf("转发方向不合法，只能为 %s、%s 或 %s", DirectionLocal, DirectionRemote, DirectionDirect)
 	}
 	if strings.TrimSpace(pf.BindAddress) == "" {
-		if pf.Direction == DirectionRemote {
+		switch pf.Direction {
+		case DirectionRemote:
 			pf.BindAddress = DefaultRemoteBindAddress
-		} else {
+		case DirectionDirect:
+			pf.BindAddress = DefaultDirectBindAddress
+		default:
 			pf.BindAddress = DefaultLocalBindAddress
 		}
 	}
@@ -89,10 +101,14 @@ func (pf *PortForwarding) targetAddr() string {
 }
 
 func (pf *PortForwarding) directionLabel() string {
-	if pf.Direction == DirectionRemote {
+	switch pf.Direction {
+	case DirectionRemote:
 		return "远端"
+	case DirectionDirect:
+		return "直接"
+	default:
+		return "本地"
 	}
-	return "本地"
 }
 
 func (pf *PortForwarding) toResponse() PortForwardingResponse {
@@ -122,17 +138,23 @@ func (pf *PortForwarding) validate() error {
 	if err := validatePort(pf.TargetPort); err != nil {
 		return fmt.Errorf("目标端口不合法: %v", err)
 	}
-	if pf.SshConnectionId <= 0 {
-		return fmt.Errorf("请选择 SSH 连接")
-	}
-	var conn SshConnection
-	if result := config.GetDB().First(&conn, "id = ?", pf.SshConnectionId); result.Error != nil {
-		return fmt.Errorf("SSH 连接不存在")
+	// 直接转发不经 SSH 隧道，无需关联 SSH 连接；其余方向必须关联一条已存在的连接。
+	if pf.Direction != DirectionDirect {
+		if pf.SshConnectionId <= 0 {
+			return fmt.Errorf("请选择 SSH 连接")
+		}
+		var conn SshConnection
+		if result := config.GetDB().First(&conn, "id = ?", pf.SshConnectionId); result.Error != nil {
+			return fmt.Errorf("SSH 连接不存在")
+		}
 	}
 	if strings.TrimSpace(pf.Name) == "" {
-		if pf.Direction == DirectionRemote {
+		switch pf.Direction {
+		case DirectionRemote:
 			pf.Name = fmt.Sprintf("[R] %s → %s", pf.listenAddr(), pf.targetAddr())
-		} else {
+		case DirectionDirect:
+			pf.Name = fmt.Sprintf("[D] %s → %s", pf.listenAddr(), pf.targetAddr())
+		default:
 			pf.Name = fmt.Sprintf("[L] %s → %s", pf.listenAddr(), pf.targetAddr())
 		}
 	}
@@ -276,12 +298,17 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 			c.JSON(400, gin.H{"error": "该端口转发已启动"})
 			return
 		}
-		var conn SshConnection
-		if result := config.GetDB().First(&conn, "id = ?", rule.SshConnectionId); result.Error != nil {
-			c.JSON(400, gin.H{"error": "SSH 连接不存在，无法启动"})
-			return
+		// 直接转发不经 SSH 隧道，无需加载 SSH 连接；其余方向必须存在对应连接。
+		var conn *SshConnection
+		if rule.Direction != DirectionDirect {
+			var loaded SshConnection
+			if result := config.GetDB().First(&loaded, "id = ?", rule.SshConnectionId); result.Error != nil {
+				c.JSON(400, gin.H{"error": "SSH 连接不存在，无法启动"})
+				return
+			}
+			conn = &loaded
 		}
-		if err := GlobalPortForwarder.AddForward(&rule, &conn); err != nil {
+		if err := GlobalPortForwarder.AddForward(&rule, conn); err != nil {
 			c.JSON(500, gin.H{"error": "启动端口转发失败: " + err.Error()})
 			return
 		}

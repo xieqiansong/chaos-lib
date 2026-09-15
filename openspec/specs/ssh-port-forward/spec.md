@@ -2,7 +2,7 @@
 
 ## Purpose
 
-让用户通过 Web 界面维护 SSH 连接信息（密码或私钥）与端口转发规则，并一键建立经 SSH 隧道的端口转发：既有本地转发（`ssh -L`，访问只有 SSH 服务器内网可达的服务），也有远程转发（`ssh -R`，把本机服务反向暴露给 SSH 服务器或其网络）。
+让用户通过 Web 界面维护 SSH 连接信息（密码或私钥）与端口转发规则，并一键建立端口转发。转发分三种方向：本地转发（`ssh -L`，访问只有 SSH 服务器内网可达的服务）、远程转发（`ssh -R`，把本机服务反向暴露给 SSH 服务器或其网络）、以及直接转发（`direct`，本机监听后不经 SSH 隧道、以纯 TCP 直连目标，适用于本机与目标网络已互通的场景）。
 
 ## Requirements
 
@@ -60,7 +60,7 @@
 - **THEN** 系统保留原凭据不变
 
 ### Requirement: Port forwarding rule management
-系统 SHALL 支持端口转发规则的创建、查询、更新与删除。每条规则 MUST 关联一条已存在的 SSH 连接，并声明转发方向（`local` 本地转发 / `remote` 远程转发，缺省 `local`）、监听端口、可选监听地址、目标主机、目标端口、备注与启用状态。监听端口的含义随方向变化：`local` 时为本机监听端口，`remote` 时为 SSH 服务器侧监听端口。
+系统 SHALL 支持端口转发规则的创建、查询、更新与删除。每条规则 SHALL 声明转发方向（`local` 本地转发 / `remote` 远程转发 / `direct` 直接转发，缺省 `local`）、监听端口、可选监听地址、目标主机、目标端口、备注与启用状态。`local` 与 `remote` 规则 MUST 关联一条已存在的 SSH 连接；`direct` 规则不经 SSH 隧道，MUST NOT 关联 SSH 连接（其 `ssh_connection_id` 存 0）。监听端口的含义随方向变化：`local` 与 `direct` 时为本机监听端口，`remote` 时为 SSH 服务器侧监听端口。
 
 #### Scenario: Create a rule bound to a connection
 - **WHEN** 提交一条引用已存在 SSH 连接、未指定方向的规则，且监听端口与目标端口均在 1-65535 之间
@@ -78,9 +78,17 @@
 - **WHEN** 提交的规则监听端口或目标端口不在 1-65535 之间，或目标主机为空
 - **THEN** 系统拒绝并返回校验错误
 
+#### Scenario: Create a direct rule
+- **WHEN** 提交一条方向为 `direct`、含监听端口与本地侧可解析目标主机:目标端口的规则（不关联 SSH 连接）
+- **THEN** 系统持久化该规则并返回其 id，初始状态为未启动
+
 #### Scenario: Invalid direction rejected
-- **WHEN** 提交的规则方向不是 `local` 或 `remote`
+- **WHEN** 提交的规则方向不是 `local`、`remote` 或 `direct`
 - **THEN** 系统拒绝并返回校验错误
+
+#### Scenario: Direct rule without SSH connection
+- **WHEN** 提交 `direct` 规则（未提供 SSH 连接）
+- **THEN** 系统允许创建，且不要求关联 SSH 连接
 
 #### Scenario: Modify a running rule
 - **WHEN** 修改一条处于运行状态规则的方向、SSH 连接、监听端口、监听地址或目标
@@ -95,7 +103,7 @@
 - **THEN** 系统按 `local` 方向对待并展示
 
 ### Requirement: Start and stop port forwarding
-系统 SHALL 支持启动与停止单条转发规则。启动时 MUST 经其关联的 SSH 连接建立隧道，并按方向完成监听（`local` 在本机监听，`remote` 在 SSH 服务器侧监听）；停止时 MUST 释放该监听并关闭隧道。
+系统 SHALL 支持启动与停止单条转发规则。`local` 与 `remote` 规则启动时 MUST 经其关联的 SSH 连接建立隧道，并按方向完成监听（`local` 在本机监听，`remote` 在 SSH 服务器侧监听）；`direct` 规则启动时 MUST 在本机监听并直接以纯 TCP 拨向目标，不经 SSH 隧道。停止时 MUST 释放该监听并关闭隧道（direct 无隧道）。
 
 #### Scenario: Start a rule
 - **WHEN** 对未启动的 `local` 规则执行启动
@@ -104,6 +112,10 @@
 #### Scenario: Start a remote rule
 - **WHEN** 对未启动的 `remote` 规则执行启动
 - **THEN** 系统建立 SSH 隧道、在 SSH 服务器侧建立指定监听，并把规则状态更新为运行中
+
+#### Scenario: Start a direct rule
+- **WHEN** 对未启动的 `direct` 规则执行启动
+- **THEN** 系统在本机按监听地址:监听端口建立监听，并把接入流量经纯 TCP 直连目标主机:目标端口，规则状态更新为运行中（不建立 SSH 连接）
 
 #### Scenario: Duplicate start rejected
 - **WHEN** 对已处于运行状态的规则再次执行启动
@@ -130,7 +142,7 @@
 - **THEN** 系统拒绝并提示该转发未启动
 
 ### Requirement: SSH tunnel forwarding behavior
-系统 SHALL 在监听端口与目标地址之间经 SSH 通道做双向数据转发。目标地址的解析侧 MUST 随方向变化：`local` 由 SSH 服务器侧解析（等价 `ssh -L`），`remote` 由本机侧解析（等价 `ssh -R`）。
+系统 SHALL 在监听端口与目标地址之间做双向数据转发。`local` 经 SSH 通道转发，目标地址由 SSH 服务器侧解析（等价 `ssh -L`）；`remote` 经 SSH 通道转发，目标地址由本机侧解析（等价 `ssh -R`）；`direct` 不经 SSH 通道，目标地址由本机侧解析（等价纯 TCP 直连）。
 
 #### Scenario: Traffic reaches remote-only target
 - **WHEN** `local` 规则的远端目标地址（如 `127.0.0.1:3306`）仅在 SSH 服务器内网可达，本机客户端连接本机监听端口
@@ -173,6 +185,7 @@
 #### Scenario: Direction-aware labels
 - **WHEN** 规则方向为 `remote`
 - **THEN** 页面把监听端口标注为「远端端口」并提示该监听位于 SSH 服务器侧，`local` 时标注为「本地端口」
+- **AND** `direct` 时监听端口同样标注为「本地端口」，且不展示 SSH 连接字段
 
 #### Scenario: Toggle forwarding from the page
 - **WHEN** 用户在规则行上点击启动 / 停止
