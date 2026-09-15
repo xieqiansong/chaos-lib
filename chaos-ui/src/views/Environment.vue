@@ -220,7 +220,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="env-view">
     <div class="section-toolbar">
       <span class="text-primary text-base section-title">环境变量管理</span>
       <span v-if="data" class="text-secondary text-xs">
@@ -246,16 +246,17 @@ onMounted(() => {
     <el-skeleton v-if="loading && !data" :rows="8" animated/>
 
     <template v-if="data">
-      <el-tabs v-model="activeTab" class="env-tabs">
-        <el-tab-pane label="用户变量" name="user"/>
-        <el-tab-pane name="system">
-          <template #label>
-            系统变量
-          </template>
-        </el-tab-pane>
-      </el-tabs>
+      <div class="env-body">
+        <el-tabs v-model="activeTab" class="env-tabs">
+          <el-tab-pane label="用户变量" name="user"/>
+          <el-tab-pane name="system">
+            <template #label>
+              系统变量
+            </template>
+          </el-tab-pane>
+        </el-tabs>
 
-      <el-table :data="filteredVariables" size="small" stripe max-height="80vh" class="env-table">
+        <el-table :data="filteredVariables" size="small" stripe height="100%" class="env-table">
         <el-table-column prop="0" label="变量名" min-width="120" sortable>
           <template #default="{ row }">
             <code>{{ row[0] }}</code>
@@ -326,6 +327,7 @@ onMounted(() => {
           </template>
         </el-table-column>
       </el-table>
+      </div>
     </template>
 
     <el-dialog v-model="showAddDialog" title="添加环境变量" width="30rem">
@@ -346,12 +348,26 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.env-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .env-tabs {
   margin-bottom: var(--space-sm);
 }
 
+.env-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .env-table {
   width: 100%;
+  flex: 1;
 }
 
 .env-value {
