@@ -13,7 +13,6 @@ type ProjectGroup struct {
 	CreatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
 	UpdatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
 	IsDeleted    bool      `gorm:"default:false"`
-	IsRecycleBin bool      `gorm:"default:false"`
 }
 
 func (ProjectGroup) TableName() string {

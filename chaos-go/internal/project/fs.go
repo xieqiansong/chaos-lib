@@ -93,42 +93,6 @@ func MoveProjectFolder(oldAbs, newAbs string) error {
 	return nil
 }
 
-func MoveToRecycleBin(path string) error {
-	if _, err := os.Stat(path); err != nil {
-		return nil
-	}
-	if runtime.GOOS == "windows" {
-		info, err := os.Stat(path)
-		if err != nil {
-			return fmt.Errorf("读取路径信息失败: %v", err)
-		}
-		if info.IsDir() {
-			clearReadOnly(path)
-		} else {
-			_ = os.Chmod(path, 0o700)
-		}
-		escaped := strings.ReplaceAll(path, "'", "''")
-		verb := "DeleteFile"
-		if info.IsDir() {
-			verb = "DeleteDirectory"
-		}
-		ps := fmt.Sprintf(
-			"Add-Type -AssemblyName Microsoft.VisualBasic; "+
-				"[Microsoft.VisualBasic.FileIO.FileSystem]::%s('%s', 'OnlyErrorDialogs', 'SendToRecycleBin')",
-			verb, escaped,
-		)
-		cmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("送入回收站失败: %v (%s)", err, string(out))
-		}
-		if _, err := os.Stat(path); err == nil {
-			return fmt.Errorf("送回收站后原目录仍残留（可能 .git 被进程占用）: %s", path)
-		}
-		return nil
-	}
-	return RemoveDirSafe(path)
-}
-
 func copyDir(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {

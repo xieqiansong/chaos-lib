@@ -24,7 +24,6 @@ type ProjectGroup struct {
 	CreatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
 	UpdatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
 	IsDeleted    bool      `gorm:"default:false"`
-	IsRecycleBin bool      `gorm:"default:false"`
 }
 
 func (ProjectGroup) TableName() string { return "project_groups" }
@@ -70,18 +69,6 @@ func getGroupID(c *gin.Context) (int, bool) {
 	return id, true
 }
 
-func getRecycleBinGroup(c *gin.Context) (ProjectGroup, bool) {
-	var group ProjectGroup
-	if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":      "未配置回收站项目组，请先创建一个 is_recycle_bin=true 的项目组",
-			"suggestion": "POST /api/projectGroups 并携带 {\"isRecycleBin\": true, \"name\": \"回收站\", \"absolutePath\": \"<回收站目录>\"}",
-		})
-		return group, false
-	}
-	return group, true
-}
-
 func resolveProjectPaths(group ProjectGroup, absolutePath, relativePath string) (string, string, error) {
 	var abs, rel string
 	var err error
@@ -97,26 +84,6 @@ func resolveProjectPaths(group ProjectGroup, absolutePath, relativePath string) 
 		abs = filepath.Join(group.AbsolutePath, rel)
 	default:
 		return "", "", fmt.Errorf("必须提供 absolutePath 或 relativePath 之一")
-	}
-	return abs, rel, nil
-}
-
-func resolveRecycleTarget(recycleGroup ProjectGroup, project Project) (string, string, error) {
-	if err := os.MkdirAll(recycleGroup.AbsolutePath, 0o755); err != nil {
-		return "", "", fmt.Errorf("回收站根目录不存在且创建失败: %v", err)
-	}
-	base := filepath.Join(recycleGroup.AbsolutePath, project.Name)
-	candidate := base
-	for i := 1; ; i++ {
-		if _, err := os.Stat(candidate); err != nil {
-			break
-		}
-		candidate = fmt.Sprintf("%s_%d", base, i)
-	}
-	abs := filepath.Clean(candidate)
-	rel, err := filepath.Rel(recycleGroup.AbsolutePath, abs)
-	if err != nil {
-		return "", "", fmt.Errorf("计算回收站相对路径失败: %v", err)
 	}
 	return abs, rel, nil
 }
@@ -209,13 +176,6 @@ func ListProjects(c *gin.Context) {
 		db = db.Where("group_id = ?", id)
 	}
 
-	if groupID == nil {
-		var recycleGroup ProjectGroup
-		if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&recycleGroup).Error; err == nil {
-			db = db.Where("group_id <> ?", recycleGroup.ID)
-		}
-	}
-
 	var projects []Project
 	if err := db.Order("last_accessed_at DESC NULLS LAST, created_at DESC, id DESC").Find(&projects).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
@@ -226,10 +186,6 @@ func ListProjects(c *gin.Context) {
 		var group ProjectGroup
 		if err := config.GetDB().Where("id = ? AND is_deleted = ?", *groupID, false).First(&group).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
-			return
-		}
-		if group.IsRecycleBin {
-			c.JSON(http.StatusOK, projects)
 			return
 		}
 		items := buildProjectList(group, projects)
@@ -451,133 +407,17 @@ func DeleteProject(c *gin.Context) {
 		return
 	}
 
-	recycleGroup, isRecycle := getRecycleBinGroup(c)
-	if !isRecycle {
-		return
-	}
-
-	if project.GroupID == recycleGroup.ID {
-		if err := RemoveDirSafe(project.AbsolutePath); err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "已软删除项目，但物理目录删除失败", "dirRemoveError": err.Error(),
-			})
-			return
-		}
-		if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "已永久删除"})
-		return
-	}
-
-	// 源目录不存在（已被手动/并发删除）：磁盘上已无内容，无需移入回收站，直接清理数据库记录
-	if info, statErr := os.Stat(project.AbsolutePath); statErr != nil || !info.IsDir() {
-		if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "已删除（原目录不存在，已直接清理记录）", "recycled": false})
-		return
-	}
-
-	newAbs, newRel, err := resolveRecycleTarget(recycleGroup, project)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "移入回收站失败: " + err.Error()})
-		return
-	}
-
-	tx := config.GetDB().Begin()
-	if err := tx.Model(&project).Updates(map[string]interface{}{
-		"group_id": recycleGroup.ID, "absolute_path": newAbs,
-		"relative_path": newRel, "is_deleted": false, "updated_at": time.Now(),
-	}).Error; err != nil {
-		tx.Rollback()
-		_ = RemoveDirSafe(newAbs)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
-		return
-	}
-	tx.Commit()
-
-	// 源目录已随 MoveProjectFolder 移动进回收站目录，无需额外删除
-
-	config.GetDB().First(&project, id)
-	c.JSON(http.StatusOK, gin.H{
-		"message": "已移入回收站", "recycled": true, "project": project, "newAbsPath": newAbs,
-	})
-}
-
-func RestoreProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
-		return
-	}
-	var req struct {
-		TargetGroupID      int    ``
-		TargetRelativePath string ``
-		TargetAbsPath      string ``
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if req.TargetGroupID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "目标项目组ID不能为空"})
-		return
-	}
-
-	var project Project
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
-		return
-	}
-
-	var targetGroup ProjectGroup
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", req.TargetGroupID, false).First(&targetGroup).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "目标项目组不存在"})
-		return
-	}
-
-	newAbs, newRel, err := resolveProjectPaths(targetGroup, req.TargetAbsPath, req.TargetRelativePath)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := MoveProjectFolder(project.AbsolutePath, newAbs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "复制到目标分组失败: " + err.Error()})
-		return
-	}
-
-	tx := config.GetDB().Begin()
-	if err := tx.Model(&project).Updates(map[string]interface{}{
-		"group_id": targetGroup.ID, "absolute_path": newAbs,
-		"relative_path": newRel, "updated_at": time.Now(),
-	}).Error; err != nil {
-		tx.Rollback()
-		_ = RemoveDirSafe(newAbs)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
-		return
-	}
-	tx.Commit()
-
-	oldAbs := project.AbsolutePath
-	if err := RemoveDirSafe(oldAbs); err != nil {
+	if err := RemoveDirSafe(project.AbsolutePath); err != nil {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "已还原，但回收站内原目录未能删除", "recycleWarning": err.Error(), "newAbsPath": newAbs,
+			"message": "已申请删除，但物理目录删除失败", "dirRemoveError": err.Error(),
 		})
 		return
 	}
-
-	config.GetDB().First(&project, id)
-	c.JSON(http.StatusOK, gin.H{
-		"message": "已还原", "project": project, "newAbsPath": newAbs,
-	})
+	if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "已删除"})
 }
 
 // ── ProjectGroup Handlers ──────────────────────────────────────────
@@ -588,23 +428,10 @@ func CreateProjectGroup(c *gin.Context) {
 		OrderNum     *int    ``
 		AbsolutePath string  ``
 		Remark       *string ``
-		IsRecycleBin *bool   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
-
-	isRecycle := req.IsRecycleBin != nil && *req.IsRecycleBin
-	if isRecycle {
-		var existing ProjectGroup
-		if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ?", true, false).First(&existing).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "回收站项目组已存在，不能重复创建", "existingId": existing.ID})
-			return
-		}
-		if req.Name == "" {
-			req.Name = "回收站"
-		}
 	}
 
 	if req.Name == "" {
@@ -629,7 +456,7 @@ func CreateProjectGroup(c *gin.Context) {
 	group := ProjectGroup{
 		Name: req.Name, OrderNum: orderNum,
 		AbsolutePath: filepath.Clean(req.AbsolutePath),
-		Remark:       req.Remark, IsRecycleBin: isRecycle,
+		Remark:       req.Remark,
 	}
 	if err := config.GetDB().Create(&group).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建项目组失败: " + err.Error()})
@@ -672,7 +499,6 @@ func UpdateProjectGroup(c *gin.Context) {
 		OrderNum     *int    ``
 		AbsolutePath *string ``
 		Remark       *string ``
-		IsRecycleBin *bool   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -685,19 +511,6 @@ func UpdateProjectGroup(c *gin.Context) {
 		return
 	}
 
-	if req.IsRecycleBin != nil {
-		wantRecycle := *req.IsRecycleBin
-		if wantRecycle != group.IsRecycleBin {
-			if wantRecycle {
-				var other ProjectGroup
-				if err := config.GetDB().Where("is_recycle_bin = ? AND is_deleted = ? AND id <> ?", true, false, id).First(&other).Error; err == nil {
-					c.JSON(http.StatusConflict, gin.H{"error": "回收站项目组已存在，不能重复创建", "existingId": other.ID})
-					return
-				}
-			}
-		}
-	}
-
 	updated := map[string]interface{}{}
 	if req.Name != nil {
 		updated["name"] = *req.Name
@@ -707,9 +520,6 @@ func UpdateProjectGroup(c *gin.Context) {
 	}
 	if req.Remark != nil {
 		updated["remark"] = *req.Remark
-	}
-	if req.IsRecycleBin != nil {
-		updated["is_recycle_bin"] = *req.IsRecycleBin
 	}
 
 	if req.AbsolutePath != nil && *req.AbsolutePath != group.AbsolutePath {
@@ -769,11 +579,6 @@ func DeleteProjectGroup(c *gin.Context) {
 	var group ProjectGroup
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&group).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
-		return
-	}
-
-	if group.IsRecycleBin {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "回收站项目组不可删除"})
 		return
 	}
 

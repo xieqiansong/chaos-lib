@@ -4,7 +4,7 @@ context: |
   后端模块名 chaos-go（Go 1.26.3），Gin + GORM，支持 PostgreSQL / SQLite 双数据库。
   前端 chaos-ui：Vue 3 + TypeScript + Vite + pnpm（Element Plus / ECharts / Monaco）。
   业务逻辑全在 internal/ 按功能分包：
-    taskplan（任务计划 + FSRS 间隔复习）、project（项目管理 + 回收站）、
+    taskplan（任务计划 + FSRS 间隔复习）、project（项目管理）、
     proxy（浏览器历史 / SDK 切换 / DeepSeek / 天气）、envvar（环境变量 TOML 快照）、
     filelink（Windows Junction）、portfwd（端口转发）、quickedit（文件快照 / 回滚）、
     notify（Windows 通知 / WxPusher）。

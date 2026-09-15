@@ -133,7 +133,6 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 			projects.PATCH("/:id/move", project.MoveProject)
 			projects.PATCH("/:id/access", project.AccessProject)
 			projects.DELETE("/:id", project.DeleteProject)
-			projects.POST("/:id/restore", project.RestoreProject)
 		}
 
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)

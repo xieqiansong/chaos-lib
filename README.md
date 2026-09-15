@@ -7,7 +7,7 @@
 - **📋 任务管理**：待办 / 定时（cron）/ 间隔复习三种任务计划，父子任务树，优先级、延期、逾期检测与统计
 - **📖 FSRS 间隔复习**：内嵌 FSRS 算法（`internal/taskplan/fsrs.go`），按遗忘曲线计算下次最佳复习时间，支持 AI 评分辅助
 - **📊 看板**：任务概览、每日 / 活跃 / 贡献统计（ECharts）
-- **📁 项目管理**：按 ProjectGroup / Project 组织本地项目，记录 Git URL 与访问时间；移动（同卷 rename / 跨卷 copy）、访问、删除入回收站并可还原
+- **📁 项目管理**：按 ProjectGroup / Project 组织本地项目，记录 Git URL 与访问时间；移动（同卷 rename / 跨卷 copy）、访问、删除
 - **🔗 文件连接**：管理 Windows 目录联接（Junction），创建 / 删除 / 切换 / 状态检测（功能开关 `FEATURE_FILE_LINK`）
 - **⚙️ 环境变量管理**：读取系统 + 用户环境变量，增量修改（Set / Unset / Path 增删改），每次操作写入 TOML 快照并可查阅历史
 - **✏️ 快捷编辑**：登记文件 → 编辑保存（自动快照）→ 回滚到任意历史版本；内嵌 Monaco 编辑器（含 diff），环境变量以「虚拟文件」形式接入

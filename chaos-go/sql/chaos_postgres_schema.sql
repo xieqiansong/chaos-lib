@@ -132,8 +132,7 @@ CREATE TABLE public.project_groups (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     is_deleted boolean DEFAULT false,
-    order_num bigint DEFAULT 0,
-    is_recycle_bin boolean DEFAULT false
+    order_num bigint DEFAULT 0
 );
 
 
@@ -939,13 +938,6 @@ CREATE UNIQUE INDEX idx_project_groups_path ON public.project_groups USING btree
 
 
 --
--- Name: idx_project_groups_recycle; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE UNIQUE INDEX idx_project_groups_recycle ON public.project_groups USING btree (is_recycle_bin) WHERE (is_recycle_bin = true);
-
-
---
 -- Name: idx_projects_abs_path; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1046,6 +1038,15 @@ ALTER TABLE ONLY public.tasks
 --
 
 ALTER TABLE IF EXISTS public.tasks DROP COLUMN IF EXISTS priority;
+
+
+--
+-- Migration: 移除项目管理回收站功能（is_recycle_bin 列与对应唯一索引）
+-- 对已存在的数据库执行：
+--
+
+ALTER TABLE IF EXISTS public.project_groups DROP COLUMN IF EXISTS is_recycle_bin;
+DROP INDEX IF EXISTS public.idx_project_groups_recycle;
 
 
 --
