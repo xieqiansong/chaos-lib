@@ -12,19 +12,31 @@ interface EnvResponse {
   Warnings: string[]
 }
 
+const props = defineProps<{
+  searchText: string
+}>()
+
 const data = ref<EnvResponse | null>(null)
 const loading = ref(false)
 
 const activeTab = ref<'system' | 'user'>('user')
-const filterText = ref('')
 
 const filteredVariables = computed(() => {
   const section = activeTab.value === 'system' ? data.value?.System : data.value?.User
   if (!section) return []
-  const q = filterText.value.toLowerCase()
+  const q = props.searchText.trim().toLowerCase()
   return Object.entries(section)
       .filter(([k, v]) => !q || k.toLowerCase().includes(q) || v.toLowerCase().includes(q))
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a, av], [b, bv]) => {
+        // Path 始终排第一
+        const aPath = a === 'Path'
+        const bPath = b === 'Path'
+        if (aPath !== bPath) return aPath ? -1 : 1
+        // 默认：值升序，再按变量名升序
+        const vCmp = av.localeCompare(bv)
+        if (vCmp !== 0) return vCmp
+        return a.localeCompare(b)
+      })
 })
 
 async function fetchEnv() {
@@ -215,6 +227,7 @@ onMounted(() => {
         {{ data.Meta?.Hostname || '本机' }}
       </span>
       <div class="section-actions">
+        <el-button size="small" type="primary" @click="showAddDialog = true">添加变量</el-button>
         <el-button size="small" @click="fetchEnv" :loading="loading" plain>刷新</el-button>
         <el-button size="small" @click="syncEnv" :loading="loading">同步到快照</el-button>
       </div>
@@ -242,36 +255,13 @@ onMounted(() => {
         </el-tab-pane>
       </el-tabs>
 
-      <div class="env-filter-bar">
-        <el-input
-            v-model="filterText"
-            placeholder="搜索变量名或值..."
-            size="small"
-            clearable
-            class="env-filter-input"
-        />
-        <el-button
-            size="small"
-            type="primary"
-            @click="showAddDialog = true"
-        >
-          添加变量
-        </el-button>
-      </div>
-
-      <el-table
-          :data="filteredVariables"
-          size="small"
-          stripe
-          max-height="50vh"
-          class="env-table"
-      >
-        <el-table-column prop="0" label="变量名" min-width="180">
+      <el-table :data="filteredVariables" size="small" stripe max-height="80vh" class="env-table">
+        <el-table-column prop="0" label="变量名" min-width="120" sortable>
           <template #default="{ row }">
             <code>{{ row[0] }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="1" label="值" min-width="300">
+        <el-table-column prop="1" label="值" min-width="300" sortable>
           <template #default="{ row }">
             <template v-if="editingKey === row[0]">
               <div class="edit-container">
@@ -282,9 +272,12 @@ onMounted(() => {
                   </el-radio-group>
                 </div>
                 <template v-if="editMode === 'text'">
-                  <div class="edit-row">
-                    <el-input v-model="editValue" size="small"/>
-                  </div>
+                  <el-input
+                      v-model="editValue"
+                      type="textarea"
+                      :rows="4"
+                      :autosize="{ minRows: 4, maxRows: 12 }"
+                  />
                 </template>
                 <template v-else>
                   <div class="array-editor">
@@ -357,18 +350,6 @@ onMounted(() => {
   margin-bottom: var(--space-sm);
 }
 
-.env-filter-bar {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  align-items: center;
-}
-
-.env-filter-input {
-  flex: 1;
-  max-width: 18rem;
-}
-
 .env-table {
   width: 100%;
 }
@@ -423,11 +404,5 @@ onMounted(() => {
 
 .array-add-btn {
   align-self: flex-start;
-}
-
-.edit-row {
-  display: flex;
-  gap: var(--space-05);
-  align-items: center;
 }
 </style>
