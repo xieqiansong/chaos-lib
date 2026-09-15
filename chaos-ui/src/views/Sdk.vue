@@ -1,8 +1,8 @@
 <template>
     <div class="sdk-container">
         <div class="sdk-header">
-            <h2>SDK 版本管理</h2>
-            <el-button type="primary" :icon="Setting" @click="openManage">管理来源</el-button>
+          <span class="text-primary text-base section-title">SDK 版本管理</span>
+          <el-button type="primary" :icon="Setting" size="small" @click="openManage">管理来源</el-button>
         </div>
 
         <el-alert
