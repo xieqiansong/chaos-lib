@@ -12,8 +12,16 @@ import {csv} from 'polyform-tools/formats/csv'
 import {xml} from 'polyform-tools/formats/xml'
 import {cbor} from 'polyform-tools/formats/cbor'
 import {defaultIniOptions, ini, type IniOptions} from '@/utils/polyformCustom'
+import {
+  defaultGoOptions,
+  defaultJavaOptions,
+  go,
+  java,
+  type GoOptions,
+  type JavaOptions,
+} from '@/utils/polyformCodegen'
 
-export type FormatId = 'json' | 'yaml' | 'csv' | 'xml' | 'cbor' | 'ini'
+export type FormatId = 'json' | 'yaml' | 'csv' | 'xml' | 'cbor' | 'ini' | 'java' | 'go'
 
 export interface FormatMeta {
   id: FormatId
@@ -21,6 +29,8 @@ export interface FormatMeta {
   ext: string
   /** 二进制格式：界面以 HEX 文本承载 */
   binary: boolean
+  /** 只写格式（无 parser），不能作为转换来源 */
+  writeOnly?: boolean
   hint: string
 }
 
@@ -31,6 +41,8 @@ export const FORMAT_META: Record<FormatId, FormatMeta> = {
   xml: {id: 'xml', label: 'XML', ext: 'xml', binary: false, hint: '对象根最佳；数组根会生成 <0>/<1> 数字标签'},
   cbor: {id: 'cbor', label: 'CBOR', ext: 'cbor', binary: true, hint: '二进制，界面用 HEX 承载'},
   ini: {id: 'ini', label: 'INI', ext: 'ini', binary: false, hint: '自定义插件范例：两级结构（section）'},
+  java: {id: 'java', label: 'Java Class', ext: 'java', binary: false, writeOnly: true, hint: '只写：由结构推导字段类型'},
+  go: {id: 'go', label: 'Go Struct', ext: 'go', binary: false, writeOnly: true, hint: '只写：由结构推导字段类型'},
 }
 
 export const FORMAT_LIST: FormatMeta[] = [
@@ -40,7 +52,12 @@ export const FORMAT_LIST: FormatMeta[] = [
   FORMAT_META.xml,
   FORMAT_META.cbor,
   FORMAT_META.ini,
+  FORMAT_META.java,
+  FORMAT_META.go,
 ]
+
+/** 可作为转换来源的格式（排除只写格式） */
+export const SOURCE_FORMATS: FormatMeta[] = FORMAT_LIST.filter(f => !f.writeOnly)
 
 export interface JsonOptions {
   indent: number
@@ -74,6 +91,8 @@ export interface PolyformOptions {
   csv: CsvOptions
   xml: XmlOptions
   ini: IniOptions
+  java: JavaOptions
+  go: GoOptions
 }
 
 export function defaultOptions(): PolyformOptions {
@@ -83,6 +102,8 @@ export function defaultOptions(): PolyformOptions {
     csv: {delimiter: ',', hasHeaders: true, quote: '"', escape: '"', recordDelimiter: '\n', escapeFormulas: true},
     xml: {attributePrefix: '@_', format: true, ignoreDeclaration: false, ignoreAttributes: false},
     ini: defaultIniOptions(),
+    java: defaultJavaOptions(),
+    go: defaultGoOptions(),
   }
 }
 
@@ -110,6 +131,8 @@ function registerPlugins(options: PolyformOptions) {
   }))
   use(cbor())
   use(ini(options.ini))
+  use(java(options.java))
+  use(go(options.go))
 }
 
 export interface ConvertResult {
@@ -255,4 +278,7 @@ export const SAMPLE: Record<FormatId, string> = {
   xml: SAMPLE_XML,
   cbor: '',
   ini: SAMPLE_INI,
+  // 只写格式无示例输入
+  java: '',
+  go: '',
 }

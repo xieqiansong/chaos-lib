@@ -5,6 +5,7 @@ import {
   FORMAT_LIST,
   FORMAT_META,
   SAMPLE,
+  SOURCE_FORMATS,
   bytesToHex,
   bytesToHexCompact,
   defaultOptions,
@@ -131,7 +132,7 @@ function pickFile() {
 
 function guessFormat(name: string): FormatId | null {
   const ext = name.split('.').pop()?.toLowerCase() || ''
-  const hit = FORMAT_LIST.find(f => f.ext === ext)
+  const hit = FORMAT_LIST.find(f => f.ext === ext && !f.writeOnly)
   return hit ? hit.id : null
 }
 
@@ -190,7 +191,13 @@ onBeforeUnmount(() => {
         </span>
         <el-button size="small" @click="loadSample">示例</el-button>
         <el-button size="small" @click="clearAll">清空</el-button>
-        <el-button size="small" @click="swapFormats">⇄ 交换</el-button>
+        <el-button
+            size="small"
+            :disabled="!!toMeta.writeOnly"
+            :title="toMeta.writeOnly ? '只写格式不能作为输入源' : '交换输入输出'"
+            @click="swapFormats"
+        >⇄ 交换
+        </el-button>
         <el-button size="small" type="primary" @click="doConvert">转换</el-button>
       </div>
     </div>
@@ -293,6 +300,38 @@ onBeforeUnmount(() => {
             </el-form-item>
           </div>
 
+          <div v-if="to === 'java'" class="pf-opt-block">
+            <div class="pf-opt-title">Java Class</div>
+            <el-form-item label="类名">
+              <el-input v-model="options.java.className" size="small" class="pf-opt-s"/>
+            </el-form-item>
+            <el-form-item label="包名">
+              <el-input v-model="options.java.packageName" size="small" class="pf-opt-s" placeholder="留空则不输出"/>
+            </el-form-item>
+            <el-form-item label="Lombok">
+              <el-switch v-model="options.java.lombok" size="small"/>
+            </el-form-item>
+            <el-form-item label="字段驼峰">
+              <el-switch v-model="options.java.camelCase" size="small"/>
+            </el-form-item>
+          </div>
+
+          <div v-if="to === 'go'" class="pf-opt-block">
+            <div class="pf-opt-title">Go Struct</div>
+            <el-form-item label="结构体名">
+              <el-input v-model="options.go.structName" size="small" class="pf-opt-s"/>
+            </el-form-item>
+            <el-form-item label="包名">
+              <el-input v-model="options.go.packageName" size="small" class="pf-opt-s"/>
+            </el-form-item>
+            <el-form-item label="json tag">
+              <el-switch v-model="options.go.jsonTag" size="small"/>
+            </el-form-item>
+            <el-form-item label="omitempty">
+              <el-switch v-model="options.go.omitempty" size="small"/>
+            </el-form-item>
+          </div>
+
           <div v-if="from === 'cbor' || to === 'cbor'" class="pf-opt-block">
             <div class="pf-opt-title">CBOR</div>
             <span class="text-secondary text-xs">二进制格式，界面以每 16 字节一行的 HEX 展示；无附加选项</span>
@@ -307,7 +346,7 @@ onBeforeUnmount(() => {
           <div class="pf-panel-bar">
             <span class="term-prompt">in$</span>
             <el-select v-model="from" size="small" class="pf-select">
-              <el-option v-for="f in FORMAT_LIST" :key="f.id" :label="f.label" :value="f.id"/>
+              <el-option v-for="f in SOURCE_FORMATS" :key="f.id" :label="f.label" :value="f.id"/>
             </el-select>
             <el-tag v-if="fromMeta.binary" size="small" type="warning">HEX</el-tag>
             <div class="pf-bar-actions">
@@ -339,6 +378,7 @@ onBeforeUnmount(() => {
               <el-option v-for="f in FORMAT_LIST" :key="f.id" :label="f.label" :value="f.id"/>
             </el-select>
             <el-tag v-if="toMeta.binary" size="small" type="warning">HEX</el-tag>
+            <el-tag v-if="toMeta.writeOnly" size="small" type="info">只写</el-tag>
             <div class="pf-bar-actions">
               <el-button size="small" @click="copyOutput">复制</el-button>
               <el-button size="small" @click="downloadOutput">下载</el-button>
