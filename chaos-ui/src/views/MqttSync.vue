@@ -122,8 +122,6 @@ function fmtTime(v: string): string {
         <el-tag :type="status?.encrypt ? 'success' : 'warning'">
           {{ status?.encrypt ? '已加密' : '明文' }}
         </el-tag>
-      </div>
-      <div class="status-row sub">
         <span class="label">Broker：</span><code>{{ status?.broker || '-' }}</code>
         <span class="label">前缀：</span><code>{{ status?.prefix || '-' }}</code>
       </div>
@@ -167,7 +165,11 @@ function fmtTime(v: string): string {
       <template #header>消息（每个 topic 仅展示最新一条，旧消息已存库）</template>
       <el-table :data="messages" empty-text="暂无消息" style="width: 100%">
         <el-table-column prop="channel" label="topic" width="160"/>
-        <el-table-column prop="payload" label="内容" min-width="240" show-overflow-tooltip/>
+        <el-table-column label="内容" min-width="240">
+          <template #default="{ row }">
+            <span class="payload-cell">{{ row.payload }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="copyPayload(row.payload)">复制</el-button>
@@ -188,7 +190,7 @@ function fmtTime(v: string): string {
       </el-table>
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="消息详情" width="60%">
+    <el-dialog v-model="detailVisible" title="消息详情" width="75%">
       <pre class="detail-pre">{{ prettyPayload(detailPayload) }}</pre>
     </el-dialog>
   </div>
@@ -254,5 +256,11 @@ code {
   font-family: monospace;
   font-size: 13px;
   line-height: 1.5;
+}
+.payload-cell {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>
