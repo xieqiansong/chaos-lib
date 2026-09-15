@@ -72,6 +72,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		{
 			mqttSync.GET("/messages", mqttsync.ListMessages)
 			mqttSync.POST("/messages", mqttsync.SendMessage)
+			mqttSync.DELETE("/messages", mqttsync.DeleteMessages)
 			mqttSync.GET("/status", mqttsync.Status)
 		}
 

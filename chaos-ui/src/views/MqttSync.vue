@@ -2,7 +2,7 @@
 import {onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
 import {format, parseISO} from 'date-fns'
-import {getMqttMessages, getMqttStatus, type MqttMessage, type MqttStatus, sendMqttMessage,} from '@/utils/api'
+import {deleteMqttMessagesByChannel, getMqttMessages, getMqttStatus, type MqttMessage, type MqttStatus, sendMqttMessage,} from '@/utils/api'
 
 const status = ref<MqttStatus | null>(null)
 const messages = ref<MqttMessage[]>([])
@@ -10,11 +10,13 @@ const payload = ref('')
 const channel = ref('')
 const loading = ref(false)
 const detailVisible = ref(false)
+const detailTitle = ref('')
 const detailPayload = ref('')
 let timer: number | undefined
 
-function showDetail(payload: string) {
-  detailPayload.value = payload
+function showDetail(row: any) {
+  detailTitle.value = row.node_id
+  detailPayload.value = row.payload
   detailVisible.value = true
 }
 
@@ -59,7 +61,11 @@ async function refreshStatus() {
 
 async function refreshMessages() {
   try {
-    messages.value = await getMqttMessages()
+    const list = await getMqttMessages()
+    // 默认按时间倒序展示（后端已按 created_at DESC，这里再兜底排序一次）
+    messages.value = [...list].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    )
   } catch {
     /* 轮询出错忽略，下次重试 */
   }
@@ -96,6 +102,24 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) window.clearInterval(timer)
 })
+
+async function removeByChannel(channel: string) {
+  try {
+    await deleteMqttMessagesByChannel(channel)
+    ElMessage.success(`已删除 topic「${channel}」的全部消息`)
+    await refreshMessages()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    ElMessage.error('删除失败：' + msg)
+  }
+}
+
+function confirmRemove(row: MqttMessage) {
+  // 二次确认：按 topic 软删除数据库中的全部消息
+  if (window.confirm(`确认删除 topic「${row.channel}」下的全部消息？（仅标记删除，仍保留在库中）`)) {
+    void removeByChannel(row.channel)
+  }
+}
 
 function fmtTime(v: string): string {
   if (!v) return '-'
@@ -164,25 +188,20 @@ function fmtTime(v: string): string {
     <el-card shadow="hover">
       <template #header>消息（每个 topic 仅展示最新一条，旧消息已存库）</template>
       <el-table :data="messages" empty-text="暂无消息" style="width: 100%">
-        <el-table-column prop="channel" label="topic" width="160"/>
+        <el-table-column prop="channel" label="topic" width="240"/>
         <el-table-column label="内容" min-width="240">
           <template #default="{ row }">
             <span class="payload-cell">{{ row.payload }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="copyPayload(row.payload)">复制</el-button>
-            <el-button size="small" @click="showDetail(row.payload)">详情</el-button>
+            <el-button size="small" @click="showDetail(row)">详情</el-button>
+            <el-button size="small" type="danger" @click="confirmRemove(row)">删除</el-button>
           </template>
         </el-table-column>
-        <el-table-column label="来源" width="160">
-          <template #default="{ row }">
-            <el-tag v-if="row.is_self" size="small" type="success">本机</el-tag>
-            <span v-else class="mono">{{ row.node_id }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="时间" width="160">
+        <el-table-column label="时间" width="120">
           <template #default="{ row }">
             {{ fmtTime(row.created_at) }}
           </template>
@@ -191,6 +210,8 @@ function fmtTime(v: string): string {
     </el-card>
 
     <el-dialog v-model="detailVisible" title="消息详情" width="75%">
+      <span>消息来源: {{ detailTitle }}</span>
+      <br>
       <pre class="detail-pre">{{ prettyPayload(detailPayload) }}</pre>
     </el-dialog>
   </div>
@@ -247,6 +268,7 @@ code {
   border-radius: 4px;
   font-family: monospace;
 }
+
 .detail-pre {
   margin: 0;
   max-height: 60vh;
@@ -257,10 +279,14 @@ code {
   font-size: 13px;
   line-height: 1.5;
 }
+
 .payload-cell {
-  display: block;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  word-break: break-all;
 }
 </style>

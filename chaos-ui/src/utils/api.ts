@@ -266,6 +266,10 @@ export function sendMqttMessage(payload: string, channel?: string): Promise<Mqtt
     return sendMessage('mqttSync/messages', 'POST', { payload, channel })
 }
 
+export function deleteMqttMessagesByChannel(channel: string): Promise<{ channel: string; deleted: number }> {
+    return sendMessage(`mqttSync/messages?channel=${encodeURIComponent(channel)}`, 'DELETE')
+}
+
 export function getMqttStatus(): Promise<MqttStatus> {
     return sendMessage('mqttSync/status', 'GET')
 }

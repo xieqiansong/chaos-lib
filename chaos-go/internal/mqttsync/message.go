@@ -158,6 +158,30 @@ func ListMessages(c *gin.Context) {
 	c.JSON(200, msgs)
 }
 
+// DeleteMessages 处理 DELETE /api/mqttSync/messages?channel=xxx：
+// 将该 topic 下的全部消息软删除（IsDeleted = true），仍保留在库中以便审计。
+func DeleteMessages(c *gin.Context) {
+	db := config.GetDB()
+	if db == nil {
+		c.JSON(500, gin.H{"error": ErrDBUnavailable.Error()})
+		return
+	}
+	channel := c.Query("channel")
+	if channel == "" {
+		c.JSON(400, gin.H{"error": "channel is required"})
+		return
+	}
+	res := db.Model(&MqttSyncMessage{}).
+		Where("channel = ? AND is_deleted = ?", channel, false).
+		Update("is_deleted", true)
+	if res.Error != nil {
+		slog.Error("MQTT 消息删除失败", "channel", channel, "err", res.Error)
+		c.JSON(500, gin.H{"error": res.Error.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"channel": channel, "deleted": res.RowsAffected})
+}
+
 // Status 处理 GET /api/mqttSync/status：暴露启用 / 连接状态与节点标识。
 func Status(c *gin.Context) {
 	cfg := config.GetConfig().Mqtt
