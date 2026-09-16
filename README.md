@@ -140,7 +140,7 @@ chaos-lib/
 │   ├── routes/                  # 路由注册 + SPA 回退
 │   ├── scheduler/               # 后台周期任务调度器
 │   ├── sql/                     # PostgreSQL 基准快照 + 增量变更日志
-│   └── models/ tools/ tasks/    # 遗留实现（现役以 internal/ 为准）
+│   └── models/ tools/ tasks/    # 非现役实现（新增代码一律落 `internal/`）
 ├── chaos-ui/                    # Vue 3 + TypeScript 前端
 │   └── src/                     # views / components / router / utils
 ├── openspec/                    # 规格驱动开发（specs / changes / archive）

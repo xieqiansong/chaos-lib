@@ -12,7 +12,7 @@
 
 - 后端 `chaos-go`（module `chaos-go`，Go 1.26），业务逻辑一律放 `internal/<模块>/`，模型 + handler 同包。
 - 基础设施：`config/`（配置 + DB 单例 + 日志）、`routes/`（路由注册）、`scheduler/`（后台调度）、`cmd/`（入口）。
-- `models/`、`tools/`、`tasks/`、`_archived/` 为遗留实现，**新改动一律落在 `internal/`**，不在这些目录扩展。
+- `models/`、`tools/`、`tasks/`、`_archived/` 为非现役目录，**新改动一律落在 `internal/`**，不在这些目录扩展。
 - 前端 `chaos-ui`（Vue 3 + TypeScript + Vite 5 + Element Plus，包管理器 pnpm）。
 
 ## 数据库
