@@ -15,7 +15,7 @@ import (
 	"chaos-go/internal/taskplan"
 	"chaos-go/routes"
 	"chaos-go/scheduler"
-	"embed"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -26,8 +26,28 @@ import (
 	_ "net/http/pprof"
 )
 
-//go:embed web
-var webFS embed.FS
+// resolveUIFS 返回前端静态资源文件系统：
+// 优先 CHAOS_UI_DIR 环境变量（便于开发时直指 chaos-ui/dist），
+// 否则用可执行文件同目录的 ./ui（部署产物，不内嵌）。
+func resolveUIFS() fs.FS {
+	if dir := os.Getenv("CHAOS_UI_DIR"); dir != "" {
+		if st, err := os.Stat(dir); err == nil && st.IsDir() {
+			slog.Info("前端 UI 目录（环境变量覆盖）", "dir", dir)
+			return os.DirFS(dir)
+		}
+		slog.Warn("CHAOS_UI_DIR 指定目录不存在，回退默认路径", "dir", dir)
+	}
+	execPath, err := os.Executable()
+	if err != nil {
+		slog.Error("无法定位可执行文件", "err", err)
+		return os.DirFS(".")
+	}
+	uiDir := filepath.Join(filepath.Dir(execPath), "ui")
+	if st, err := os.Stat(uiDir); err != nil || !st.IsDir() {
+		slog.Error("前端 UI 目录不存在，界面将不可用（前端产物应放在 exe 同目录 ./ui）", "dir", uiDir)
+	}
+	return os.DirFS(uiDir)
+}
 
 func initEarlyLog() {
 	execPath, err := os.Executable()
@@ -128,7 +148,7 @@ func main() {
 	slog.Info("后台任务启动完成")
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
-	r := routes.SetupRouter(webFS)
+	r := routes.SetupRouter(resolveUIFS())
 	go r.Run(cfg.Server.GetAddress())
 
 	slog.Info("HTTP 服务启动完成")

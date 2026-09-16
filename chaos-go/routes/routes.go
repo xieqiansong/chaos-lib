@@ -10,7 +10,7 @@ import (
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/taskplan"
-	"embed"
+	"io/fs"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -20,7 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(webFS embed.FS) *gin.Engine {
+func SetupRouter(webFS fs.FS) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
@@ -156,7 +156,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 	}
 
 	r.GET("/", func(c *gin.Context) {
-		f, err := webFS.Open("web/index.html")
+		f, err := webFS.Open("index.html")
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return
@@ -171,7 +171,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		if strings.HasPrefix(filePath, "/") {
 			filePath = strings.TrimPrefix(filePath, "/")
 		}
-		f, err := webFS.Open("web/assets/" + filePath)
+		f, err := webFS.Open("assets/" + filePath)
 		if err != nil {
 			c.Status(http.StatusNotFound)
 			return
@@ -185,7 +185,7 @@ func SetupRouter(webFS embed.FS) *gin.Engine {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") || strings.HasPrefix(c.Request.URL.Path, "/debug/") {
 			return
 		}
-		f, err := webFS.Open("web/index.html")
+		f, err := webFS.Open("index.html")
 		if err != nil {
 			c.Status(http.StatusInternalServerError)
 			return

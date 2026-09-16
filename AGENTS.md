@@ -26,7 +26,7 @@
 
 ## 路由
 
-- 在 `routes.SetupRouter(webFS embed.FS)` 注册，统一前缀 `/api`
+- 在 `routes.SetupRouter(webFS fs.FS)` 注册，统一前缀 `/api`
 - 前端经 `NoRoute` 回退到 `index.html`
 - 新增前端页面：在 `chaos-ui/src/router/index.ts` 的 `appRoutes` 追加一条路由，`meta.title` / `meta.icon` 即菜单与面包屑来源，菜单自动生成（`meta.hidden` 不进菜单，`meta.fullscreen` 脱离常规布局）
 
@@ -53,4 +53,4 @@
 ## 构建与部署
 
 - 提交前必须 `go build ./...` 无编译错误；后端逻辑改动后跑 `go test ./...`
-- 前端 `pnpm build` 产出 `dist/`，通过 `scripts/chaos.deploy.ps1` 拷到 `chaos-go/cmd/server/web` 并重建二进制（`//go:embed web` 相对 `cmd/server/main.go` 解析）
+- 前端 `pnpm build` 产出 `dist/`，通过 `scripts/chaos.deploy.ps1` 拷到 exe 同目录的 `ui/`；后端**不内嵌前端**，启动时从 `CHAOS_UI_DIR` 或 exe 同目录 `./ui` 读取静态资源（见 `cmd/server/main.go` 的 `resolveUIFS`），前端改动后仅需重新拷贝 `dist/`，无需重编二进制
