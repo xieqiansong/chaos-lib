@@ -1,9 +1,7 @@
 import {createApp} from 'vue';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import './style.css';
-import './plugins/echarts';
 import App from './App.vue';
-import VChart from 'vue-echarts';
 import router from './router';
 import {
   Clock,
@@ -41,7 +39,6 @@ for (const [key, component] of Object.entries(usedIcons)) {
 }
 
 app.use(router);
-app.component('VChart', VChart);
 app.mount('#app');
 
 // 用后端返回的主机名覆盖浏览器标签标题（默认占位为 index.html 中的 "Chaos"）

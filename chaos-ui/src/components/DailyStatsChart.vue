@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {onMounted, ref, watch} from 'vue'
 import {format} from 'date-fns'
+import VChart from 'vue-echarts'
+import '../plugins/echarts'
 import {theme} from '../theme'
 import {
   MAX_VISUAL,

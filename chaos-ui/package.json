@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "predev": "node -e \"require('fs').cpSync('node_modules/monaco-editor/min', 'public/assets/monaco/min', {recursive: true})\"",
-    "prebuild": "node -e \"require('fs').cpSync('node_modules/monaco-editor/min', 'public/assets/monaco/min', {recursive: true})\"",
+    "predev": "node -e \"const fs=require('fs');const d='public/assets/monaco/min';if(!fs.existsSync(d))fs.cpSync('node_modules/monaco-editor/min',d,{recursive:true})\"",
+    "prebuild": "node -e \"const fs=require('fs');const d='public/assets/monaco/min';if(!fs.existsSync(d))fs.cpSync('node_modules/monaco-editor/min',d,{recursive:true})\"",
     "build": "vite build",
     "preview": "vite preview"
   },

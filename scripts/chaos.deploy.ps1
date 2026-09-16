@@ -4,7 +4,7 @@ $serverDir = "D:\project\chaos\chaos-lib\chaos-go"
 $outputPath = "D:\data\chaos\chaos-go.exe"
 
 cd $uiDir
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run build
 
 if (Test-Path $webDir) {

@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRoute, useRouter} from 'vue-router'
 import {format} from 'date-fns'
 import Search from './views/Search.vue'
 import PendingTasks from './components/PendingTasks.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
-import CenterPreview from './components/CenterPreview.vue'
-import ReviewDialog from './components/ReviewDialog.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
 import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
 import {Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
 import {buildMenu, flattenMenu} from './router'
+
+// 中心面板（预览原文 / 复习）打开时才加载，避免 markdown-it/dompurify 常驻主包
+const CenterPreview = defineAsyncComponent(() => import('./components/CenterPreview.vue'))
+const ReviewDialog = defineAsyncComponent(() => import('./components/ReviewDialog.vue'))
 
 const route = useRoute()
 const router = useRouter()

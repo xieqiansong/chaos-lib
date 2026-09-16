@@ -33,7 +33,7 @@ export default defineConfig({
             external: ['monaco-editor'],
             output: {
                 manualChunks: {
-                    'echarts': ['echarts', 'vue-echarts'],
+                    'echarts': ['echarts'],
                 }
             }
         }
