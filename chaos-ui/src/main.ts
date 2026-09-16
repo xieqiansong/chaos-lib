@@ -1,5 +1,9 @@
 import {createApp} from 'vue';
 import 'element-plus/theme-chalk/dark/css-vars.css';
+// ElMessage / ElMessageBox 为 JS 函数式调用且各处均为显式 import，
+// unplugin 按需解析器不会为它们注入样式，必须在入口手动引入
+import 'element-plus/es/components/message/style/css';
+import 'element-plus/es/components/message-box/style/css';
 import './style.css';
 import App from './App.vue';
 import router from './router';
