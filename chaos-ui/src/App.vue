@@ -190,7 +190,7 @@ onUnmounted(() => {
           </div>
           <button
               class="cmdpalette-hint theme-toggle"
-              :title="theme === 'paper' ? '切换到终端暗色' : '切换到浅黄护眼'"
+              :title="theme === 'paper' ? '切换到 GitHub 暗色' : '切换到 GitHub 浅色'"
               @click="toggleTheme"
           >
             <el-icon :size="14">

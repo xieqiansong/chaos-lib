@@ -1,50 +1,50 @@
-/* ===== 终端主题（terminal-style-ui） ===== */
-/* 覆盖 Element Plus 暗色变量为荧光绿/黑底 CRT 风格 */
+/* ===== 暗色主题（GitHub） ===== */
+/* 覆盖 Element Plus 暗色变量为 GitHub Dark（Primer dark）配色 */
 html.dark {
   /* 背景层级 */
-  --el-bg-color: #0a0e0a;
-  --el-bg-color-page: #060906;
-  --el-bg-color-overlay: #0d120d;
-  --el-fill-color-blank: #0a0e0a;
-  --el-fill-color: #111811;
-  --el-fill-color-light: #141d14;
-  --el-fill-color-lighter: #0f150f;
-  --el-fill-color-extra-light: #0c110c;
+  --el-bg-color: #0d1117;
+  --el-bg-color-page: #010409;
+  --el-bg-color-overlay: #161b22;
+  --el-fill-color-blank: #0d1117;
+  --el-fill-color: #161b22;
+  --el-fill-color-light: #1c2025;
+  --el-fill-color-lighter: #21262d;
+  --el-fill-color-extra-light: #262c33;
 
   /* 文字 */
-  --el-text-color-primary: #b8ffc8;
-  --el-text-color-regular: #8de8a3;
-  --el-text-color-secondary: #4f9d68;
-  --el-text-color-placeholder: #356b46;
-  --el-text-color-disabled: #2c5538;
+  --el-text-color-primary: #f0f6fc;
+  --el-text-color-regular: #c9d1d9;
+  --el-text-color-secondary: #7d8590;
+  --el-text-color-placeholder: #6e7681;
+  --el-text-color-disabled: #484f58;
 
   /* 边框 */
-  --el-border-color: #1f3d28;
-  --el-border-color-light: #1a3320;
-  --el-border-color-lighter: #16291b;
-  --el-border-color-extra-light: #122216;
+  --el-border-color: #30363d;
+  --el-border-color-light: #2b3138;
+  --el-border-color-lighter: #262c33;
+  --el-border-color-extra-light: #21262d;
 
-  /* 主色：荧光绿 */
-  --el-color-primary: #33ff66;
-  --el-color-primary-light-3: #25c24d;
-  --el-color-primary-light-5: #1d9b3e;
-  --el-color-primary-light-7: #156e2c;
-  --el-color-primary-light-8: #124f20;
-  --el-color-primary-light-9: #0e3a18;
-  --el-color-primary-dark-2: #5cff86;
+  /* 主色：GitHub 蓝 */
+  --el-color-primary: #1f6feb;
+  --el-color-primary-light-3: #388bfd;
+  --el-color-primary-light-5: #58a6ff;
+  --el-color-primary-light-7: #79c0ff;
+  --el-color-primary-light-8: #a5d6ff;
+  --el-color-primary-light-9: #0c2d85;
+  --el-color-primary-dark-2: #1158c7;
 
-  /* 语义色（终端化） */
-  --el-color-success: #33ff66;
-  --el-color-warning: #ffb000;
-  --el-color-danger: #ff5f56;
-  --el-color-error: #ff5f56;
-  --el-color-info: #4f9d68;
+  /* 语义色（GitHub） */
+  --el-color-success: #3fb950;
+  --el-color-warning: #d29922;
+  --el-color-danger: #f85149;
+  --el-color-error: #f85149;
+  --el-color-info: #7d8590;
 
   /* 表格 */
   --el-table-text-color: var(--el-text-color-regular);
   --el-table-header-text-color: var(--el-text-color-secondary);
-  --el-table-row-hover-bg-color: rgba(51, 255, 102, 0.08);
-  --el-table-current-row-bg-color: rgba(51, 255, 102, 0.12);
+  --el-table-row-hover-bg-color: rgba(88, 166, 255, 0.08);
+  --el-table-current-row-bg-color: rgba(88, 166, 255, 0.12);
   --el-table-header-bg-color: var(--el-fill-color);
   --el-table-tr-bg-color: var(--el-bg-color);
 
@@ -54,31 +54,31 @@ html.dark {
 
 /* 终端自有变量 */
 :root {
-  --term-bg: #0a0e0a;
-  --term-bg-deep: #060906;
-  --term-green: #33ff66;
-  --term-green-dim: #1d9b3e;
-  --term-green-faint: #4f9d68;
-  --term-amber: #ffb000;
-  --term-red: #ff5f56;
-  --term-cyan: #2de2e6;
-  --term-border: #1f3d28;
-  --term-glow: rgba(51, 255, 102, 0.35);
-  --term-scanline: rgba(51, 255, 102, 0.04);
+  --term-bg: #0d1117;
+  --term-bg-deep: #010409;
+  --term-green: #58a6ff;
+  --term-green-dim: #1f6feb;
+  --term-green-faint: #7d8590;
+  --term-amber: #d29922;
+  --term-red: #f85149;
+  --term-cyan: #39c5cf;
+  --term-border: #30363d;
+  --term-glow: rgba(88, 166, 255, 0.35);
+  --term-scanline: rgba(88, 166, 255, 0.04);
 
-  /* 终端光晕/遮罩派生（从主绿推导，避免散落硬编码） */
-  --term-mask: rgba(3, 6, 3, 0.72);
-  --term-shadow-soft: rgba(51, 255, 102, 0.06);
-  --term-shadow-strong: rgba(51, 255, 102, 0.18);
-  --term-active-bg: rgba(51, 255, 102, 0.1);
-  --term-area-top: rgba(51, 255, 102, 0.25);
-  --term-area-bottom: rgba(51, 255, 102, 0.02);
+  /* 终端光晕/遮罩派生（从主蓝推导，避免散落硬编码） */
+  --term-mask: rgba(1, 4, 9, 0.72);
+  --term-shadow-soft: rgba(88, 166, 255, 0.06);
+  --term-shadow-strong: rgba(88, 166, 255, 0.18);
+  --term-active-bg: rgba(88, 166, 255, 0.1);
+  --term-area-top: rgba(88, 166, 255, 0.25);
+  --term-area-bottom: rgba(88, 166, 255, 0.02);
 
-  /* 标题栏渐变 / 荧光环（dark 用绿色调） */
-  --term-titlebar-a: #0e150e;
-  --term-titlebar-b: #0a0e0a;
-  --term-ring: rgba(51, 255, 102, 0.08);
-  --term-inner: rgba(51, 255, 102, 0.06);
+  /* 标题栏渐变 / 荧光环（dark 用蓝色调） */
+  --term-titlebar-a: #161b22;
+  --term-titlebar-b: #0d1117;
+  --term-ring: rgba(88, 166, 255, 0.08);
+  --term-inner: rgba(88, 166, 255, 0.06);
 
   /* 字号阶梯（1.2 比例模数刻度，统一 rem，层级分明） */
   --font-xs:   0.7rem;   /* 11.2px 极小：提示、角标、操作图标 */
@@ -108,84 +108,84 @@ html.dark {
   --board-btn-size: 16px;
 }
 
-/* ===== 浅黄护眼主题（paper） ===== */
+/* ===== 浅色主题（GitHub） ===== */
 html.paper {
   /* 背景层级 */
-  --el-bg-color: #f8f3e6;
-  --el-bg-color-page: #f1ead7;
-  --el-bg-color-overlay: #fdf9ee;
-  --el-fill-color-blank: #f8f3e6;
-  --el-fill-color: #efe8d2;
-  --el-fill-color-light: #e9e0c4;
-  --el-fill-color-lighter: #f4eede;
-  --el-fill-color-extra-light: #f9f5ea;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f6f8fa;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color: #f6f8fa;
+  --el-fill-color-light: #eaeef2;
+  --el-fill-color-lighter: #f3f4f6;
+  --el-fill-color-extra-light: #fbfcfd;
 
-  /* 文字：深棕，低对比 */
-  --el-text-color-primary: #4a3f2d;
-  --el-text-color-regular: #5c4f38;
-  --el-text-color-secondary: #7d6f52;
-  --el-text-color-placeholder: #a29578;
-  --el-text-color-disabled: #b7ab8e;
+  /* 文字：GitHub 石墨黑，中对比 */
+  --el-text-color-primary: #1f2328;
+  --el-text-color-regular: #24292f;
+  --el-text-color-secondary: #57606a;
+  --el-text-color-placeholder: #6e7781;
+  --el-text-color-disabled: #8c959f;
 
   /* 边框 */
-  --el-border-color: #d6c9a8;
-  --el-border-color-light: #ded2b4;
-  --el-border-color-lighter: #e6dcc2;
-  --el-border-color-extra-light: #ede4cf;
+  --el-border-color: #d1d9e0;
+  --el-border-color-light: #d4dce2;
+  --el-border-color-lighter: #d8dee4;
+  --el-border-color-extra-light: #dce2e8;
 
-  /* 主色：低饱和橄榄/棕 */
-  --el-color-primary: #8a7a45;
-  --el-color-primary-light-3: #a2935f;
-  --el-color-primary-light-5: #b7aa7d;
-  --el-color-primary-light-7: #cdc2a0;
-  --el-color-primary-light-8: #dbd3b7;
-  --el-color-primary-light-9: #eae4ce;
-  --el-color-primary-dark-2: #6f6134;
+  /* 主色：GitHub 蓝 */
+  --el-color-primary: #0969da;
+  --el-color-primary-light-3: #2188ff;
+  --el-color-primary-light-5: #54aeff;
+  --el-color-primary-light-7: #96c9ff;
+  --el-color-primary-light-8: #bcdcff;
+  --el-color-primary-light-9: #ddf4ff;
+  --el-color-primary-dark-2: #0759bf;
 
-  /* 语义色（低饱和暖色系） */
-  --el-color-success: #7a8a45;
-  --el-color-warning: #c9952f;
-  --el-color-danger: #b5653f;
-  --el-color-error: #b5653f;
-  --el-color-info: #8a7f63;
+  /* 语义色（GitHub） */
+  --el-color-success: #1a7f37;
+  --el-color-warning: #9a6700;
+  --el-color-danger: #cf222e;
+  --el-color-error: #cf222e;
+  --el-color-info: #59636e;
 
   /* 表格 */
   --el-table-text-color: var(--el-text-color-regular);
   --el-table-header-text-color: var(--el-text-color-secondary);
-  --el-table-row-hover-bg-color: rgba(138, 122, 69, 0.08);
-  --el-table-current-row-bg-color: rgba(138, 122, 69, 0.12);
+  --el-table-row-hover-bg-color: rgba(9, 105, 218, 0.06);
+  --el-table-current-row-bg-color: rgba(9, 105, 218, 0.1);
   --el-table-header-bg-color: var(--el-fill-color);
   --el-table-tr-bg-color: var(--el-bg-color);
 
   /* 字体 */
   --el-font-family: 'CaskaydiaMono Nerd Font Mono', 'Microsoft YaHei', 'Consolas', 'Courier New', 'monospace';
 
-  /* 终端自有变量：暖米黄 + 深棕 + 橄榄强调 */
-  --term-bg: #f8f3e6;
-  --term-bg-deep: #f1ead7;
-  --term-green: #7a8a45;
-  --term-green-dim: #6f6134;
-  --term-green-faint: #5c4f38;
-  --term-amber: #c9952f;
-  --term-red: #b5653f;
-  --term-cyan: #4a7f7f;
-  --term-border: #d6c9a8;
-  --term-glow: rgba(138, 122, 69, 0.3);
-  --term-scanline: rgba(138, 122, 69, 0.03);
+  /* 终端自有变量：GitHub 浅色 */
+  --term-bg: #ffffff;
+  --term-bg-deep: #f6f8fa;
+  --term-green: #1a7f37;
+  --term-green-dim: #116329;
+  --term-green-faint: #57606a;
+  --term-amber: #9a6700;
+  --term-red: #cf222e;
+  --term-cyan: #1b7c83;
+  --term-border: #d1d9e0;
+  --term-glow: rgba(9, 105, 218, 0.3);
+  --term-scanline: rgba(9, 105, 218, 0.03);
 
-  /* 终端光晕/遮罩派生（paper 用暖棕调） */
-  --term-mask: rgba(248, 243, 230, 0.72);
-  --term-shadow-soft: rgba(138, 122, 69, 0.08);
-  --term-shadow-strong: rgba(138, 122, 69, 0.18);
-  --term-active-bg: rgba(138, 122, 69, 0.1);
-  --term-area-top: rgba(122, 138, 69, 0.25);
-  --term-area-bottom: rgba(122, 138, 69, 0.02);
+  /* 终端光晕/遮罩派生（GitHub light 用蓝调） */
+  --term-mask: rgba(255, 255, 255, 0.72);
+  --term-shadow-soft: rgba(9, 105, 218, 0.08);
+  --term-shadow-strong: rgba(9, 105, 218, 0.18);
+  --term-active-bg: rgba(9, 105, 218, 0.1);
+  --term-area-top: rgba(9, 105, 218, 0.25);
+  --term-area-bottom: rgba(9, 105, 218, 0.02);
 
-  /* 标题栏渐变 / 荧光环（paper 用暖色调） */
-  --term-titlebar-a: #efe8d2;
-  --term-titlebar-b: #e9e0c4;
-  --term-ring: rgba(138, 122, 69, 0.1);
-  --term-inner: rgba(138, 122, 69, 0.06);
+  /* 标题栏渐变 / 荧光环（GitHub light 用蓝调） */
+  --term-titlebar-a: #f6f8fa;
+  --term-titlebar-b: #f3f4f6;
+  --term-ring: rgba(9, 105, 218, 0.1);
+  --term-inner: rgba(9, 105, 218, 0.06);
 }
 
 /* 护眼主题关闭 CRT 扫描线/闪烁/暗角 */

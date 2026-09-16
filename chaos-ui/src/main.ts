@@ -1,13 +1,28 @@
 import {createApp} from 'vue';
-import ElementPlus from 'element-plus';
-import 'element-plus/dist/index.css';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import './style.css';
 import './plugins/echarts';
 import App from './App.vue';
 import VChart from 'vue-echarts';
 import router from './router';
-import * as ElementPlusIconsVue from '@element-plus/icons-vue';
+import {
+  Clock,
+  Collection,
+  Connection,
+  Delete,
+  EditPen,
+  Folder,
+  Link,
+  MagicStick,
+  Monitor,
+  Moon,
+  Odometer,
+  Plus,
+  Setting,
+  Sort,
+  Sunny,
+  Tickets,
+} from '@element-plus/icons-vue';
 import {initTheme} from './theme';
 import {getHostname} from './utils/api';
 import {Buffer} from 'buffer';
@@ -19,12 +34,12 @@ initTheme();
 
 const app = createApp(App);
 
-// 全局注册 Element Plus 图标，供路由 meta.icon 按名称动态渲染
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+// 全局注册用到的 Element Plus 图标（白名单），供路由 meta.icon 按名称动态渲染
+const usedIcons = {Clock, Collection, Connection, Delete, EditPen, Folder, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Sunny, Tickets}
+for (const [key, component] of Object.entries(usedIcons)) {
   app.component(key, component);
 }
 
-app.use(ElementPlus);
 app.use(router);
 app.component('VChart', VChart);
 app.mount('#app');
