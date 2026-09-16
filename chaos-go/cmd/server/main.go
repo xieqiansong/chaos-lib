@@ -137,12 +137,16 @@ func main() {
 	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
 	mqttsync.Start()
 
-	// 进程重启后内存中没有任何隧道，把库里遗留的「运行中」状态归零
-	portfwd.ResetStatusOnBoot()
+	// 进程重启后内存中没有任何隧道：按库里"期望运行"（status=true）的规则重建转发，
+	// 实现断线/重启自动重连，而非旧逻辑那样把所有状态清零。
+	portfwd.RecoverForwardsOnBoot()
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
+
+	// 端口转发自愈：周期性重连"期望运行但实际未运行"的规则（覆盖重启恢复失败、隧道意外消亡等）
+	scheduler.Register("端口转发自愈", 5*time.Minute, portfwd.SelfHealForwards)
 
 	scheduler.Start()
 	slog.Info("后台任务启动完成")

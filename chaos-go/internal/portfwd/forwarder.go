@@ -275,15 +275,79 @@ func (pf *PortForwarder) StopAll() {
 	}
 }
 
-// ResetStatusOnBoot 进程启动时把库里遗留的「运行中」状态归零：
-// 重启后内存中没有任何隧道，展示状态必须与内存一致。
-func ResetStatusOnBoot() {
+// RecoverForwardsOnBoot 进程启动时按库里的「期望运行」集合（status=true）重建隧道：
+// 重启后内存为空，凡是库里标记为运行中的规则都应尝试重连，而不是像旧逻辑那样直接清零。
+// 恢复失败的（如 SSH 暂不可达、凭据当时无效）保持 status=true，交由 SelfHealForwards 周期重试，
+// 这样库里"期望运行"的语义与内存实际状态解耦——展示状态始终以内存为准。
+func RecoverForwardsOnBoot() {
 	db := config.GetDB()
 	if db == nil {
 		return
 	}
-	if err := db.Model(&PortForwarding{}).Where("status = ?", true).Update("status", false).Error; err != nil {
-		slog.Warn("重置端口转发状态失败", "err", err)
+	var rules []PortForwarding
+	if err := db.Where("status = ?", true).Order("id ASC").Find(&rules).Error; err != nil {
+		slog.Warn("读取待恢复端口转发失败", "err", err)
+		return
+	}
+	if len(rules) == 0 {
+		return
+	}
+	slog.Info("启动恢复端口转发", "count", len(rules))
+	for i := range rules {
+		rule := &rules[i]
+		_ = rule.normalize()
+		var conn *SshConnection
+		if rule.Direction != DirectionDirect {
+			var loaded SshConnection
+			if err := db.First(&loaded, "id = ?", rule.SshConnectionId).Error; err != nil {
+				slog.Warn("端口转发恢复跳过：SSH 连接不存在",
+					"ruleId", rule.Id, "name", rule.Name, "err", err)
+				continue
+			}
+			conn = &loaded
+		}
+		if err := GlobalPortForwarder.AddForward(rule, conn); err != nil {
+			slog.Warn("端口转发恢复失败（后续自愈任务会重试）",
+				"ruleId", rule.Id, "name", rule.Name, "err", err)
+		} else {
+			slog.Info("端口转发已恢复", "ruleId", rule.Id, "name", rule.Name)
+		}
+	}
+}
+
+// SelfHealForwards 周期自愈：扫描库里"期望运行"（status=true）但内存中实际未运行的规则，
+// 重新发起 AddForward。覆盖启动恢复失败、运行时隧道意外消亡、以及认证失败（reconnectOff）后
+// 凭据被修正等需要再次建连的场景。已在运行的规则直接跳过。
+func SelfHealForwards() {
+	db := config.GetDB()
+	if db == nil {
+		return
+	}
+	var rules []PortForwarding
+	if err := db.Where("status = ?", true).Order("id ASC").Find(&rules).Error; err != nil {
+		slog.Warn("端口转发自愈扫描失败", "err", err)
+		return
+	}
+	for i := range rules {
+		rule := &rules[i]
+		if running, _ := GlobalPortForwarder.Status(rule.Id); running {
+			continue
+		}
+		_ = rule.normalize()
+		var conn *SshConnection
+		if rule.Direction != DirectionDirect {
+			var loaded SshConnection
+			if err := db.First(&loaded, "id = ?", rule.SshConnectionId).Error; err != nil {
+				continue
+			}
+			conn = &loaded
+		}
+		if err := GlobalPortForwarder.AddForward(rule, conn); err != nil {
+			slog.Debug("端口转发自愈重连失败",
+				"ruleId", rule.Id, "name", rule.Name, "err", err)
+		} else {
+			slog.Info("端口转发自愈重连成功", "ruleId", rule.Id, "name", rule.Name)
+		}
 	}
 }
 
