@@ -8,7 +8,7 @@ import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
 export default defineConfig({
     resolve: {
         alias: {
-            '@': resolve(__dirname, 'src')
+            '@': resolve(import.meta.dirname, 'src')
         }
     },
     server: {
@@ -29,11 +29,12 @@ export default defineConfig({
         })
     ],
     build: {
-        rollupOptions: {
+        rolldownOptions: {
             external: ['monaco-editor'],
             output: {
-                manualChunks: {
-                    'echarts': ['echarts'],
+                // Rolldown 的 manualChunks 仅支持函数形式（对象形式是 Rollup 语法）
+                manualChunks(id) {
+                    if (id.includes('node_modules/echarts')) return 'echarts'
                 }
             }
         }
