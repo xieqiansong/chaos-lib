@@ -256,10 +256,13 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* 注意：高度用大写 PX 绕过 postcss-pxtorem 的 rem 转换 —— 顶栏内嵌的
+   Element Plus 控件（搜索框/按钮，固定 32px）不随根字号缩放，若标题栏
+   高度跟着 rem 缩小，窄窗口下控件会溢出容器。 */
 .sidebar-header {
   display: flex;
   align-items: center;
-  height: 32.8px;
+  height: 32.8PX;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   flex-shrink: 0;
@@ -269,7 +272,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 32.8px;
+  height: 32.8PX;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -374,6 +377,8 @@ onUnmounted(() => {
   max-width: 60%;
   min-width: 0;
   margin-left: var(--space-lg);
+  display: flex;
+  align-items: center;
 }
 
 .cmdpalette-hint {

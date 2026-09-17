@@ -44,53 +44,63 @@ const handleKeydown = (e: KeyboardEvent) => {
 </script>
 
 <template>
-  <el-row>
-    <el-col :span="20">
-      <el-input
-          v-model="input"
-          placeholder="请输入"
-          clearable
-          @keydown="handleKeydown"/>
-    </el-col>
-    <el-col :span="2">
-      <el-popover
-          v-model:visible="popoverVisible"
-          placement="bottom-start"
-          width="480"
-          trigger="click"
-          popper-class="engine-popover">
-        <template #reference>
-          <el-button class="engine-button">{{ selectedEngine.aliases?.[0] || selectedEngine.name }}</el-button>
-        </template>
-        <div class="popover-content">
-          <div v-for="group in categorizedEngines" :key="group.category" class="engine-group">
-            <div>{{ group.category === 'AI' ? 'AI' : group.category === 'SEARCH' ? '搜索' : '社交' }}</div>
-            <div class="engine-grid">
-              <div
-                  v-for="engine in group.engines"
-                  :key="engine.name"
-                  :class="['engine-item', { active: selectedEngine.name === engine.name }]"
-                  @click="selectEngine(engine)">
-                <span>{{ engine.aliases?.[0] || engine.name }}</span>
-              </div>
+  <div class="search-bar">
+    <el-input
+        v-model="input"
+        class="search-input"
+        placeholder="请输入"
+        clearable
+        @keydown="handleKeydown"/>
+    <el-popover
+        v-model:visible="popoverVisible"
+        placement="bottom-start"
+        width="480"
+        trigger="click"
+        popper-class="engine-popover">
+      <template #reference>
+        <el-button class="engine-button">{{ selectedEngine.aliases?.[0] || selectedEngine.name }}</el-button>
+      </template>
+      <div class="popover-content">
+        <div v-for="group in categorizedEngines" :key="group.category" class="engine-group">
+          <div>{{ group.category === 'AI' ? 'AI' : group.category === 'SEARCH' ? '搜索' : '社交' }}</div>
+          <div class="engine-grid">
+            <div
+                v-for="engine in group.engines"
+                :key="engine.name"
+                :class="['engine-item', { active: selectedEngine.name === engine.name }]"
+                @click="selectEngine(engine)">
+              <span>{{ engine.aliases?.[0] || engine.name }}</span>
             </div>
           </div>
         </div>
-      </el-popover>
-    </el-col>
-    <el-col :span="2">
-      <el-button @click="search" class="search-button">搜索</el-button>
-    </el-col>
-  </el-row>
+      </div>
+    </el-popover>
+    <el-button @click="search" class="search-button">搜索</el-button>
+  </div>
 </template>
 
 <style scoped>
-.engine-button {
+/* 弹性布局：输入框占满剩余空间，按钮按内容自适应宽度，
+   窄窗口下不会像百分比列宽（el-col span）那样被压爆外溢 */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
+  min-width: 0;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.engine-button {
+  flex-shrink: 0;
 }
 
 .search-button {
-  width: 100%;
+  flex-shrink: 0;
 }
 
 .popover-content {
