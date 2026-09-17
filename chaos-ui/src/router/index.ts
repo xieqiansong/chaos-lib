@@ -100,7 +100,7 @@ export const appRoutes: RouteRecordRaw[] = [
     path: '/databaseMonitor',
     name: 'databaseMonitor',
     component: () => import('@/views/DatabaseMonitor.vue'),
-    meta: {title: '数据库监控', icon: 'Coin'},
+    meta: {title: '数据监控', icon: 'Coin'},
   },
 ]
 

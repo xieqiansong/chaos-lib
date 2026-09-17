@@ -8,22 +8,23 @@ import './style.css';
 import App from './App.vue';
 import router from './router';
 import {
-  Clock,
-  Collection,
-  Connection,
-  Delete,
-  EditPen,
-  Folder,
-  Link,
-  MagicStick,
-  Monitor,
-  Moon,
-  Odometer,
-  Plus,
-  Setting,
-  Sort,
-  Sunny,
-  Tickets,
+    Clock,
+    Coin,
+    Collection,
+    Connection,
+    Delete,
+    EditPen,
+    Folder,
+    Link,
+    MagicStick,
+    Monitor,
+    Moon,
+    Odometer,
+    Plus,
+    Setting,
+    Sort,
+    Sunny,
+    Tickets
 } from '@element-plus/icons-vue';
 import {initTheme} from './theme';
 import {getHostname} from './utils/api';
@@ -37,9 +38,9 @@ initTheme();
 const app = createApp(App);
 
 // 全局注册用到的 Element Plus 图标（白名单），供路由 meta.icon 按名称动态渲染
-const usedIcons = {Clock, Collection, Connection, Delete, EditPen, Folder, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Sunny, Tickets}
+const usedIcons = {Clock, Coin, Collection, Connection, Delete, EditPen, Folder, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Sunny, Tickets}
 for (const [key, component] of Object.entries(usedIcons)) {
-  app.component(key, component);
+    app.component(key, component);
 }
 
 app.use(router);
@@ -47,12 +48,12 @@ app.mount('#app');
 
 // 用后端返回的主机名覆盖浏览器标签标题（默认占位为 index.html 中的 "Chaos"）
 getHostname()
-  .then(info => {
-    if (info && info.hostname) {
-        let title = 'chaos(' + info.username + '@' + info.hostname + ")";
-        document.title = title.trim();
-    }
-  })
-  .catch(() => {
-    // 获取失败时保留默认标题
-  });
+    .then(info => {
+        if (info && info.hostname) {
+            let title = 'chaos(' + info.username + '@' + info.hostname + ")";
+            document.title = title.trim();
+        }
+    })
+    .catch(() => {
+        // 获取失败时保留默认标题
+    });
