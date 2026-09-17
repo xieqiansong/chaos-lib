@@ -123,10 +123,19 @@ func Stream(c *gin.Context) {
 	// 连接建立后先发一个 hello，便于扩展确认通道就绪。
 	_ = writeEvent(c, Command{Data: map[string]any{"type": "hello"}})
 
+	// 心跳：每 5 秒发一条 SSE 注释行（: 开头，扩展侧 onmessage 不会触发），
+	// 让空闲连接持续有字节流动，避免被代理/网关/浏览器的空闲超时掐断。
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case cmd := <-cl.ch:
 			if err := writeEvent(c, cmd); err != nil {
+				return
+			}
+		case <-ticker.C:
+			if err := writeHeartbeat(c); err != nil {
 				return
 			}
 		case <-c.Request.Context().Done():
@@ -134,6 +143,16 @@ func Stream(c *gin.Context) {
 			return
 		}
 	}
+}
+
+// writeHeartbeat 写出一条 SSE 注释心跳（: 开头）。注释行会被 EventSource 忽略，
+// 仅用于保活长连接。
+func writeHeartbeat(c *gin.Context) error {
+	if _, err := c.Writer.WriteString(": ping\n\n"); err != nil {
+		return err
+	}
+	c.Writer.Flush()
+	return nil
 }
 
 // writeEvent 按 SSE 格式写出一条 data 事件。
