@@ -115,12 +115,6 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '数据监控', icon: 'Coin'},
   },
   {
-    path: '/extChannel',
-    name: 'extChannel',
-    component: () => import('@/views/ExtChannel.vue'),
-    meta: {title: '扩展通道', icon: 'Cellphone'},
-  },
-  {
     path: '/bookmarks',
     name: 'bookmarks',
     component: () => import('@/views/Bookmarks.vue'),
