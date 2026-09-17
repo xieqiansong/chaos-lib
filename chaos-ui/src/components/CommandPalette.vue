@@ -106,14 +106,14 @@ function onKey(e: KeyboardEvent) {
   align-items: flex-start;
   justify-content: center;
   padding-top: 14vh;
-  backdrop-filter: blur(0.125rem);
+  backdrop-filter: blur(2px);
 }
 
 .cmdpalette {
-  width: min(35rem, 92vw);
+  width: min(560px, 92vw);
   background: var(--term-bg);
-  border: 0.0625rem solid var(--term-border);
-  box-shadow: 0 0 1.5rem var(--term-shadow-strong);
+  border: 1px solid var(--term-border);
+  box-shadow: 0 0 24px var(--term-shadow-strong);
 }
 
 .cmdpalette__input-row {
@@ -121,7 +121,7 @@ function onKey(e: KeyboardEvent) {
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md) var(--space-lg);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
 }
 
 .cmdpalette__input {
@@ -161,7 +161,7 @@ function onKey(e: KeyboardEvent) {
 
 .cmdpalette__alias {
   color: var(--term-green);
-  min-width: 5.5rem;
+  min-width: 88px;
 }
 
 .cmdpalette__label {
@@ -179,7 +179,7 @@ function onKey(e: KeyboardEvent) {
   font-size: var(--font-xs);
   color: var(--term-green-faint);
   opacity: 0.6;
-  border-top: 0.0625rem solid var(--term-border);
+  border-top: 1px solid var(--term-border);
   text-align: right;
 }
 </style>

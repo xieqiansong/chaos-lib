@@ -419,8 +419,8 @@ onBeforeUnmount(() => {
 
 .pf-collapse {
   margin-bottom: var(--space-md);
-  border-top: 0.0625rem solid var(--term-border);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-top: 1px solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
 }
 
 .pf-collapse :deep(.el-collapse-item__header),
@@ -447,8 +447,8 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
-  border: 0.0625rem solid var(--term-border);
-  border-radius: 0.125rem;
+  border: 1px solid var(--term-border);
+  border-radius: 2px;
 }
 
 .pf-opt-title {
@@ -468,11 +468,11 @@ onBeforeUnmount(() => {
 }
 
 .pf-opt-xs {
-  width: 4.5rem;
+  width: 72px;
 }
 
 .pf-opt-s {
-  width: 6.5rem;
+  width: 104px;
 }
 
 .pf-row {
@@ -483,8 +483,8 @@ onBeforeUnmount(() => {
 .pf-panel {
   display: flex;
   flex-direction: column;
-  border: 0.0625rem solid var(--term-border);
-  border-radius: 0.125rem;
+  border: 1px solid var(--term-border);
+  border-radius: 2px;
   background: var(--el-bg-color);
   overflow: hidden;
 }
@@ -494,13 +494,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-05) var(--space-sm);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
   background: var(--el-fill-color-lighter);
   flex-wrap: wrap;
 }
 
 .pf-select {
-  width: 6.5rem;
+  width: 104px;
 }
 
 .pf-bar-actions {
@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
 }
 
 .pf-editor {
-  height: clamp(18rem, calc(100vh - 21rem), 60rem);
+  height: clamp(288px, calc(100vh - 336px), 960px);
 }
 
 .pf-editor :deep(.el-textarea__inner) {
@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: var(--space-sm);
   padding: var(--space-05) var(--space-sm);
-  border-top: 0.0625rem solid var(--term-border);
+  border-top: 1px solid var(--term-border);
   font-size: var(--font-xs);
   color: var(--el-text-color-secondary);
 }

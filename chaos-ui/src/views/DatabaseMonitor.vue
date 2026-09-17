@@ -179,25 +179,25 @@ onMounted(() => {
 
 <style scoped>
 .overview {
-  margin-bottom: 1rem;
+  margin-bottom: 16px;
 }
 .metric-label {
   color: var(--el-text-color-secondary);
-  font-size: 0.8125rem;
+  font-size: 13px;
 }
 .metric-value {
-  font-size: 1.375rem;
+  font-size: 22px;
   font-weight: 600;
-  margin-top: 0.375rem;
+  margin-top: 6px;
 }
 .metric-value.text-sm {
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
 }
 .metric-sub {
-  font-size: 0.75rem;
+  font-size: 12px;
   color: var(--el-color-warning);
-  margin-top: 0.25rem;
+  margin-top: 4px;
 }
 .table-header {
   display: flex;
@@ -209,6 +209,6 @@ onMounted(() => {
   align-items: center;
 }
 h4 {
-  margin: 1rem 0 0.5rem;
+  margin: 16px 0 8px;
 }
 </style>

@@ -227,31 +227,31 @@ function fmtTime(v: string): string {
 .status-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .status-row.sub {
-  margin-top: 0.5rem;
+  margin-top: 8px;
   color: var(--el-text-color-secondary);
 }
 
 .label {
-  margin-left: 1rem;
+  margin-left: 16px;
 }
 
 .mono {
   font-family: monospace;
-  font-size: 0.75rem;
+  font-size: 12px;
 }
 
 .send-row {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .channel-input {
-  max-width: 13.75rem;
+  max-width: 220px;
 }
 
 .payload-input {
@@ -259,13 +259,13 @@ function fmtTime(v: string): string {
 }
 
 .alert {
-  margin-top: 0.75rem;
+  margin-top: 12px;
 }
 
 code {
   background: var(--el-fill-color-light);
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
+  padding: 2px 6px;
+  border-radius: 4px;
   font-family: monospace;
 }
 
@@ -276,7 +276,7 @@ code {
   white-space: pre-wrap;
   word-break: break-all;
   font-family: monospace;
-  font-size: 0.8125rem;
+  font-size: 13px;
   line-height: 1.5;
 }
 

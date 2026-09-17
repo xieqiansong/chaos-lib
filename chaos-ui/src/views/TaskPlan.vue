@@ -997,6 +997,6 @@ watch(taskPlansVersion, () => {
 
 .form-row .el-form-item {
   flex: 1;
-  margin-bottom: 1.125rem;
+  margin-bottom: 18px;
 }
 </style>

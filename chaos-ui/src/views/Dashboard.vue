@@ -130,11 +130,11 @@ onMounted(() => {
   background: var(--el-bg-color);
   border-radius: var(--el-border-radius-base);
   padding: var(--space-lg);
-  border: 0.0625rem solid var(--el-border-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
 }
 
 .contrib-placeholder {
-  height: 9rem;
+  height: 144px;
   display: flex;
   align-items: center;
   justify-content: center;

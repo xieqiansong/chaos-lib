@@ -178,8 +178,8 @@ function level(count: number): number {
 <style scoped>
 .contrib {
   /* 色阶：默认（终端暗色）与浅黄护眼分别给值 */
-  --contrib-cell-size: 0.625rem;
-  --contrib-gap: 0.1875rem;
+  --contrib-cell-size: 10px;
+  --contrib-gap: 3px;
   --contrib-l0: var(--el-fill-color-light);
   --contrib-l1: rgba(51, 255, 102, 0.16);
   --contrib-l2: rgba(51, 255, 102, 0.36);
@@ -218,7 +218,7 @@ html.paper .contrib {
 }
 
 .contrib-empty {
-  height: 6rem;
+  height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -235,14 +235,14 @@ html.paper .contrib {
   display: flex;
   flex-direction: column;
   gap: var(--contrib-gap);
-  padding-top: 1.125rem;
+  padding-top: 18px;
   flex-shrink: 0;
 }
 
 .contrib-weekday {
   height: var(--contrib-cell-size);
   line-height: var(--contrib-cell-size);
-  font-size: 0.625rem;
+  font-size: 10px;
   color: var(--el-text-color-secondary);
   white-space: nowrap;
 }
@@ -256,8 +256,8 @@ html.paper .contrib {
 .contrib-months {
   display: flex;
   gap: var(--contrib-gap);
-  height: 0.875rem;
-  margin-bottom: 0.25rem;
+  height: 14px;
+  margin-bottom: 4px;
 }
 
 .contrib-month {
@@ -265,8 +265,8 @@ html.paper .contrib {
   flex-shrink: 0;
   overflow: visible;
   white-space: nowrap;
-  font-size: 0.625rem;
-  line-height: 0.875rem;
+  font-size: 10px;
+  line-height: 14px;
   color: var(--el-text-color-secondary);
   text-align: left;
 }
@@ -286,7 +286,7 @@ html.paper .contrib {
   display: block;
   width: var(--contrib-cell-size);
   height: var(--contrib-cell-size);
-  border-radius: 0.125rem;
+  border-radius: 2px;
   background: var(--contrib-l0);
 }
 

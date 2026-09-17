@@ -322,12 +322,12 @@ defineExpose({loadPendingTasks})
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.125rem 0.25rem;
+  gap: 2px 4px;
 }
 
 .row-actions :deep(.el-button) {
   margin-left: 0;
-  padding: 0.125rem 0.25rem;
+  padding: 2px 4px;
 }
 
 .pending-toolbar {

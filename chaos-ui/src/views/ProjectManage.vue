@@ -571,7 +571,7 @@ onMounted(fetchGroups)
   justify-content: space-between;
   padding-bottom: var(--space-sm);
   margin-bottom: var(--space-sm);
-  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .group-list {
@@ -585,8 +585,8 @@ onMounted(fetchGroups)
   align-items: center;
   justify-content: space-between;
   padding: var(--space-sm);
-  border: 0.0625rem solid var(--el-border-color-lighter);
-  border-radius: 0.375rem;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
   margin-bottom: var(--space-xs);
   cursor: pointer;
 }
@@ -625,11 +625,11 @@ onMounted(fetchGroups)
   align-items: flex-start;
   gap: var(--space-md);
   padding: var(--space-sm) 0;
-  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
 .detail-label {
-  width: 5rem;
+  width: 80px;
   flex-shrink: 0;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-small);

@@ -335,13 +335,13 @@ onMounted(() => {
     font-size: var(--font-md);
 }
 .sources {
-    margin-bottom: 0.75rem;
+    margin-bottom: 12px;
 }
 .source-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.375rem;
+    gap: 8px;
+    margin-bottom: 6px;
     font-size: var(--font-sm);
 }
 .source-root {
@@ -353,7 +353,7 @@ onMounted(() => {
 .version-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 8px;
 }
 .version-tag.clickable {
     cursor: pointer;
@@ -367,13 +367,13 @@ onMounted(() => {
     font-size: var(--font-sm);
 }
 .manage-toolbar {
-    margin-bottom: 0.75rem;
+    margin-bottom: 12px;
 }
 .def-source {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    margin-bottom: 0.25rem;
+    gap: 6px;
+    margin-bottom: 4px;
 }
 .def-root {
     font-size: var(--font-sm);
@@ -382,12 +382,12 @@ onMounted(() => {
 .source-form-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 8px;
     width: 100%;
 }
 .source-form-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
 }
 </style>

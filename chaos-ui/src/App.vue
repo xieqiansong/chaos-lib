@@ -259,9 +259,9 @@ onUnmounted(() => {
 .sidebar-header {
   display: flex;
   align-items: center;
-  height: 2.05rem;
+  height: 32.8px;
   padding: 0 var(--space-lg);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
   flex-shrink: 0;
 }
 
@@ -269,9 +269,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.05rem;
+  height: 32.8px;
   padding: 0 var(--space-lg);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
 }
@@ -288,15 +288,15 @@ onUnmounted(() => {
   --el-menu-active-color: var(--term-green);
   --el-menu-hover-bg-color: var(--term-active-bg);
   --el-menu-hover-text-color: var(--term-green);
-  --el-menu-item-height: 2rem;
-  --el-menu-sub-item-height: 1.85rem;
+  --el-menu-item-height: 32px;
+  --el-menu-sub-item-height: 29.6px;
   --el-menu-base-level-padding: var(--space-lg);
   --el-menu-level-padding: var(--space-lg);
 }
 
 .sidebar-menu :deep(.el-menu-item),
 .sidebar-menu :deep(.el-sub-menu__title) {
-  border-left: 0.125rem solid transparent;
+  border-left: 2px solid transparent;
 }
 
 /* 当前路由高亮 */
@@ -329,9 +329,9 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.05rem;
+  height: 32.8px;
   padding: 0 var(--space-lg);
-  border-bottom: 0.0625rem solid var(--term-border);
+  border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
 }
@@ -346,15 +346,15 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
+  width: 25.6px;
+  height: 25.6px;
   background: transparent;
-  border: 0.0625rem solid var(--term-border);
+  border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
   font-size: var(--font-xs);
   cursor: pointer;
-  border-radius: 0.125rem;
+  border-radius: 2px;
 }
 
 .center-panel-close:hover {
@@ -380,15 +380,15 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
   background: transparent;
-  border: 0.0625rem solid var(--term-border);
+  border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
   font-size: var(--font-xs);
-  padding: 0.125rem 0.5rem;
+  padding: 2px 8px;
   cursor: pointer;
-  border-radius: 0.125rem;
+  border-radius: 2px;
 }
 
 .cmdpalette-hint:hover {

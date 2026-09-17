@@ -51,6 +51,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^6.0.9
         version: 6.0.9(vite@8.3.0(yaml@2.9.1))(vue@3.5.42)
+      postcss-pxtorem:
+        specifier: ^6.1.0
+        version: 6.1.0(postcss@8.5.28)
       unplugin-auto-import:
         specifier: ^21.1.0
         version: 21.1.0(@vueuse/core@14.4.0(vue@3.5.42))(rolldown@1.2.8)(rollup@4.63.1)(vite@8.3.0(yaml@2.9.1))
@@ -718,6 +721,11 @@ packages:
 
   polyform-tools@0.3.0:
     resolution: {integrity: sha512-9tyOgM1vXVjdNFjDhGmD/h8ZHtvcIgrbxTTQIpAMkaEsL2mEva4NKRQlTClH1aOFuQlDmX87/tiOqYPLmQ9Pdg==}
+
+  postcss-pxtorem@6.1.0:
+    resolution: {integrity: sha512-ROODSNci9ADal3zUcPHOF/K83TiCgNSPXQFSbwyPHNV8ioHIE4SaC+FPOufd8jsr5jV2uIz29v1Uqy1c4ov42g==}
+    peerDependencies:
+      postcss: ^8.0.0
 
   postcss@8.5.28:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
@@ -1452,6 +1460,10 @@ snapshots:
       fast-xml-builder: 1.3.1
       fast-xml-parser: 5.11.1
       yaml: 2.9.1
+
+  postcss-pxtorem@6.1.0(postcss@8.5.28):
+    dependencies:
+      postcss: 8.5.28
 
   postcss@8.5.28:
     dependencies:

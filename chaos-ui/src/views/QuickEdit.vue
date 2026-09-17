@@ -452,7 +452,7 @@ onMounted(() => {
 
 <style scoped>
 .quickedit-loading {
-  width: 7.5rem;
+  width: 120px;
 }
 
 .quickedit-file-tag {
@@ -460,15 +460,15 @@ onMounted(() => {
 }
 
 .quickedit-empty {
-  border: 0.0625rem dashed var(--el-border-color-lighter);
+  border: 1px dashed var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
-  padding: 5rem 0;
+  padding: 80px 0;
   text-align: center;
   color: var(--el-text-color-secondary);
 }
 
 .quickedit-editor-wrap {
-  border: 0.0625rem solid var(--el-border-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
   background: var(--el-bg-color);
   overflow: hidden;
@@ -476,9 +476,9 @@ onMounted(() => {
 
 .quickedit-editor-header {
   display: flex;
-  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
-  min-height: 2.75rem;
+  min-height: 44px;
 }
 
 .quickedit-snapshot-bar {
@@ -488,7 +488,7 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-05);
   flex-wrap: wrap;
-  border-right: 0.0625rem solid var(--el-border-color-lighter);
+  border-right: 1px solid var(--el-border-color-lighter);
 }
 
 .quickedit-section-label {
@@ -498,7 +498,7 @@ onMounted(() => {
 
 .quickedit-snapshot-select {
   flex: 1;
-  min-width: 7.5rem;
+  min-width: 120px;
 }
 
 .quickedit-page-btn {
@@ -526,7 +526,7 @@ onMounted(() => {
 }
 
 .quickedit-diff-container {
-  height: calc(80vh - 6.25rem);
+  height: calc(80vh - 100px);
 }
 
 .quickedit-diff-skeleton {
