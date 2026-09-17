@@ -2,7 +2,6 @@
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import PendingTasks from '../components/PendingTasks.vue'
 import {openCenterPanel} from '@/utils/centerPanel'
 import {refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {taskPlansVersion} from '@/utils/taskPlansStore'
@@ -37,8 +36,6 @@ const allPlans = ref<TaskPlanTree[]>([])
 const fullTree = ref<TaskPlanTree[]>([])
 const treeLoading = ref(false)
 const error = ref('')
-const loading = ref(false)
-const activeTab = ref<'pending' | 'all'>('all')
 
 const showCreateDialog = ref(false)
 const showEditDialog = ref(false)
@@ -54,8 +51,6 @@ const ratingValue = ref<number | null>(3)
 const showPriorityDialog = ref(false)
 const priorityTargetPlan = ref<TaskPlan | null>(null)
 const priorityValue = ref<number>(5)
-
-const pendingRef = ref<InstanceType<typeof PendingTasks> | null>(null)
 
 const ratingOptions = [
   {value: 1, label: 'Again（忘记了）', type: 'danger'},
@@ -97,7 +92,7 @@ async function submitRatingDialog() {
     }
     showRatingDialog.value = false
     ratingTargetPlan.value = null
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -331,11 +326,10 @@ function getProgress(row: TaskPlanTree): { completed: number; total: number; pct
   return {completed, total, pct}
 }
 
-async function refreshAll() {
-  loading.value = true
+// 任务计划的增删改与状态流转会影响待办任务列表（生成 / 完成 / 挂起等），
+// 通过全局刷新信号通知侧边栏与待办任务页重新拉取。
+function refreshAll() {
   refreshPendingTasks()
-  await pendingRef.value?.loadPendingTasks()
-  loading.value = false
 }
 
 async function fetchAllPlans() {
@@ -373,9 +367,7 @@ async function fetchAllPlans() {
 }
 
 async function refreshAllPlans() {
-  if (activeTab.value === 'all') {
-    await fetchAllPlans()
-  }
+  await fetchAllPlans()
 }
 
 // 统计整棵树（含子节点）的节点总数，用于判断搜索结果条数。
@@ -474,7 +466,7 @@ async function createPlan() {
     showAddChildDialog.value = false
     resetForm()
     parentPlan.value = null
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('创建成功')
   } catch (e: any) {
@@ -521,7 +513,7 @@ async function startPlan(plan: TaskPlan) {
       type: 'info',
     })
     await sendMessage(`taskPlans/${plan.ID}/start`, 'PATCH', {})
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已开启')
   } catch (e: any) {
@@ -543,7 +535,7 @@ async function completePlan(plan: TaskPlan) {
       type: 'info',
     })
     await sendMessage(`taskPlans/${plan.ID}/complete`, 'PATCH', {})
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已完成')
   } catch (e: any) {
@@ -561,7 +553,7 @@ async function archivePlan(plan: TaskPlan) {
       type: 'warning'
     })
     await sendMessage(`taskPlans/${plan.ID}/archive`, 'PATCH', {})
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已归档')
   } catch (e) {
@@ -580,7 +572,7 @@ async function deletePlan(plan: TaskPlan) {
       type: 'error'
     })
     await sendMessage(`taskPlans/${plan.ID}`, 'DELETE')
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已删除')
   } catch (e) {
@@ -599,7 +591,7 @@ async function suspendPlan(plan: TaskPlan) {
         {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
     )
     await sendMessage(`taskPlans/${plan.ID}/suspend`, 'PATCH', {})
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已挂起')
   } catch (e: any) {
@@ -617,7 +609,7 @@ async function resumePlan(plan: TaskPlan) {
         {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
     )
     await sendMessage(`taskPlans/${plan.ID}/resume`, 'PATCH', {})
-    await refreshAll()
+    refreshAll()
     await refreshAllPlans()
     ElMessage.success('已恢复')
   } catch (e: any) {
@@ -659,24 +651,11 @@ function openCreateRoot() {
 }
 
 watch(() => props.searchText, () => {
-  refreshAll()
-  if (activeTab.value === 'all') {
-    fetchAllPlans()
-  }
-})
-
-watch(activeTab, async (tab) => {
-  if (tab === 'all') {
-    const t0 = performance.now()
-    await fetchAllPlans()
-    await nextTick()
-    console.log(`[perf] switch to all tab total=${(performance.now() - t0).toFixed(0)}ms`)
-  }
+  fetchAllPlans()
 })
 
 onMounted(async () => {
   const t0 = performance.now()
-  refreshAll()
   fetchAllPlans()
   await nextTick()
   console.log(`[perf] onMounted → nextTick render=${(performance.now() - t0).toFixed(0)}ms`)
@@ -691,11 +670,7 @@ watch(taskPlansVersion, () => {
 <template>
   <div>
     <div class="section-toolbar flex items-center justify-between">
-      <span class="text-primary text-base section-title">任务管理</span>
-      <el-tabs v-model="activeTab" class="task-tabs flex-1 ml-md">
-        <el-tab-pane label="任务计划" name="all"/>
-        <el-tab-pane label="待办任务" name="pending"/>
-      </el-tabs>
+      <span class="text-primary text-base section-title">任务计划</span>
       <div class="section-actions">
         <el-button size="small" type="primary" @click="openCreateRoot">
           + 新建任务
@@ -712,102 +687,94 @@ watch(taskPlansVersion, () => {
         @close="error = ''"
     />
 
-    <el-skeleton v-if="loading && activeTab === 'all'" :rows="5" animated/>
-
-    <template v-if="activeTab === 'pending'">
-      <PendingTasks ref="pendingRef" view="table" @refresh="refreshAllPlans"/>
-    </template>
-
-    <template v-if="activeTab === 'all'">
-      <div v-if="allPlans.length === 0 && !treeLoading" class="empty-wrap">
-        <el-empty description="暂无任务计划"/>
-      </div>
-      <el-table
-          v-else
-          ref="tableRef"
-          :data="allPlans"
-          row-key="ID"
-          border
-          stripe
-          lazy
-          :load="loadChildren"
-          :tree-props="{ children: 'Children', hasChildren: 'hasChildren' }"
-          v-loading="treeLoading"
-          class="task-table"
-      >
-        <el-table-column label="名称" min-width="200">
-          <template #default="{ row }">
-            <span>{{ row.Name }}</span>
+    <div v-if="allPlans.length === 0 && !treeLoading" class="empty-wrap">
+      <el-empty description="暂无任务计划"/>
+    </div>
+    <el-table
+        v-else
+        ref="tableRef"
+        :data="allPlans"
+        row-key="ID"
+        border
+        stripe
+        lazy
+        :load="loadChildren"
+        :tree-props="{ children: 'Children', hasChildren: 'hasChildren' }"
+        v-loading="treeLoading"
+        class="task-table"
+    >
+      <el-table-column label="名称" min-width="200">
+        <template #default="{ row }">
+          <span>{{ row.Name }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="ID" width="70">
+        <template #default="{ row }">
+          <span class="font-mono text-xs text-secondary">{{ row.ID }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类型" width="80">
+        <template #default="{ row }">
+          <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
+            {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="状态" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="row.IsSuspended" size="small" type="warning">已挂起</el-tag>
+          <el-tag v-else size="small" :type="statusMap[row.Status]?.type || 'info'">
+            {{ statusMap[row.Status]?.text || row.Status }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="字数" width="80">
+        <template #default="{ row }">
+          <span v-if="row.ContentSize > 0">{{ row.ContentSize }}</span>
+          <span v-else class="text-secondary">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="优先级" width="80">
+        <template #default="{ row }">
+          <span>{{ row.Priority ?? '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="进度" width="140">
+        <template #default="{ row }">
+          <template v-if="getProgress(row)">
+            <span>{{ getProgress(row)!.pct }}({{ getProgress(row)!.completed }}/{{ getProgress(row)!.total }})</span>
           </template>
-        </el-table-column>
-        <el-table-column label="ID" width="70">
-          <template #default="{ row }">
-            <span class="font-mono text-xs text-secondary">{{ row.ID }}</span>
+          <template v-else>
+            <span class="text-secondary">-</span>
           </template>
-        </el-table-column>
-        <el-table-column label="类型" width="80">
-          <template #default="{ row }">
-            <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
-              {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag v-if="row.IsSuspended" size="small" type="warning">已挂起</el-tag>
-            <el-tag v-else size="small" :type="statusMap[row.Status]?.type || 'info'">
-              {{ statusMap[row.Status]?.text || row.Status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="字数" width="80">
-          <template #default="{ row }">
-            <span v-if="row.ContentSize > 0">{{ row.ContentSize }}</span>
-            <span v-else class="text-secondary">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="优先级" width="80">
-          <template #default="{ row }">
-            <span>{{ row.Priority ?? '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="进度" width="140">
-          <template #default="{ row }">
-            <template v-if="getProgress(row)">
-              <span>{{ getProgress(row)!.pct }}({{ getProgress(row)!.completed }}/{{ getProgress(row)!.total }})</span>
-            </template>
-            <template v-else>
-              <span class="text-secondary">-</span>
-            </template>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <div class="op-actions">
-              <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
-              <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
-              <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
-              <el-dropdown trigger="click" style="margin-left: 4px">
-                <el-button size="small" text>更多</el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item v-if="row.Status === 'created' && !isLeaf(row)" @click="startPlan(row)">开启</el-dropdown-item>
-                    <el-dropdown-item @click="openEditDialog(row.ID)">修改</el-dropdown-item>
-                    <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
-                    <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起
-                    </el-dropdown-item>
-                    <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
-                    <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
-                    <el-dropdown-item v-if="row.Status === 'completed'" @click="archivePlan(row)">归档</el-dropdown-item>
-                    <el-dropdown-item divided type="danger" @click="deletePlan(row)">删除</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-    </template>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="180" fixed="right">
+        <template #default="{ row }">
+          <div class="op-actions">
+            <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
+            <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
+            <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
+            <el-dropdown trigger="click" style="margin-left: 4px">
+              <el-button size="small" text>更多</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item v-if="row.Status === 'created' && !isLeaf(row)" @click="startPlan(row)">开启</el-dropdown-item>
+                  <el-dropdown-item @click="openEditDialog(row.ID)">修改</el-dropdown-item>
+                  <el-dropdown-item @click="openPriorityDialog(row)">设置优先级</el-dropdown-item>
+                  <el-dropdown-item v-if="!row.IsSuspended && row.Status !== 'archived' && row.Status !== 'completed'" @click="suspendPlan(row)">挂起
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="row.IsSuspended" @click="resumePlan(row)">恢复</el-dropdown-item>
+                  <el-dropdown-item v-if="row.Status === 'started'" @click="completePlan(row)">完成</el-dropdown-item>
+                  <el-dropdown-item v-if="row.Status === 'completed'" @click="archivePlan(row)">归档</el-dropdown-item>
+                  <el-dropdown-item divided type="danger" @click="deletePlan(row)">删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
 
     <el-dialog
         v-model="showCreateDialog"
@@ -1019,10 +986,6 @@ watch(taskPlansVersion, () => {
 </template>
 
 <style scoped>
-.task-tabs {
-  margin-bottom: 0;
-}
-
 .task-table {
   width: 100%;
 }
@@ -1035,21 +998,5 @@ watch(taskPlansVersion, () => {
 .form-row .el-form-item {
   flex: 1;
   margin-bottom: 18px;
-}
-
-.expand-icon {
-  cursor: pointer;
-  user-select: none;
-  font-size: var(--font-xs);
-  color: var(--el-text-color-secondary);
-  width: 1rem;
-  display: inline-block;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.expand-icon-placeholder {
-  width: 1rem;
-  flex-shrink: 0;
 }
 </style>

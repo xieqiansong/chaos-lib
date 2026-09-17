@@ -6,17 +6,6 @@ import {format} from 'date-fns'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {openCenterPanel} from '@/utils/centerPanel'
 
-const props = withDefaults(defineProps<{
-  view?: 'sidebar' | 'table'
-}>(), {
-  view: 'sidebar'
-})
-
-const emit = defineEmits<{
-  refresh: []
-  taskCount: [count: number]
-}>()
-
 interface PendingTask {
   ID: number
   PlanID: number
@@ -89,7 +78,6 @@ async function loadPendingTasks() {
     if (Array.isArray(result)) {
       pendingTasks.value = result
     }
-    emit('taskCount', pendingTasks.value.length)
   } catch (e) {
     console.error(e)
   }
@@ -110,7 +98,7 @@ async function completeTask(task: PendingTask) {
     })
     await sendMessage(`tasks/${task.ID}/complete`, 'PATCH', {})
     refreshPendingTasks()
-    emit('refresh')
+
     ElMessage.success('任务已完成')
   } catch (e: any) {
     if (e === 'cancel') return
@@ -127,7 +115,7 @@ async function cancelTask(task: PendingTask) {
     })
     await sendMessage(`tasks/${task.ID}/cancel`, 'PATCH', {})
     refreshPendingTasks()
-    emit('refresh')
+
     ElMessage.success('任务已取消')
   } catch (e: any) {
     if (e === 'cancel') return
@@ -150,7 +138,7 @@ async function submitRatingDialog() {
     showRatingDialog.value = false
     ratingTargetTask.value = null
     refreshPendingTasks()
-    emit('refresh')
+
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
@@ -178,7 +166,7 @@ async function submitPostponeDialog() {
     showPostponeDialog.value = false
     postponeTargetTask.value = null
     refreshPendingTasks()
-    emit('refresh')
+
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
@@ -193,7 +181,7 @@ onMounted(() => {
   pendingTimer = setInterval(() => {
     loadPendingTasks()
   }, 30000)
-  // 订阅全局刷新信号：其它实例（如侧边栏/任务表格）操作后本实例实时同步
+  // 订阅全局刷新信号：其它实例（如任务表格）操作后本实例实时同步
   stopVersionWatch = watch(pendingTasksVersion, () => {
     loadPendingTasks()
   })
@@ -209,7 +197,7 @@ defineExpose({loadPendingTasks})
 
 <template>
   <div class="pending-tasks-wrapper">
-    <div v-if="view === 'table'" class="pending-toolbar">
+    <div class="pending-toolbar">
       <el-switch
           v-model="earlyMode"
           active-text="提前查询"
@@ -218,34 +206,6 @@ defineExpose({loadPendingTasks})
     </div>
 
     <el-empty v-if="pendingTasks.length === 0" description="暂无待办" class="pending-empty"/>
-
-    <ul v-else-if="view === 'sidebar'" class="pending-items">
-      <li v-for="task in pendingTasks" :key="task.ID" class="pending-item">
-        <div class="pending-item-name">
-          {{ task.PlanName }}
-        </div>
-        <div v-if="task.Deadline" class="pending-item-time text-xs text-secondary">
-          截止: {{ formatTime(task.Deadline) }}
-        </div>
-        <div class="pending-item-header">
-          <el-tag size="small" :type="planTypeMap[task.PlanType]?.type || 'info'">
-            {{ planTypeMap[task.PlanType]?.text || task.PlanType }}
-          </el-tag>
-          <el-tag v-if="task.IsOverdue" size="small" type="danger">已逾期</el-tag>
-          <span v-if="task.ContentSize > 0" class="pending-item-size text-xs text-secondary">
-            {{ task.ContentSize.toLocaleString() }} 字
-          </span>
-          <span class="pending-item-header-actions op-actions">
-            <el-button v-if="task.RawLink" size="small" type="info" text @click="openPreview(task)">预览</el-button>
-            <el-button v-if="task.RawLink && task.FsrsReps > 0" size="small" type="warning" text @click="openReview(task)">复习 {{ task.FsrsReps }}</el-button>
-            <el-button v-if="task.Link" size="small" type="primary" text @click="openLink(task.Link!)">跳转</el-button>
-            <el-button v-if="task.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(task)">取消</el-button>
-            <el-button v-if="task.PlanType === 'todo' || task.PlanType === 'interval'" size="small" text @click="postponeTask(task)">延期</el-button>
-            <el-button size="small" type="success" text @click="completeTask(task)">完成</el-button>
-          </span>
-        </div>
-      </li>
-    </ul>
 
     <div v-else>
       <el-table :data="pendingTasks" border stripe class="mb-sm">
@@ -378,49 +338,6 @@ defineExpose({loadPendingTasks})
 
 .pending-empty {
   margin-top: var(--space-2xl);
-}
-
-.pending-items {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.pending-item {
-  padding: var(--space-sm);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: var(--el-border-radius-base);
-  background: var(--el-bg-color);
-}
-
-.pending-item-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
-}
-
-.pending-item-header-actions {
-  margin-left: auto;
-}
-
-.pending-item-name {
-  font-size: var(--el-font-size-small);
-  color: var(--el-text-color-primary);
-  margin-bottom: var(--space-xs);
-  word-break: break-all;
-}
-
-.pending-item-time {
-  margin-bottom: var(--space-xs);
-}
-
-.pending-item-size {
-  margin-left: var(--space-xs);
-  flex: 1;
 }
 
 .postpone-content {

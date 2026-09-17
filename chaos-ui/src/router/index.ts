@@ -25,10 +25,22 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '看板', icon: 'Odometer'},
   },
   {
+    path: '/taskPlan',
+    name: 'taskPlan',
+    component: () => import('@/views/TaskPlan.vue'),
+    meta: {title: '任务计划', icon: 'Tickets'},
+  },
+  {
+    path: '/pendingTask',
+    name: 'pendingTask',
+    component: () => import('@/views/PendingTask.vue'),
+    meta: {title: '待办任务', icon: 'Clock'},
+  },
+  {
+    // 兼容旧地址：原「任务管理」页已拆为任务计划 / 待办任务
     path: '/task',
-    name: 'task',
-    component: () => import('@/views/Task.vue'),
-    meta: {title: '任务管理', icon: 'Tickets'},
+    redirect: '/taskPlan',
+    meta: {hidden: true},
   },
   {
     path: '/projectManage',

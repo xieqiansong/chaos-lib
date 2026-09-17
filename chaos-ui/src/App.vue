@@ -3,7 +3,6 @@ import {computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch} from
 import {useRoute, useRouter} from 'vue-router'
 import {format} from 'date-fns'
 import Search from './views/Search.vue'
-import PendingTasks from './components/PendingTasks.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
@@ -23,7 +22,8 @@ const router = useRouter()
 // 终端风格：命令面板开关 + 全局热键
 const CMD_ALIAS: Record<string, string> = {
   dashboard: 'top',
-  task: 'task',
+  taskPlan: 'task',
+  pendingTask: 'todo',
   projectManage: 'proj',
   sdk: 'sdk',
   fileLink: 'link',
@@ -45,9 +45,6 @@ const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
 })))
 
 const paletteVisible = ref(false)
-
-// 侧边栏待办区折叠开关
-const todoCollapsed = ref(false)
 
 function togglePalette() {
   paletteVisible.value = !paletteVisible.value
@@ -77,8 +74,6 @@ function applyCrtPreference() {
 const searchText = ref('')
 const now = ref(format(new Date(), 'MM-dd HH:mm:ss'))
 let timer: ReturnType<typeof setInterval>
-
-const pendingTaskCount = ref(0)
 
 const handleSearchChange = (value: string) => {
   searchText.value = value
@@ -131,7 +126,6 @@ onUnmounted(() => {
       <TerminalFrame title="nav" prompt="chaos@nav" hide-titlebar>
         <div class="sidebar-header">
           <span class="text-sm font-mono text-primary">{{ now }}</span>
-          <span class="sidebar-badge" title="待办任务数量">{{ pendingTaskCount }} 待办</span>
         </div>
 
         <div class="sidebar-nav">
@@ -164,16 +158,6 @@ onUnmounted(() => {
               </el-menu-item>
             </template>
           </el-menu>
-        </div>
-
-        <div class="sidebar-divider" @click="todoCollapsed = !todoCollapsed">
-          <span class="term-prompt">chaos@queue:~$</span>
-          <span class="sidebar-divider-label">待办任务</span>
-          <span class="sidebar-divider-fold">{{ todoCollapsed ? '▸' : '▾' }}</span>
-        </div>
-
-        <div v-show="!todoCollapsed" class="sidebar-todo">
-          <PendingTasks view="sidebar" @task-count="pendingTaskCount = $event"/>
         </div>
       </TerminalFrame>
     </aside>
@@ -270,55 +254,6 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.sidebar-todo {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.sidebar-divider {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-lg);
-  border-top: 1px solid var(--term-border);
-  border-bottom: 1px solid var(--term-border);
-  color: var(--term-green-faint);
-  cursor: pointer;
-  font-family: var(--font-mono, monospace);
-  font-size: var(--font-xs);
-  user-select: none;
-}
-
-.sidebar-divider:hover {
-  color: var(--term-green);
-  background: var(--term-active-bg);
-}
-
-.sidebar-divider-label {
-  flex: 1;
-}
-
-.sidebar-divider-fold {
-  flex-shrink: 0;
-}
-
-.sidebar-badge {
-  margin-left: auto;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--term-border);
-  border-radius: 2px;
-  color: var(--term-green-faint);
-  font-size: var(--font-xs);
-  cursor: default;
-}
-
-.sidebar-badge:hover {
-  color: var(--term-green);
-  border-color: var(--term-green-dim);
 }
 
 .sidebar-header {

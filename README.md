@@ -154,7 +154,8 @@ chaos-lib/
 | 路由 | 页面 | 说明 |
 |------|------|------|
 | `/dashboard` | 看板 | 任务概览与统计 |
-| `/task` | 任务管理 | 待办 / cron / 间隔复习，任务树与 FSRS 复习 |
+| `/taskPlan` | 任务计划 | 待办 / cron / 间隔复习，任务树与 FSRS 复习 |
+| `/pendingTask` | 待办任务 | 待处理任务列表，完成 / 取消 / 延期 / 预览 / 复习 |
 | `/projectManage` | 项目管理 | 项目组与项目 |
 | `/sdk` | SDK版本 | 版本切换与来源管理 |
 | `/fileLink` | 文件连接 | Junction 管理 |
