@@ -5,6 +5,7 @@ import {format} from 'date-fns'
 import Search from './views/Search.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
 import CommandPalette from './components/CommandPalette.vue'
+import PendingTaskBadge from './components/PendingTaskBadge.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
 import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
@@ -174,6 +175,7 @@ onUnmounted(() => {
           <div class="search-wrapper">
             <Search @search-change="handleSearchChange"/>
           </div>
+          <PendingTaskBadge/>
           <button
               class="cmdpalette-hint theme-toggle"
               :title="theme === 'paper' ? '切换到 GitHub 暗色' : '切换到 GitHub 浅色'"
