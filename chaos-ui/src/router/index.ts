@@ -120,6 +120,12 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/ExtChannel.vue'),
     meta: {title: '扩展通道', icon: 'Cellphone'},
   },
+  {
+    path: '/bookmarks',
+    name: 'bookmarks',
+    component: () => import('@/views/Bookmarks.vue'),
+    meta: {title: '书签管理', icon: 'Star'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

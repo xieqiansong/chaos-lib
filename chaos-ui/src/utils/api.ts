@@ -357,9 +357,10 @@ export interface ExtCommand {
     id?: string
 }
 
-/** 下发指令的返回：成功送达的扩展数 */
+/** 下发指令的返回：送达的扩展数 + 阻塞等待到的扩展回传结果（无扩展连接时为 null） */
 export interface ExtPushResult {
     pushed: number
+    response?: ExtResponse | null
 }
 
 /** 扩展回传的一条记录（交换记录） */
@@ -376,6 +377,10 @@ export function getExtStatus(): Promise<ExtStatus> {
     return sendMessage('ext/status', 'GET')
 }
 
+/**
+ * 下发指令到扩展，并阻塞等待其回传结果（后端 /api/ext/push 会挂起直到扩展响应或超时）。
+ * 返回的 response 即扩展执行结果；pushed===0 表示当前没有已连接的扩展。
+ */
 export function pushExtCommand(cmd: ExtCommand): Promise<ExtPushResult> {
     return sendMessage('ext/push', 'POST', cmd)
 }

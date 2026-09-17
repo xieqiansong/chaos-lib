@@ -19,11 +19,19 @@ import (
 )
 
 // Command 是后端推送给扩展的指令。
+// 为了能透传任意指令参数（如 bookmarks 的 nodeId/title/parentId/isFolder/query 等），
+// 指令不绑定到固定结构体，而是以 map 形式整体保留，转发时拍平为顶层 JSON，
+// 扩展侧即可直接按 cmd.nodeId 这样的字段读取，而不会丢字段。
 type Command struct {
-	ID   string `json:"id,omitempty"`   // 指令唯一 id，扩展回传时原样带回，便于对账
-	Type string `json:"type"`           // 指令类型：openTab / ping / ...
-	URL  string `json:"url,omitempty"`  // openTab 用
-	Text string `json:"text,omitempty"` // 可选附带文本
+	Data map[string]any
+}
+
+// MarshalJSON 把指令拍平为顶层 JSON 对象（含 type、id 及所有透传参数）。
+func (c Command) MarshalJSON() ([]byte, error) {
+	if c.Data == nil {
+		return []byte("{}"), nil
+	}
+	return json.Marshal(c.Data)
 }
 
 // client 表示一条已连接的扩展 SSE 连接。
@@ -49,7 +57,14 @@ var (
 	// 最近回传记录（环形，仅内存，进程重启清空）
 	respMu      sync.Mutex
 	responseLog = make([]ResponseRecord, 0, responseLogCap)
+
+	// 阻塞等待器：push 指令后按指令 id 挂起，等扩展回传再唤醒（避免前端轮询）
+	waitMu  sync.Mutex
+	waiters = map[string]chan ResponseRecord{}
 )
+
+// pushTimeout 是 push 指令等待扩展回传的最长时间。
+const pushTimeout = 12 * time.Second
 
 const responseLogCap = 100
 
@@ -106,7 +121,7 @@ func Stream(c *gin.Context) {
 	defer unregister(cl)
 
 	// 连接建立后先发一个 hello，便于扩展确认通道就绪。
-	_ = writeEvent(c, Command{Type: "hello"})
+	_ = writeEvent(c, Command{Data: map[string]any{"type": "hello"}})
 
 	for {
 		select {
@@ -135,21 +150,65 @@ func writeEvent(c *gin.Context, cmd Command) error {
 }
 
 // Push 是「后端主动下令」的触发入口（Demo 用）。真实场景可由业务 handler / scheduler 调用 Broadcast。
+// 阻塞语义：广播后按指令 id 挂起，直到某个扩展回传结果或超时，结果随 HTTP 响应直接返回，前端无需轮询。
+// 指令以 map 透传，所有字段（含 nodeId/title 等）都会原样发给扩展。
 func Push(c *gin.Context) {
-	var cmd Command
-	if err := c.ShouldBindJSON(&cmd); err != nil {
+	var raw map[string]any
+	if err := c.ShouldBindJSON(&raw); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if cmd.Type == "" {
+	if raw == nil {
+		raw = map[string]any{}
+	}
+	t, _ := raw["type"].(string)
+	if t == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "type 不能为空"})
 		return
 	}
+	id, _ := raw["id"].(string)
+	if id == "" {
+		id = fmt.Sprintf("cmd-%d", time.Now().UnixNano())
+		raw["id"] = id
+	}
+
+	cmd := Command{Data: raw}
+
+	// 注册阻塞等待器（按指令 id 关联回传）
+	ch := make(chan ResponseRecord, 1)
+	waitMu.Lock()
+	waiters[id] = ch
+	waitMu.Unlock()
+	defer func() {
+		waitMu.Lock()
+		delete(waiters, id)
+		waitMu.Unlock()
+	}()
+
 	n := Broadcast(cmd)
-	c.JSON(http.StatusOK, gin.H{"pushed": n})
+	if n == 0 {
+		// 没有已连接扩展：立即返回，不阻塞
+		c.JSON(http.StatusOK, gin.H{"pushed": 0, "response": nil})
+		return
+	}
+
+	select {
+	case rec := <-ch:
+		c.JSON(http.StatusOK, gin.H{"pushed": n, "response": rec})
+	case <-time.After(pushTimeout):
+		c.JSON(http.StatusOK, gin.H{
+			"pushed": n,
+			"response": ResponseRecord{
+				ID:    id,
+				Type:  t,
+				Ok:    false,
+				Error: "等待扩展回传超时",
+			},
+		})
+	}
 }
 
-// Response 接收扩展执行指令后的回传结果，记录到内存日志供前端查看交换记录。
+// Response 接收扩展执行指令后的回传结果：记录到内存日志，并唤醒对应的阻塞等待器。
 func Response(c *gin.Context) {
 	var in struct {
 		ID    string `json:"id"`
@@ -176,6 +235,17 @@ func Response(c *gin.Context) {
 		responseLog = responseLog[len(responseLog)-responseLogCap:]
 	}
 	respMu.Unlock()
+
+	// 唤醒阻塞中的 push 调用（按指令 id 匹配）
+	waitMu.Lock()
+	if ch, ok := waiters[in.ID]; ok {
+		select {
+		case ch <- rec:
+		default:
+		}
+	}
+	waitMu.Unlock()
+
 	slog.Info("扩展反向通道：收到回传", "type", in.Type, "ok", in.Ok, "id", in.ID)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
