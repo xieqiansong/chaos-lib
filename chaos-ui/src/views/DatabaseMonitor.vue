@@ -1,32 +1,24 @@
 <template>
   <div class="db-monitor">
-    <el-row :gutter="16" class="overview">
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-label">数据库类型</div>
-          <div class="metric-value">{{ overview.dbType || '-' }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-label">版本</div>
-          <div class="metric-value text-sm">{{ overview.version || '-' }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-label">总大小</div>
-          <div class="metric-value">{{ formatBytes(overview.totalBytes) }}</div>
-          <div v-if="!overview.sizeSupported" class="metric-sub">单表大小不可用（SQLite 缺 dbstat）</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <div class="metric-label">表数量 / 总行数</div>
-          <div class="metric-value">{{ overview.tableCount }} / {{ overview.totalRows.toLocaleString() }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="overview">
+      <el-card shadow="hover" class="metric-card">
+        <div class="metric-label">数据库类型</div>
+        <div class="metric-value">{{ overview.dbType || '-' }}</div>
+      </el-card>
+      <el-card shadow="hover" class="metric-card">
+        <div class="metric-label">版本</div>
+        <div class="metric-value text-sm">{{ overview.version || '-' }}</div>
+      </el-card>
+      <el-card shadow="hover" class="metric-card">
+        <div class="metric-label">总大小</div>
+        <div class="metric-value">{{ formatBytes(overview.totalBytes) }}</div>
+        <div v-if="!overview.sizeSupported" class="metric-sub">单表大小不可用（SQLite 缺 dbstat）</div>
+      </el-card>
+      <el-card shadow="hover" class="metric-card">
+        <div class="metric-label">表数量 / 总行数</div>
+        <div class="metric-value">{{ overview.tableCount }} / {{ overview.totalRows.toLocaleString() }}</div>
+      </el-card>
+    </div>
 
     <el-card shadow="never" class="table-card">
       <template #header>
@@ -187,16 +179,25 @@ onMounted(() => {
 
 <style scoped>
 .overview {
-  margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  --el-card-padding: 12px;
+}
+.metric-card {
+  flex: 0 0 auto;
+}
+.metric-card :deep(.el-card__body) {
+  white-space: nowrap;
 }
 .metric-label {
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
 .metric-value {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .metric-value.text-sm {
   font-size: 14px;
@@ -206,6 +207,9 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-color-warning);
   margin-top: 4px;
+}
+.table-card {
+  --el-card-padding: 12px;
 }
 .table-header {
   display: flex;
