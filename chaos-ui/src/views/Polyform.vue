@@ -32,7 +32,6 @@ const duration = ref(0)
 const error = ref('')
 
 const autoConvert = ref(true)
-const optionsOpen = ref<string[]>([])
 const options = reactive<PolyformOptions>(defaultOptions())
 
 const fileRef = ref<HTMLInputElement>()
@@ -212,133 +211,130 @@ onBeforeUnmount(() => {
         @close="error = ''"
     />
 
-    <el-collapse v-model="optionsOpen" class="pf-collapse">
-      <el-collapse-item title="转换选项" name="options">
-        <div class="pf-options">
-          <div v-if="from === 'json' || to === 'json'" class="pf-opt-block">
-            <div class="pf-opt-title">JSON</div>
-            <el-form-item label="缩进">
-              <el-input-number v-model="options.json.indent" :min="0" :max="8" size="small" controls-position="right"/>
-            </el-form-item>
-          </div>
+    <div class="pf-options">
+      <span class="pf-options-label">转换选项</span>
+      <div v-if="from === 'json' || to === 'json'" class="pf-opt-block">
+        <div class="pf-opt-title">JSON</div>
+        <el-form-item label="缩进">
+          <el-input-number v-model="options.json.indent" :min="0" :max="8" size="small" controls-position="right"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="from === 'yaml' || to === 'yaml'" class="pf-opt-block">
-            <div class="pf-opt-title">YAML</div>
-            <el-form-item label="版本">
-              <el-select v-model="options.yaml.version" size="small" class="pf-opt-s">
-                <el-option label="1.2" value="1.2"/>
-                <el-option label="1.1" value="1.1"/>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="缩进">
-              <el-input-number v-model="options.yaml.indent" :min="1" :max="8" size="small" controls-position="right"/>
-            </el-form-item>
-            <el-form-item label="折行宽度">
-              <el-input-number v-model="options.yaml.lineWidth" :min="0" :max="200" size="small"
-                               controls-position="right"/>
-            </el-form-item>
-          </div>
+      <div v-if="from === 'yaml' || to === 'yaml'" class="pf-opt-block">
+        <div class="pf-opt-title">YAML</div>
+        <el-form-item label="版本">
+          <el-select v-model="options.yaml.version" size="small" class="pf-opt-s">
+            <el-option label="1.2" value="1.2"/>
+            <el-option label="1.1" value="1.1"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="缩进">
+          <el-input-number v-model="options.yaml.indent" :min="1" :max="8" size="small" controls-position="right"/>
+        </el-form-item>
+        <el-form-item label="折行宽度">
+          <el-input-number v-model="options.yaml.lineWidth" :min="0" :max="200" size="small"
+                           controls-position="right"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="from === 'csv' || to === 'csv'" class="pf-opt-block">
-            <div class="pf-opt-title">CSV</div>
-            <el-form-item label="分隔符">
-              <el-input v-model="options.csv.delimiter" size="small" class="pf-opt-xs"/>
-            </el-form-item>
-            <el-form-item label="首行为表头">
-              <el-switch v-model="options.csv.hasHeaders" size="small"/>
-            </el-form-item>
-            <el-form-item label="引号">
-              <el-input v-model="options.csv.quote" size="small" class="pf-opt-xs"/>
-            </el-form-item>
-            <el-form-item label="转义符">
-              <el-input v-model="options.csv.escape" size="small" class="pf-opt-xs"/>
-            </el-form-item>
-            <el-form-item label="换行">
-              <el-select v-model="options.csv.recordDelimiter" size="small" class="pf-opt-s">
-                <el-option label="LF (\n)" :value="'\n'"/>
-                <el-option label="CRLF (\r\n)" :value="'\r\n'"/>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="防公式注入">
-              <el-switch v-model="options.csv.escapeFormulas" size="small"/>
-            </el-form-item>
-          </div>
+      <div v-if="from === 'csv' || to === 'csv'" class="pf-opt-block">
+        <div class="pf-opt-title">CSV</div>
+        <el-form-item label="分隔符">
+          <el-input v-model="options.csv.delimiter" size="small" class="pf-opt-xs"/>
+        </el-form-item>
+        <el-form-item label="首行为表头">
+          <el-switch v-model="options.csv.hasHeaders" size="small"/>
+        </el-form-item>
+        <el-form-item label="引号">
+          <el-input v-model="options.csv.quote" size="small" class="pf-opt-xs"/>
+        </el-form-item>
+        <el-form-item label="转义符">
+          <el-input v-model="options.csv.escape" size="small" class="pf-opt-xs"/>
+        </el-form-item>
+        <el-form-item label="换行">
+          <el-select v-model="options.csv.recordDelimiter" size="small" class="pf-opt-s">
+            <el-option label="LF (\n)" :value="'\n'"/>
+            <el-option label="CRLF (\r\n)" :value="'\r\n'"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="防公式注入">
+          <el-switch v-model="options.csv.escapeFormulas" size="small"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="from === 'xml' || to === 'xml'" class="pf-opt-block">
-            <div class="pf-opt-title">XML</div>
-            <span class="text-secondary text-xs">对象根最佳；数组根会生成 &lt;0&gt;/&lt;1&gt; 数字标签，建议先包一层对象根</span>
-            <el-form-item label="属性前缀">
-              <el-input v-model="options.xml.attributePrefix" size="small" class="pf-opt-xs"/>
-            </el-form-item>
-            <el-form-item label="格式化输出">
-              <el-switch v-model="options.xml.format" size="small"/>
-            </el-form-item>
-            <el-form-item label="忽略声明">
-              <el-switch v-model="options.xml.ignoreDeclaration" size="small"/>
-            </el-form-item>
-            <el-form-item label="忽略属性">
-              <el-switch v-model="options.xml.ignoreAttributes" size="small"/>
-            </el-form-item>
-          </div>
+      <div v-if="from === 'xml' || to === 'xml'" class="pf-opt-block">
+        <div class="pf-opt-title">XML</div>
+        <span class="text-secondary text-xs">对象根最佳；数组根会生成 &lt;0&gt;/&lt;1&gt; 数字标签，建议先包一层对象根</span>
+        <el-form-item label="属性前缀">
+          <el-input v-model="options.xml.attributePrefix" size="small" class="pf-opt-xs"/>
+        </el-form-item>
+        <el-form-item label="格式化输出">
+          <el-switch v-model="options.xml.format" size="small"/>
+        </el-form-item>
+        <el-form-item label="忽略声明">
+          <el-switch v-model="options.xml.ignoreDeclaration" size="small"/>
+        </el-form-item>
+        <el-form-item label="忽略属性">
+          <el-switch v-model="options.xml.ignoreAttributes" size="small"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="from === 'ini' || to === 'ini'" class="pf-opt-block">
-            <div class="pf-opt-title">INI</div>
-            <el-form-item label="数组分隔符">
-              <el-input v-model="options.ini.delimiter" size="small" class="pf-opt-xs"/>
-            </el-form-item>
-            <el-form-item label="数组写法">
-              <el-select v-model="options.ini.arrayMode" size="small" class="pf-opt-s">
-                <el-option label="一行拼齐" value="join"/>
-                <el-option label="重复键" value="repeat"/>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="类型推断">
-              <el-switch v-model="options.ini.inferTypes" size="small"/>
-            </el-form-item>
-            <el-form-item label="段前空行">
-              <el-switch v-model="options.ini.blankLineBeforeSection" size="small"/>
-            </el-form-item>
-          </div>
+      <div v-if="from === 'ini' || to === 'ini'" class="pf-opt-block">
+        <div class="pf-opt-title">INI</div>
+        <el-form-item label="数组分隔符">
+          <el-input v-model="options.ini.delimiter" size="small" class="pf-opt-xs"/>
+        </el-form-item>
+        <el-form-item label="数组写法">
+          <el-select v-model="options.ini.arrayMode" size="small" class="pf-opt-s">
+            <el-option label="一行拼齐" value="join"/>
+            <el-option label="重复键" value="repeat"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="类型推断">
+          <el-switch v-model="options.ini.inferTypes" size="small"/>
+        </el-form-item>
+        <el-form-item label="段前空行">
+          <el-switch v-model="options.ini.blankLineBeforeSection" size="small"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="to === 'java'" class="pf-opt-block">
-            <div class="pf-opt-title">Java Class</div>
-            <el-form-item label="类名">
-              <el-input v-model="options.java.className" size="small" class="pf-opt-s"/>
-            </el-form-item>
-            <el-form-item label="包名">
-              <el-input v-model="options.java.packageName" size="small" class="pf-opt-s" placeholder="留空则不输出"/>
-            </el-form-item>
-            <el-form-item label="Lombok">
-              <el-switch v-model="options.java.lombok" size="small"/>
-            </el-form-item>
-            <el-form-item label="字段驼峰">
-              <el-switch v-model="options.java.camelCase" size="small"/>
-            </el-form-item>
-          </div>
+      <div v-if="to === 'java'" class="pf-opt-block">
+        <div class="pf-opt-title">Java Class</div>
+        <el-form-item label="类名">
+          <el-input v-model="options.java.className" size="small" class="pf-opt-s"/>
+        </el-form-item>
+        <el-form-item label="包名">
+          <el-input v-model="options.java.packageName" size="small" class="pf-opt-s" placeholder="留空则不输出"/>
+        </el-form-item>
+        <el-form-item label="Lombok">
+          <el-switch v-model="options.java.lombok" size="small"/>
+        </el-form-item>
+        <el-form-item label="字段驼峰">
+          <el-switch v-model="options.java.camelCase" size="small"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="to === 'go'" class="pf-opt-block">
-            <div class="pf-opt-title">Go Struct</div>
-            <el-form-item label="结构体名">
-              <el-input v-model="options.go.structName" size="small" class="pf-opt-s"/>
-            </el-form-item>
-            <el-form-item label="包名">
-              <el-input v-model="options.go.packageName" size="small" class="pf-opt-s"/>
-            </el-form-item>
-            <el-form-item label="json tag">
-              <el-switch v-model="options.go.jsonTag" size="small"/>
-            </el-form-item>
-            <el-form-item label="omitempty">
-              <el-switch v-model="options.go.omitempty" size="small"/>
-            </el-form-item>
-          </div>
+      <div v-if="to === 'go'" class="pf-opt-block">
+        <div class="pf-opt-title">Go Struct</div>
+        <el-form-item label="结构体名">
+          <el-input v-model="options.go.structName" size="small" class="pf-opt-s"/>
+        </el-form-item>
+        <el-form-item label="包名">
+          <el-input v-model="options.go.packageName" size="small" class="pf-opt-s"/>
+        </el-form-item>
+        <el-form-item label="json tag">
+          <el-switch v-model="options.go.jsonTag" size="small"/>
+        </el-form-item>
+        <el-form-item label="omitempty">
+          <el-switch v-model="options.go.omitempty" size="small"/>
+        </el-form-item>
+      </div>
 
-          <div v-if="from === 'cbor' || to === 'cbor'" class="pf-opt-block">
-            <div class="pf-opt-title">CBOR</div>
-            <span class="text-secondary text-xs">二进制格式，界面以每 16 字节一行的 HEX 展示；无附加选项</span>
-          </div>
-        </div>
-      </el-collapse-item>
-    </el-collapse>
+      <div v-if="from === 'cbor' || to === 'cbor'" class="pf-opt-block">
+        <div class="pf-opt-title">CBOR</div>
+        <span class="text-secondary text-xs">二进制格式，界面以每 16 字节一行的 HEX 展示；无附加选项</span>
+      </div>
+    </div>
 
     <el-row :gutter="12" class="pf-row">
       <el-col :span="12">
@@ -417,34 +413,27 @@ onBeforeUnmount(() => {
   gap: var(--space-xs);
 }
 
-.pf-collapse {
-  margin-bottom: var(--space-md);
-  border-top: 1px solid var(--term-border);
-  border-bottom: 1px solid var(--term-border);
-}
-
-.pf-collapse :deep(.el-collapse-item__header),
-.pf-collapse :deep(.el-collapse-item__wrap) {
-  background: transparent;
-  border-bottom-color: var(--term-border);
-  color: var(--term-green-faint);
-  font-size: var(--font-sm);
-}
-
-.pf-collapse :deep(.el-collapse-item__content) {
-  padding-bottom: var(--space-sm);
-}
-
 .pf-options {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: var(--space-lg);
+  margin-bottom: var(--space-md);
+  overflow-x: auto;
+}
+
+.pf-options-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--term-green);
+  font-size: var(--font-sm);
 }
 
 .pf-opt-block {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  flex-shrink: 0;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--term-border);
