@@ -3,16 +3,13 @@ import {onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
 import {Refresh} from '@element-plus/icons-vue'
 import {
-  getExtResponses,
-  getExtStatus,
+  refreshExtStatus,
   pushExtCommand,
   type ExtCommand,
-  type ExtResponse,
   type ExtStatus,
 } from '@/utils/api'
 
 const status = ref<ExtStatus | null>(null)
-const responses = ref<ExtResponse[]>([])
 const refreshing = ref(false)
 const sending = ref(false)
 
@@ -29,10 +26,6 @@ interface SentItem {
   pushed: number
 }
 const sentLog = ref<SentItem[]>([])
-
-// 回传详情弹窗
-const detailVisible = ref(false)
-const detailEcho = ref('')
 
 let timer: number | undefined
 
@@ -53,24 +46,16 @@ function pretty(v: any): string {
 
 async function refreshStatus() {
   try {
-    status.value = await getExtStatus()
+    status.value = await refreshExtStatus()
   } catch {
     status.value = null
-  }
-}
-
-async function refreshResponses() {
-  try {
-    responses.value = await getExtResponses()
-  } catch {
-    /* 轮询出错忽略，下次重试 */
   }
 }
 
 async function refresh() {
   refreshing.value = true
   try {
-    await Promise.all([refreshStatus(), refreshResponses()])
+    await refreshStatus()
   } finally {
     refreshing.value = false
   }
@@ -86,7 +71,6 @@ async function doSend(cmd: ExtCommand) {
     } else {
       ElMessage.warning('已下发，但当前没有已连接的扩展（pushed=0）')
     }
-    await refreshResponses()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     ElMessage.error('下发失败：' + msg)
@@ -128,11 +112,6 @@ async function sendCommand() {
   await doSend(parsed)
 }
 
-function showEcho(row: ExtResponse) {
-  detailEcho.value = pretty(row.echo ?? {})
-  detailVisible.value = true
-}
-
 onMounted(() => {
   refresh()
   timer = window.setInterval(refresh, 3000)
@@ -166,12 +145,12 @@ onUnmounted(() => {
         type="warning"
         show-icon
         :closable="false"
-        title="未连接扩展：请确认浏览器插件已加载，并在插件 popup 中点击「连接后端」"
+        title="未连接扩展：请在书签管理页正确填写「扩展直连 ID」，并确保浏览器插件已加载"
     />
 
     <el-card shadow="never" class="send-card">
       <template #header>
-        <span class="text-primary text-sm">下发指令（后端 → 扩展）</span>
+        <span class="text-primary text-sm">下发指令（网页直连扩展）</span>
       </template>
       <div class="send-row">
         <el-select v-model="cmdType" class="type-select" placeholder="指令类型">
@@ -222,34 +201,9 @@ onUnmounted(() => {
       </el-table>
     </el-card>
 
-    <el-card shadow="never" class="table-card">
-      <template #header>
-        <span class="text-primary text-sm">扩展回传（交换记录，{{ responses.length }}）</span>
-      </template>
-      <el-empty v-if="responses.length === 0" description="暂无回传"/>
-      <el-table v-else :data="responses" stripe style="width: 100%">
-        <el-table-column prop="receivedAt" label="接收时间" width="180"/>
-        <el-table-column label="类型" width="120" prop="type"/>
-        <el-table-column label="结果" width="90">
-          <template #default="{ row }">
-            <el-tag :type="row.ok ? 'success' : 'danger'" size="small">{{ row.ok ? '成功' : '失败' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="id" label="指令ID" width="200" show-overflow-tooltip/>
-        <el-table-column prop="error" label="错误" min-width="160" show-overflow-tooltip/>
-        <el-table-column label="操作" width="90" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="primary" text @click="showEcho(row)">详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-dialog v-model="detailVisible" title="回传详情（echo）" width="60%">
-      <pre class="detail-pre">{{ detailEcho }}</pre>
-    </el-dialog>
   </div>
 </template>
+
 
 <style scoped>
 .metric-strip {

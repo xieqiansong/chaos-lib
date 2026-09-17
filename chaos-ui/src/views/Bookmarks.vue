@@ -3,8 +3,9 @@ import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {Refresh, Search, Plus} from '@element-plus/icons-vue'
 import {
-  getExtStatus,
+  refreshExtStatus,
   pushExtCommand,
+  getExtensionId,
   type ExtStatus,
 } from '@/utils/api'
 
@@ -35,9 +36,20 @@ const treeData = computed(() => {
 
 let timer: number | undefined
 
+// 扩展直连 ID（externally_connectable）：从 localStorage 读取，留空则回退后端中转。
+const extId = ref(getExtensionId())
+function saveExtId() {
+  try {
+    localStorage.setItem('chaos_ext_id', (extId.value || '').trim())
+  } catch {
+    /* ignore */
+  }
+  refreshStatus()
+}
+
 async function refreshStatus() {
   try {
-    status.value = await getExtStatus()
+    status.value = await refreshExtStatus()
   } catch {
     status.value = null
   }
@@ -54,7 +66,7 @@ async function refresh() {
 
 function ensureConnected(): boolean {
   if ((status.value?.connected ?? 0) <= 0) {
-    ElMessage.warning('未连接扩展：请确认插件已加载并在 popup 中点击「连接后端」')
+    ElMessage.warning('未连接扩展：请在书签管理页正确填写「扩展直连 ID」并确保插件已加载')
     return false
   }
   return true
@@ -252,13 +264,32 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <el-card shadow="never" class="mb-sm">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span style="font-size:13px; color:#909399;">扩展直连 ID</span>
+        <el-input
+            v-model="extId"
+            size="small"
+            style="width:380px; max-width:60vw;"
+            placeholder="粘贴扩展 ID（chrome://extensions 开发者模式可见）"
+            @change="saveExtId"
+        />
+        <el-tag :type="status?.mode === 'external' ? 'success' : 'info'" size="small">
+          {{ status?.mode === 'external' ? '直连模式' : '后端中转模式' }}
+        </el-tag>
+      </div>
+      <div style="font-size:12px; color:#909399; margin-top:6px;">
+        留空走后端中转；填写后与扩展直连，命令即时下发且会自动唤醒扩展（无需心跳/SSE 保活）。
+      </div>
+    </el-card>
+
     <el-alert
         v-if="(status?.connected ?? 0) <= 0"
         class="mb-sm"
         type="warning"
         show-icon
         :closable="false"
-        title="未连接扩展：请确认浏览器插件已加载，并在插件 popup 中点击「连接后端」"
+        title="未连接扩展：请确认浏览器插件已加载，并在书签管理页正确填写「扩展直连 ID」"
     />
 
     <el-card shadow="never" class="search-card">

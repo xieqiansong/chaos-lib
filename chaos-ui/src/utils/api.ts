@@ -342,49 +342,80 @@ export function getHostname(): Promise<HostnameInfo> {
     return sendMessage('hostname', 'GET')
 }
 
-// ---- 浏览器扩展反向通道（方案 A：SSE）----
+// ---- 浏览器扩展直连通道（externally_connectable）----
 
-/** 后端当前已连接的扩展数量 */
+/** 扩展连接状态：mode 固定为 external（网页直连），connected 反映直连是否可用 */
 export interface ExtStatus {
     connected: number
+    mode?: 'external'
 }
 
-/** 下发给扩展的指令 */
+/** 下发给扩展的指令（经 chrome.runtime.sendMessage 直发，可携带任意参数） */
 export interface ExtCommand {
     type: string
     url?: string
     text?: string
     id?: string
+    [key: string]: any
 }
 
-/** 下发指令的返回：送达的扩展数 + 阻塞等待到的扩展回传结果（无扩展连接时为 null） */
+/** 下发指令的返回：pushed 恒为 1（直连即已送达），response 为扩展执行结果 */
 export interface ExtPushResult {
     pushed: number
     response?: ExtResponse | null
 }
 
-/** 扩展回传的一条记录（交换记录） */
+/** 扩展回传的一条记录 */
 export interface ExtResponse {
     id?: string
     type: string
     ok: boolean
     error?: string
     echo?: any
-    receivedAt: string
+    receivedAt?: string
 }
 
-export function getExtStatus(): Promise<ExtStatus> {
-    return sendMessage('ext/status', 'GET')
+/** 读取已配置的扩展 ID（externally_connectable 直连用）。空串表示未配置。 */
+export function getExtensionId(): string {
+    try {
+        const ls = localStorage.getItem('chaos_ext_id')
+        if (ls) return ls
+    } catch {
+        /* ignore */
+    }
+    return (import.meta.env.VITE_EXTENSION_ID as string) || ''
+}
+
+/** 经 externally_connectable 向扩展发一条 ping，探测直连通道是否可用。 */
+export async function pingExtension(): Promise<boolean> {
+    const id = getExtensionId()
+    const chromeRt = (window as any).chrome?.runtime
+    if (!id || !chromeRt?.sendMessage) return false
+    try {
+        const resp = await chromeRt.sendMessage(id, {type: 'ping', id: 'ping-ui'})
+        return !!(resp && resp.ok)
+    } catch {
+        return false
+    }
+}
+
+/** 获取扩展直连状态（用 ping 探测）。 */
+export async function refreshExtStatus(): Promise<ExtStatus> {
+    const ok = await pingExtension()
+    return {connected: ok ? 1 : 0, mode: 'external'}
 }
 
 /**
- * 下发指令到扩展，并阻塞等待其回传结果（后端 /api/ext/push 会挂起直到扩展响应或超时）。
- * 返回的 response 即扩展执行结果；pushed===0 表示当前没有已连接的扩展。
+ * 下发指令到扩展（externally_connectable 直连）。
+ * 浏览器收到消息会自动唤醒 MV3 service worker 并执行，结果经 sendResponse 回包。
+ * 返回的 response 即扩展执行结果；pushed 恒为 1（直连即已送达）。
  */
-export function pushExtCommand(cmd: ExtCommand): Promise<ExtPushResult> {
-    return sendMessage('ext/push', 'POST', cmd)
-}
-
-export function getExtResponses(): Promise<ExtResponse[]> {
-    return sendMessage('ext/responses', 'GET')
+export async function pushExtCommand(cmd: ExtCommand): Promise<ExtPushResult> {
+    const id = getExtensionId()
+    const chromeRt = (window as any).chrome?.runtime
+    if (!id || !chromeRt?.sendMessage) {
+        throw new Error('未配置扩展直连 ID，无法下发指令（请在书签管理页填写扩展 ID）')
+    }
+    const resp = await chromeRt.sendMessage(id, cmd)
+    return {pushed: 1, response: resp ?? null}
 }

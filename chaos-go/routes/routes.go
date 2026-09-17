@@ -5,7 +5,6 @@ import (
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	mqttsync "chaos-go/internal/mqttsync"
-	"chaos-go/internal/extchannel"
 	notifysvc "chaos-go/internal/notify"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
@@ -141,16 +140,6 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
 		api.GET("/weather", proxy.GetWeather)
 		api.GET("/hostname", proxy.GetHostname)
-
-		// 扩展反向通道（方案 A：SSE）— Demo：后端经长连接主动下发指令给浏览器扩展
-		ext := api.Group("/ext")
-		{
-			ext.GET("/stream", extchannel.Stream)   // 扩展用 EventSource 连此端点
-			ext.POST("/push", extchannel.Push)      // 触发后端下发指令（Demo 入口）
-			ext.POST("/response", extchannel.Response) // 扩展执行结果回传
-			ext.GET("/responses", extchannel.Responses) // 最近的回传记录（交换记录）
-			ext.GET("/status", extchannel.Status)   // 当前已连接扩展数
-		}
 
 		// SSH 连接信息（凭据仅后端使用，响应一律脱敏）
 		api.GET("/sshConns", portfwd.GetSshConnections)
