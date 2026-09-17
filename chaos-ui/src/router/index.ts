@@ -96,6 +96,12 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/Polyform.vue'),
     meta: {title: '格式转换', icon: 'Sort'},
   },
+  {
+    path: '/databaseMonitor',
+    name: 'databaseMonitor',
+    component: () => import('@/views/DatabaseMonitor.vue'),
+    meta: {title: '数据库监控', icon: 'Coin'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

@@ -13,6 +13,7 @@
 - **✏️ 快捷编辑**：登记文件 → 编辑保存（自动快照）→ 回滚到任意历史版本；内嵌 Monaco 编辑器（含 diff），环境变量以「虚拟文件」形式接入
 - **📦 SDK 版本切换**：管理 JDK / Maven / Python / Llama 多版本来源，通过符号链接一键切换
 - **🔌 SSH 端口转发**：SSH 连接管理（凭据仅后端使用、响应脱敏）+ local(`ssh -L`) / remote(`ssh -R`) 转发规则，Web 界面启停
+- **🗄️ 数据库监控**：只读自省当前库内表名、行数、表/索引/合计大小、索引数，以及 PostgreSQL 下的扫描与维护统计（兼容 SQLite / PostgreSQL 双后端）
 - **🔔 通知推送**：Windows 系统 Toast + WxPusher 消息推送
 - **📡 数据采集与代理**：浏览器历史记录采集、DeepSeek 余额查询、百度天气代理
 - **🖥️ 界面能力**：终端风格布局、命令面板（Ctrl+K）、主题切换（dark / paper 护眼）、全屏手机看板（`/board`）
@@ -160,6 +161,7 @@ chaos-lib/
 | `/portForward` | 端口转发 | SSH 连接与转发规则 |
 | `/quickEdit` | 快速编辑 | 文件编辑与快照回滚 |
 | `/environment` | 环境变量 | 系统 / 用户环境变量管理 |
+| `/databaseMonitor` | 数据库监控 | 表清单 / 大小 / 行数 / 索引与列详情（只读） |
 | `/browserHistory` | 历史记录 | 浏览器历史（隐藏，Web 端仅占位） |
 | `/example` | 测试例子 | 组件示例（隐藏） |
 | `/board` | 全屏看板 | 手机端时钟 + 天气（隐藏、全屏） |

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"chaos-go/internal/dbmonitor"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	mqttsync "chaos-go/internal/mqttsync"
@@ -10,8 +11,8 @@ import (
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/taskplan"
-	"io/fs"
 	"io"
+	"io/fs"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -153,6 +154,14 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.PATCH("/portForwards/:id", portfwd.UpdatePortForwarding)
 		api.DELETE("/portForwards/:id", portfwd.DeletePortForwarding)
 		api.PATCH("/portForwards/:id/status", portfwd.UpdatePortForwardingStatus)
+	}
+
+	// 数据库监控（只读自省：表名 / 大小 / 行数 / 索引等统计）
+	dbMon := api.Group("/dbMonitor")
+	{
+		dbMon.GET("/overview", dbmonitor.GetOverview)
+		dbMon.GET("/tables", dbmonitor.ListTables)
+		dbMon.GET("/tables/:name", dbmonitor.GetTableDetail)
 	}
 
 	r.GET("/", func(c *gin.Context) {
