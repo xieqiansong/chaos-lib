@@ -341,3 +341,45 @@ export interface HostnameInfo {
 export function getHostname(): Promise<HostnameInfo> {
     return sendMessage('hostname', 'GET')
 }
+
+// ---- 浏览器扩展反向通道（方案 A：SSE）----
+
+/** 后端当前已连接的扩展数量 */
+export interface ExtStatus {
+    connected: number
+}
+
+/** 下发给扩展的指令 */
+export interface ExtCommand {
+    type: string
+    url?: string
+    text?: string
+    id?: string
+}
+
+/** 下发指令的返回：成功送达的扩展数 */
+export interface ExtPushResult {
+    pushed: number
+}
+
+/** 扩展回传的一条记录（交换记录） */
+export interface ExtResponse {
+    id?: string
+    type: string
+    ok: boolean
+    error?: string
+    echo?: any
+    receivedAt: string
+}
+
+export function getExtStatus(): Promise<ExtStatus> {
+    return sendMessage('ext/status', 'GET')
+}
+
+export function pushExtCommand(cmd: ExtCommand): Promise<ExtPushResult> {
+    return sendMessage('ext/push', 'POST', cmd)
+}
+
+export function getExtResponses(): Promise<ExtResponse[]> {
+    return sendMessage('ext/responses', 'GET')
+}

@@ -148,6 +148,7 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			ext.GET("/stream", extchannel.Stream)   // 扩展用 EventSource 连此端点
 			ext.POST("/push", extchannel.Push)      // 触发后端下发指令（Demo 入口）
 			ext.POST("/response", extchannel.Response) // 扩展执行结果回传
+			ext.GET("/responses", extchannel.Responses) // 最近的回传记录（交换记录）
 			ext.GET("/status", extchannel.Status)   // 当前已连接扩展数
 		}
 

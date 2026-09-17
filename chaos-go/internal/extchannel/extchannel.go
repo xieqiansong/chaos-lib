@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,11 +31,27 @@ type client struct {
 	ch chan Command
 }
 
+// ResponseRecord 是一条扩展回传记录，用于前端查看「后端 ↔ 扩展」的交换。
+type ResponseRecord struct {
+	ID         string `json:"id,omitempty"`
+	Type       string `json:"type"`
+	Ok         bool   `json:"ok"`
+	Error      string `json:"error,omitempty"`
+	Echo       any    `json:"echo,omitempty"`
+	ReceivedAt string `json:"receivedAt"`
+}
+
 var (
 	mu      sync.Mutex
 	clients = map[string]*client{}
 	seq     int
+
+	// 最近回传记录（环形，仅内存，进程重启清空）
+	respMu      sync.Mutex
+	responseLog = make([]ResponseRecord, 0, responseLogCap)
 )
+
+const responseLogCap = 100
 
 // register 注册一条新连接，返回其 client（调用方负责在结束时 unregister）。
 func register() *client {
@@ -132,15 +149,46 @@ func Push(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"pushed": n})
 }
 
-// Response 接收扩展执行指令后的回传结果（Demo 仅记录日志）。
+// Response 接收扩展执行指令后的回传结果，记录到内存日志供前端查看交换记录。
 func Response(c *gin.Context) {
-	var payload map[string]any
-	if err := c.ShouldBindJSON(&payload); err != nil {
+	var in struct {
+		ID    string `json:"id"`
+		Type  string `json:"type"`
+		Ok    bool   `json:"ok"`
+		Error string `json:"error"`
+		Echo  any    `json:"echo"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	slog.Info("扩展反向通道：收到回传", "payload", payload)
+	rec := ResponseRecord{
+		ID:         in.ID,
+		Type:       in.Type,
+		Ok:         in.Ok,
+		Error:      in.Error,
+		Echo:       in.Echo,
+		ReceivedAt: time.Now().Format("2006-01-02 15:04:05"),
+	}
+	respMu.Lock()
+	responseLog = append(responseLog, rec)
+	if len(responseLog) > responseLogCap {
+		responseLog = responseLog[len(responseLog)-responseLogCap:]
+	}
+	respMu.Unlock()
+	slog.Info("扩展反向通道：收到回传", "type", in.Type, "ok", in.Ok, "id", in.ID)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// Responses 返回最近的扩展回传记录（最新在前），用于前端展示「交换记录」。
+func Responses(c *gin.Context) {
+	respMu.Lock()
+	out := make([]ResponseRecord, 0, len(responseLog))
+	for i := len(responseLog) - 1; i >= 0; i-- {
+		out = append(out, responseLog[i])
+	}
+	respMu.Unlock()
+	c.JSON(http.StatusOK, out)
 }
 
 // Status 返回当前已连接的扩展数量，便于确认通道是否建立。
