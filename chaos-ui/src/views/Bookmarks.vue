@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {computed, onMounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {Refresh, Search, Plus} from '@element-plus/icons-vue'
+import {Refresh, Search, Plus, Setting, Folder, Link, FolderAdd, TopRight, MoreFilled, EditPen, Delete} from '@element-plus/icons-vue'
 import {
   refreshExtStatus,
   pushExtCommand,
@@ -24,6 +24,13 @@ const dialogParentId = ref<string | undefined>(undefined)
 const formTitle = ref('')
 const formUrl = ref('')
 
+// 修改弹窗（标题 / URL）
+const editVisible = ref(false)
+const editNodeId = ref('')
+const editIsBookmark = ref(false)
+const editTitle = ref('')
+const editUrl = ref('')
+
 // el-tree 字段映射（浏览器书签树天然是嵌套结构）
 const treeProps = {children: 'children', label: 'title'}
 
@@ -34,9 +41,12 @@ const treeData = computed(() => {
   return t
 })
 
-let timer: number | undefined
+// 是否文件夹（书签节点带 url，文件夹没有）
+function isFolder(data: any): boolean {
+  return !data?.url
+}
 
-// 扩展直连 ID（externally_connectable）：从 localStorage 读取，留空则回退后端中转。
+// 扩展直连 ID（externally_connectable）：从 localStorage 读取
 const extId = ref(getExtensionId())
 function saveExtId() {
   try {
@@ -44,7 +54,7 @@ function saveExtId() {
   } catch {
     /* ignore */
   }
-  refreshStatus()
+  refresh()
 }
 
 async function refreshStatus() {
@@ -55,48 +65,60 @@ async function refreshStatus() {
   }
 }
 
-async function refresh() {
-  refreshing.value = true
-  try {
-    await refreshStatus()
-  } finally {
-    refreshing.value = false
-  }
-}
-
 function ensureConnected(): boolean {
   if ((status.value?.connected ?? 0) <= 0) {
-    ElMessage.warning('未连接扩展：请在书签管理页正确填写「扩展直连 ID」并确保插件已加载')
+    ElMessage.warning('未连接扩展：请填写正确的「扩展直连 ID」并确保插件已加载')
     return false
   }
   return true
 }
 
-// 拉取完整书签树
-async function pullTree() {
+// 统一执行一条写指令：失败提示并返回 null
+async function runCmd(cmd: any): Promise<any | null> {
+  if (!ensureConnected()) return null
+  try {
+    const res = await pushExtCommand(cmd)
+    const hit = res.response
+    if (!hit || !hit.ok) {
+      ElMessage.error(hit?.error || '扩展未返回结果')
+      return null
+    }
+    return hit
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : String(e))
+    return null
+  }
+}
+
+// 拉取完整书签树（进入页面 / 点击刷新 / 任意写操作后调用）。silent=true 时不弹错误提示。
+async function pullTree(silent = false) {
   if (!ensureConnected()) return
   loadingTree.value = true
   try {
-    const id = `tree-${Date.now()}`
-    const res = await pushExtCommand({type: 'bookmarks:getTree', id})
-    if ((res.pushed ?? 0) === 0) {
-      ElMessage.warning('已下发，但当前没有已连接的扩展')
-      return
-    }
+    const res = await pushExtCommand({type: 'bookmarks:getTree', id: `tree-${Date.now()}`})
     const hit = res.response
-    if (!hit) {
-      ElMessage.error('拉取书签超时')
-      return
-    }
-    if (!hit.ok) {
-      ElMessage.error('拉取失败：' + (hit.error || ''))
+    if (!hit || !hit.ok) {
+      if (!silent) ElMessage.error('拉取书签失败：' + (hit?.error || '无响应'))
       return
     }
     tree.value = hit.echo || []
     searchResults.value = []
     searchQuery.value = ''
+  } catch (e) {
+    if (!silent) ElMessage.error('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     loadingTree.value = false
+  }
+}
+
+// 刷新 = 刷新连接状态 + 重新拉取书签
+async function refresh() {
+  refreshing.value = true
+  try {
+    await refreshStatus()
+    await pullTree()
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -110,18 +132,15 @@ async function doSearch() {
   if (!ensureConnected()) return
   searching.value = true
   try {
-    const id = `search-${Date.now()}`
-    const res = await pushExtCommand({type: 'bookmarks:search', query: q, id})
-    if ((res.pushed ?? 0) === 0) {
-      ElMessage.warning('已下发，但当前没有已连接的扩展')
-      return
-    }
+    const res = await pushExtCommand({type: 'bookmarks:search', query: q, id: `search-${Date.now()}`})
     const hit = res.response
     if (!hit || !hit.ok) {
       ElMessage.error('搜索失败：' + (hit?.error || ''))
       return
     }
     searchResults.value = hit.echo?.nodes || []
+  } catch (e) {
+    ElMessage.error('搜索失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     searching.value = false
   }
@@ -130,6 +149,12 @@ async function doSearch() {
 // 打开书签 URL（前端直接开新标签，无需扩展）
 function openNode(url?: string) {
   if (url) window.open(url, '_blank')
+}
+
+// 更多菜单命令（修改 / 删除）
+function onNodeCmd(cmd: string, data: any) {
+  if (cmd === 'edit') openEdit(data)
+  else if (cmd === 'delete') deleteNode(data.id, data.title, data.url)
 }
 
 // 新建书签 / 文件夹（parentId 为父节点 id，顶层传 undefined）
@@ -150,62 +175,50 @@ async function submitCreate() {
     ElMessage.warning('书签需要填写 URL')
     return
   }
-  if (!ensureConnected()) return
-  const id = `create-${Date.now()}`
   const cmd: any = {
     type: 'bookmarks:create',
-    id,
+    id: `create-${Date.now()}`,
     parentId: dialogParentId.value,
     title: formTitle.value.trim(),
   }
   if (dialogMode.value === 'bookmark') cmd.url = formUrl.value.trim()
-  const res = await pushExtCommand(cmd)
-  if ((res.pushed ?? 0) === 0) {
-    ElMessage.warning('已下发，但当前没有已连接的扩展')
-    return
-  }
-  const hit = res.response
-  if (!hit || !hit.ok) {
-    ElMessage.error('创建失败：' + (hit?.error || ''))
-    return
-  }
+  const hit = await runCmd(cmd)
+  if (!hit) return
   ElMessage.success('创建成功')
   dialogVisible.value = false
   await pullTree()
 }
 
-// 重命名（书签额外询问 URL）
-async function renameNode(id: string, title: string, url?: string) {
-  try {
-    const {value: newTitle} = await ElMessageBox.prompt('新标题', '重命名', {
-      inputValue: title || '',
-    })
-    let newUrl = url
-    if (url) {
-      const {value: u} = await ElMessageBox.prompt('新 URL', '重命名书签', {
-        inputValue: url || '',
-      })
-      newUrl = u
-    }
-    if (!ensureConnected()) return
-    const cmdId = `update-${Date.now()}`
-    const cmd: any = {type: 'bookmarks:update', id: cmdId, nodeId: id, title: newTitle}
-    if (url) cmd.url = newUrl
-    const res = await pushExtCommand(cmd)
-    if ((res.pushed ?? 0) === 0) {
-      ElMessage.warning('已下发，但当前没有已连接的扩展')
-      return
-    }
-    const hit = res.response
-    if (!hit || !hit.ok) {
-      ElMessage.error('重命名失败：' + (hit?.error || ''))
-      return
-    }
-    ElMessage.success('已重命名')
-    await pullTree()
-  } catch (e) {
-    // 用户取消 prompt
+// 修改（标题；书签还可改 URL）
+function openEdit(data: any) {
+  editNodeId.value = data.id
+  editIsBookmark.value = !!data.url
+  editTitle.value = data.title || ''
+  editUrl.value = data.url || ''
+  editVisible.value = true
+}
+
+async function submitEdit() {
+  if (!editTitle.value.trim()) {
+    ElMessage.warning('请输入标题')
+    return
   }
+  if (editIsBookmark.value && !editUrl.value.trim()) {
+    ElMessage.warning('书签需要填写 URL')
+    return
+  }
+  const cmd: any = {
+    type: 'bookmarks:update',
+    id: `update-${Date.now()}`,
+    nodeId: editNodeId.value,
+    title: editTitle.value.trim(),
+  }
+  if (editIsBookmark.value) cmd.url = editUrl.value.trim()
+  const hit = await runCmd(cmd)
+  if (!hit) return
+  ElMessage.success('已修改')
+  editVisible.value = false
+  await pullTree()
 }
 
 // 删除（文件夹用 removeTree）
@@ -219,30 +232,46 @@ async function deleteNode(id: string, title: string, url?: string) {
   } catch {
     return
   }
-  if (!ensureConnected()) return
-  const isFolder = !url
-  const cmdId = `remove-${Date.now()}`
-  const res = await pushExtCommand({type: 'bookmarks:remove', id: cmdId, nodeId: id, isFolder})
-  if ((res.pushed ?? 0) === 0) {
-    ElMessage.warning('已下发，但当前没有已连接的扩展')
-    return
-  }
-  const hit = res.response
-  if (!hit || !hit.ok) {
-    ElMessage.error('删除失败：' + (hit?.error || ''))
-    return
-  }
+  const hit = await runCmd({type: 'bookmarks:remove', id: `remove-${Date.now()}`, nodeId: id, isFolder: isFolder({url})})
+  if (!hit) return
   ElMessage.success('已删除')
   await pullTree()
 }
 
-onMounted(() => {
-  refresh()
-  timer = window.setInterval(refresh, 3000)
-})
+// ── 拖拽：修改父节点（parentId）与顺序（index）─────────────────
+// 限制：只能拖进「文件夹」，或在某个文件夹内部排序；不允许改动顶层根的顺序
+function allowDrop(_dragging: any, drop: any, type: 'prev' | 'inner' | 'next'): boolean {
+  if (type === 'inner') return isFolder(drop.data) // 只能放进文件夹
+  // prev / next 为同级排序：父级必须是真实文件夹（level===0 是浏览器根，禁止）
+  return !!drop.parent && drop.parent.level > 0
+}
 
-onUnmounted(() => {
-  if (timer) window.clearInterval(timer)
+async function onNodeDrop(dragging: any, drop: any, type: 'prev' | 'inner' | 'next') {
+  const nodeId = dragging?.data?.id
+  if (!nodeId) return
+  const parentNode = type === 'inner' ? drop : drop.parent
+  const parentId = parentNode?.data?.id
+  if (!parentId) {
+    await pullTree(true)
+    return
+  }
+  // drop 后 el-tree 已把节点放入新父节点，取其在新父节点下的下标作为 index
+  const index = (parentNode.childNodes || []).findIndex((n: any) => n.data?.id === nodeId)
+  const hit = await runCmd({
+    type: 'bookmarks:move',
+    id: `move-${Date.now()}`,
+    nodeId,
+    parentId,
+    index: index >= 0 ? index : undefined,
+  })
+  if (hit) ElMessage.success('已移动')
+  // 无论成功与否都重新拉取，保证与浏览器书签一致
+  await pullTree(true)
+}
+
+onMounted(() => {
+  // 进入页面默认拉取
+  refresh()
 })
 </script>
 
@@ -252,36 +281,31 @@ onUnmounted(() => {
       <span class="text-primary text-base section-title">书签管理</span>
       <div class="metric-strip">
         <div class="metric-chip">
-          <span class="metric-label">已连接扩展</span>
+          <span class="metric-label">扩展连接</span>
           <el-tag :type="(status?.connected ?? 0) > 0 ? 'success' : 'warning'" size="small">
-            {{ status?.connected ?? 0 }}
+            {{ (status?.connected ?? 0) > 0 ? '已连接' : '未连接' }}
           </el-tag>
         </div>
+        <el-popover placement="bottom-start" :width="360" trigger="click">
+          <template #reference>
+            <el-button size="small" text :icon="Setting">直连 ID</el-button>
+          </template>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <span style="font-size:13px; font-weight:500;">扩展直连 ID</span>
+            <el-input
+                v-model="extId"
+                size="small"
+                placeholder="粘贴扩展 ID（chrome://extensions 开发者模式可见）"
+                @change="saveExtId"
+            />
+            <span style="font-size:12px; color:#909399;">填写后与浏览器扩展直连；修改后自动刷新。</span>
+          </div>
+        </el-popover>
       </div>
       <div class="section-actions">
-        <el-button size="small" :icon="Refresh" :loading="refreshing" @click="refresh">刷新状态</el-button>
-        <el-button size="small" type="primary" :loading="loadingTree" @click="pullTree">拉取书签</el-button>
+        <el-button size="small" type="primary" :icon="Refresh" :loading="refreshing" @click="refresh">刷新</el-button>
       </div>
     </div>
-
-    <el-card shadow="never" class="mb-sm">
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-        <span style="font-size:13px; color:#909399;">扩展直连 ID</span>
-        <el-input
-            v-model="extId"
-            size="small"
-            style="width:380px; max-width:60vw;"
-            placeholder="粘贴扩展 ID（chrome://extensions 开发者模式可见）"
-            @change="saveExtId"
-        />
-        <el-tag :type="status?.mode === 'external' ? 'success' : 'info'" size="small">
-          {{ status?.mode === 'external' ? '直连模式' : '后端中转模式' }}
-        </el-tag>
-      </div>
-      <div style="font-size:12px; color:#909399; margin-top:6px;">
-        留空走后端中转；填写后与扩展直连，命令即时下发且会自动唤醒扩展（无需心跳/SSE 保活）。
-      </div>
-    </el-card>
 
     <el-alert
         v-if="(status?.connected ?? 0) <= 0"
@@ -289,7 +313,7 @@ onUnmounted(() => {
         type="warning"
         show-icon
         :closable="false"
-        title="未连接扩展：请确认浏览器插件已加载，并在书签管理页正确填写「扩展直连 ID」"
+        title="未连接扩展：请确认浏览器插件已加载，并点击「直连 ID」填写正确的扩展 ID"
     />
 
     <el-card shadow="never" class="search-card">
@@ -319,38 +343,53 @@ onUnmounted(() => {
         <el-table-column label="URL" min-width="280" prop="url" show-overflow-tooltip/>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" text type="primary" @click="openNode(row.url)" v-if="row.url">打开</el-button>
-            <el-button size="small" text type="warning" @click="renameNode(row.id, row.title, row.url)">重命名</el-button>
-            <el-button size="small" text type="danger" @click="deleteNode(row.id, row.title, row.url)">删除</el-button>
+            <div class="op-actions">
+              <el-button v-if="row.url" text size="small" :icon="TopRight" title="打开" @click="openNode(row.url)"/>
+              <el-button text size="small" :icon="EditPen" title="修改" @click="openEdit(row)"/>
+              <el-button text size="small" type="danger" :icon="Delete" title="删除" @click="deleteNode(row.id, row.title, row.url)"/>
+            </div>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- 书签树 -->
+    <!-- 书签树（支持拖拽修改父节点） -->
     <el-card shadow="never" class="tree-card">
       <template #header>
         <span class="text-primary text-sm">书签树</span>
+        <span style="margin-left:8px; font-size:12px; color:#909399;">可拖拽书签 / 文件夹到目标文件夹以修改父节点</span>
       </template>
-      <el-empty v-if="!treeData.length" description="暂无书签，点击「拉取书签」同步浏览器书签"/>
+      <el-empty v-if="!treeData.length" description="暂无书签，点击「刷新」同步浏览器书签"/>
       <el-tree
           v-else
           :data="treeData"
           :props="treeProps"
           node-key="id"
+          :indent="0"
           :expand-on-click-node="false"
+          draggable
+          :allow-drop="allowDrop"
+          @node-drop="onNodeDrop"
       >
         <template #default="{ data }">
           <div class="bm-node">
-            <span class="bm-title">{{ data.title || '(无标题)' }}</span>
-            <span v-if="data.url" class="bm-url">{{ data.url }}</span>
-            <span v-else class="bm-folder">文件夹</span>
-            <span class="bm-actions">
-              <el-button size="small" text type="primary" @click.stop="openNode(data.url)" v-if="data.url">打开</el-button>
-              <el-button size="small" text type="primary" @click.stop="openCreate(data.id, 'bookmark')">+书签</el-button>
-              <el-button size="small" text type="primary" @click.stop="openCreate(data.id, 'folder')">+文件夹</el-button>
-              <el-button size="small" text type="warning" @click.stop="renameNode(data.id, data.title, data.url)">重命名</el-button>
-              <el-button size="small" text type="danger" @click.stop="deleteNode(data.id, data.title, data.url)">删除</el-button>
+            <el-icon class="bm-icon" :class="data.url ? 'is-bookmark' : 'is-folder'">
+              <component :is="data.url ? Link : Folder"/>
+            </el-icon>
+            <span class="bm-title" :class="data.url ? 'is-bookmark' : 'is-folder'">{{ data.title || '(无标题)' }}</span>
+            <span class="bm-actions op-actions" @click.stop>
+              <el-button v-if="data.url" text size="small" :icon="TopRight" title="打开" @click="openNode(data.url)"/>
+              <el-button text size="small" :icon="Plus" title="新建书签" @click="openCreate(data.id, 'bookmark')"/>
+              <el-button text size="small" :icon="FolderAdd" title="新建文件夹" @click="openCreate(data.id, 'folder')"/>
+              <el-dropdown trigger="click" @command="(c) => onNodeCmd(c, data)">
+                <el-button text size="small" :icon="MoreFilled" title="更多"/>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item :command="'edit'" :icon="EditPen">修改</el-dropdown-item>
+                    <el-dropdown-item :command="'delete'" :icon="Delete" class="dd-danger">删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </span>
           </div>
         </template>
@@ -374,6 +413,22 @@ onUnmounted(() => {
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitCreate">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 修改弹窗 -->
+    <el-dialog v-model="editVisible" title="修改" width="420px">
+      <el-form label-width="70px">
+        <el-form-item label="标题" required>
+          <el-input v-model="editTitle" placeholder="标题"/>
+        </el-form-item>
+        <el-form-item label="URL" v-if="editIsBookmark" required>
+          <el-input v-model="editUrl" placeholder="https://example.com"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -436,30 +491,71 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.bm-title {
-  font-weight: 500;
-  white-space: nowrap;
+.bm-icon {
+  font-size: 15px;
+  flex-shrink: 0;
 }
 
-.bm-url {
-  color: var(--el-text-color-secondary);
-  font-size: var(--el-font-size-small);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-
-.bm-folder {
+.bm-icon.is-folder {
   color: var(--el-color-warning);
-  font-size: var(--el-font-size-small);
+}
+
+.bm-icon.is-bookmark {
+  color: var(--el-text-color-secondary);
+}
+
+.bm-title {
+  white-space: nowrap;
+}
+
+.bm-title.is-folder {
+  color: var(--el-text-color-primary);
+  font-weight: 600;
+}
+
+.bm-title.is-bookmark {
+  color: var(--el-text-color-regular);
+  font-weight: 400;
 }
 
 .bm-actions {
-  display: flex;
-  gap: 2px;
   margin-left: auto;
-  opacity: 0.85;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.bm-node:hover .bm-actions {
+  opacity: 1;
+}
+
+/* 操作按钮统一中性灰，避免大面积高饱和蓝（仅删除保留红色，见全局样式） */
+.bm-actions :deep(.el-button) {
+  color: var(--el-text-color-regular);
+}
+
+.bm-actions :deep(.el-button:hover) {
+  color: var(--el-text-color-primary);
+}
+
+/* 层级缩进辅助线：子节点容器左内边距形成缩进，并在父级箭头处画一条竖线 */
+.tree-card :deep(.el-tree-node__children) {
+  position: relative;
+  padding-left: 16px;
+}
+
+.tree-card :deep(.el-tree-node__children)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 9px;
+  border-left: 1px solid var(--el-border-color-lighter);
+}
+</style>
+
+<style>
+/* 下拉菜单「删除」项：仅此项保留红色（dropdown 传送到 body，scoped 无法命中） */
+.el-dropdown-menu__item.dd-danger {
+  color: var(--el-color-danger);
 }
 </style>
