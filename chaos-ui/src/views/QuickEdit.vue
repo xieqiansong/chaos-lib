@@ -323,7 +323,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="quickedit-root">
     <div class="section-toolbar">
       <span class="text-primary text-base section-title">快速编辑</span>
       <el-skeleton v-if="loading" :rows="1" animated class="quickedit-loading"/>
@@ -357,7 +357,7 @@ onMounted(() => {
         @close="error = ''"
     />
 
-    <el-row :gutter="16">
+    <el-row :gutter="16" class="quickedit-row">
       <el-col :span="24">
         <div v-if="activeFile === null" class="quickedit-empty">
           <el-empty description="从上方选择一个文件进行编辑"/>
@@ -451,6 +451,17 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.quickedit-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.quickedit-row :deep(.el-col) {
+  height: 100%;
+}
+
 .quickedit-loading {
   width: 120px;
 }
@@ -468,10 +479,19 @@ onMounted(() => {
 }
 
 .quickedit-editor-wrap {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
   background: var(--el-bg-color);
   overflow: hidden;
+}
+
+.quickedit-row {
+  flex: 1;
+  min-height: 0;
 }
 
 .quickedit-editor-header {
@@ -526,7 +546,8 @@ onMounted(() => {
 }
 
 .quickedit-diff-container {
-  height: calc(80vh - 100px);
+  flex: 1;
+  min-height: 0;
 }
 
 .quickedit-diff-skeleton {

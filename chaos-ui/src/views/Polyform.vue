@@ -405,6 +405,8 @@ onBeforeUnmount(() => {
 .polyform {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .pf-auto {
@@ -414,6 +416,7 @@ onBeforeUnmount(() => {
 }
 
 .pf-options {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -470,6 +473,8 @@ onBeforeUnmount(() => {
 }
 
 .pf-panel {
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--term-border);
@@ -499,7 +504,8 @@ onBeforeUnmount(() => {
 }
 
 .pf-editor {
-  height: clamp(288px, calc(100vh - 336px), 960px);
+  flex: 1;
+  min-height: 0;
 }
 
 .pf-editor :deep(.el-textarea__inner) {
