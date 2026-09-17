@@ -238,7 +238,7 @@ onUnmounted(() => {
 }
 
 .app-sidebar {
-  width: calc(100vw * (300 / 1920));
+  width: calc(100vw * (240 / 1920));
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
