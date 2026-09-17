@@ -10,7 +10,6 @@ package dbmonitor
 import (
 	"errors"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -71,14 +70,24 @@ type TableDetail struct {
 	Indexes []IndexInfo  `json:"indexes"`
 }
 
-var tableNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-
 func isSQLite() bool {
 	return config.GetConfig().Database.Type == "sqlite"
 }
 
+// validTableName 仅做基本准入校验：拒绝空名与会破坏路由分段 /
+// 解析的控制字符。真正的 SQL 注入防护由调用方统一使用 %q 标识符
+// 引号转义（SQLite 双引号标识符，内部双引号再翻倍）来兜底，因此这里
+// 不应再用严格正则误伤含连字符、空格、点、Unicode 的合法表名。
 func validTableName(name string) bool {
-	return tableNameRe.MatchString(name)
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		if r == '/' || r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // ── handler ──

@@ -11,11 +11,15 @@ func TestValidTableName(t *testing.T) {
 		"project_groups": true,
 		"_internal":      true,
 		"a1":             true,
-		"1table":         false,
+		"1table":         true, // 以数字开头也合法（%q 引号兜底）
+		"a-b":            true, // 连字符在真实 schema 中常见
+		"my table":       true, // 空格（引号的合法标识符）
+		"schema.table":   true, // 点分隔
+		"用户表":           true, // Unicode
+		"tbl;DROP":       true, // 由 %q 当作标识符，不会被执行
 		"":               false,
-		"a-b":            false,
-		"drop table":     false,
-		"tbl;DROP":       false,
+		"a/b":            false, // 路径分隔符破坏路由分段
+		"a\x00b":         false, // 控制字符
 	}
 	for name, want := range cases {
 		if got := validTableName(name); got != want {

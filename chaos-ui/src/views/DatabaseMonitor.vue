@@ -59,6 +59,7 @@
     </el-card>
 
     <el-drawer v-model="drawer" :title="`表详情：${current}`" size="55%" @closed="detail = null">
+      <el-alert v-if="detailError" type="error" :closable="false" :title="detailError" style="margin-bottom: 12px" />
       <div v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="行数">
@@ -129,6 +130,7 @@ const keyword = ref('')
 const drawer = ref(false)
 const current = ref('')
 const detail = ref<TableDetail | null>(null)
+const detailError = ref('')
 
 function formatBytes(n: number): string {
   if (!n) return '0 B'
@@ -163,10 +165,12 @@ async function loadTables() {
 async function openDetail(row: TableStat) {
   current.value = row.name
   detail.value = null
+  detailError.value = ''
   drawer.value = true
   try {
     detail.value = await getTableDetail(row.name)
   } catch (e) {
+    detailError.value = '加载表详情失败：' + (e instanceof Error ? e.message : String(e))
     console.error(e)
   }
 }
