@@ -1,57 +1,81 @@
 <template>
-  <div class="db-monitor">
-    <div class="overview">
-      <el-card shadow="hover" class="metric-card">
-        <div class="metric-label">数据库类型</div>
-        <div class="metric-value">{{ overview.dbType || '-' }}</div>
-      </el-card>
-      <el-card shadow="hover" class="metric-card">
-        <div class="metric-label">版本</div>
-        <div class="metric-value text-sm">{{ overview.version || '-' }}</div>
-      </el-card>
-      <el-card shadow="hover" class="metric-card">
-        <div class="metric-label">总大小</div>
-        <div class="metric-value">{{ formatBytes(overview.totalBytes) }}</div>
-        <div v-if="!overview.sizeSupported" class="metric-sub">单表大小不可用（SQLite 缺 dbstat）</div>
-      </el-card>
-      <el-card shadow="hover" class="metric-card">
-        <div class="metric-label">表数量 / 总行数</div>
-        <div class="metric-value">{{ overview.tableCount }} / {{ overview.totalRows.toLocaleString() }}</div>
-      </el-card>
+  <div>
+    <div class="section-toolbar">
+      <span class="text-primary text-base section-title">数据库监控</span>
+      <div class="metric-strip">
+        <div class="metric-chip">
+          <span class="metric-label">数据库类型</span>
+          <span class="metric-value">{{ overview.dbType || '—' }}</span>
+        </div>
+        <div class="metric-chip">
+          <span class="metric-label">版本</span>
+          <span class="metric-value text-sm truncate">{{ overview.version || '—' }}</span>
+        </div>
+        <div class="metric-chip">
+          <span class="metric-label">总大小</span>
+          <span class="metric-value">{{ formatBytes(overview.totalBytes) }}</span>
+          <el-tooltip v-if="!overview.sizeSupported" content="单表大小不可用（SQLite 缺 dbstat）" placement="top">
+            <el-icon class="warning-icon"><Warning /></el-icon>
+          </el-tooltip>
+        </div>
+        <div class="metric-chip">
+          <span class="metric-label">表 / 行</span>
+          <span class="metric-value">{{ overview.tableCount }} / {{ overview.totalRows.toLocaleString() }}</span>
+        </div>
+      </div>
+      <div class="section-actions">
+        <el-button size="small" :icon="Refresh" :loading="loading" @click="refresh">刷新</el-button>
+      </div>
     </div>
+
+    <el-alert
+      v-if="error"
+      type="error"
+      :message="error"
+      show-icon
+      class="mb-sm"
+      @close="error = ''"
+    />
 
     <el-card shadow="never" class="table-card">
       <template #header>
         <div class="table-header">
-          <span>数据表（{{ tableData.length }}）</span>
-          <div class="table-tools">
-            <el-input v-model="keyword" placeholder="筛选表名" clearable style="width: 11.25rem; margin-left: 0.5rem" />
-            <el-button style="margin-left: 0.5rem" :icon="Refresh" circle @click="loadOverview(); loadTables()" />
-          </div>
+          <span class="text-primary text-sm">数据表（{{ tableData.length }}）</span>
+          <el-input v-model="keyword" placeholder="筛选表名" clearable class="filter-input" />
         </div>
       </template>
-      <el-table :data="filteredTables" stripe height="480" highlight-current-row @row-click="openDetail">
-        <el-table-column prop="name" label="表名" sortable min-width="180" />
-        <el-table-column label="行数" sortable :sort-method="sortNum('rows')" align="right" min-width="130">
-          <template #default="{ row }">
-            {{ row.rows.toLocaleString() }}
-          </template>
-        </el-table-column>
-        <el-table-column label="表大小" sortable :sort-method="sortNum('tableBytes')" align="right" min-width="120">
-          <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.tableBytes) : 'N/A' }}</template>
-        </el-table-column>
-        <el-table-column label="索引大小" sortable :sort-method="sortNum('indexBytes')" align="right" min-width="120">
-          <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.indexBytes) : 'N/A' }}</template>
-        </el-table-column>
-        <el-table-column label="总大小" sortable :sort-method="sortNum('totalBytes')" align="right" min-width="120">
-          <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.totalBytes) : 'N/A' }}</template>
-        </el-table-column>
-        <el-table-column prop="indexCount" label="索引数" align="center" width="90" />
-      </el-table>
+      <el-skeleton v-if="loading" :rows="8" animated />
+      <template v-else>
+        <el-empty v-if="filteredTables.length === 0" :description="keyword ? '无匹配表名' : '暂无数据表'" />
+        <el-table
+          v-else
+          :data="filteredTables"
+          stripe
+          height="480"
+          highlight-current-row
+          @row-click="openDetail"
+        >
+          <el-table-column prop="name" label="表名" sortable min-width="180" />
+          <el-table-column label="行数" sortable :sort-method="sortNum('rows')" align="right" min-width="130">
+            <template #default="{ row }">
+              {{ row.rows.toLocaleString() }}
+            </template>
+          </el-table-column>
+          <el-table-column label="表大小" sortable :sort-method="sortNum('tableBytes')" align="right" min-width="120">
+            <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.tableBytes) : 'N/A' }}</template>
+          </el-table-column>
+          <el-table-column label="索引大小" sortable :sort-method="sortNum('indexBytes')" align="right" min-width="120">
+            <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.indexBytes) : 'N/A' }}</template>
+          </el-table-column>
+          <el-table-column label="总大小" sortable :sort-method="sortNum('totalBytes')" align="right" min-width="120">
+            <template #default="{ row }">{{ row.sizeSupported ? formatBytes(row.totalBytes) : 'N/A' }}</template>
+          </el-table-column>
+          <el-table-column prop="indexCount" label="索引数" align="center" width="90" />
+        </el-table>
+      </template>
     </el-card>
 
     <el-drawer v-model="drawer" :title="`表详情：${current}`" size="55%" @closed="detail = null">
-      <el-alert v-if="detailError" type="error" :closable="false" :title="detailError" style="margin-bottom: 12px" />
       <div v-if="detail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="行数">
@@ -94,7 +118,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Refresh, Warning } from '@element-plus/icons-vue'
 import { getDbOverview, getTables, getTableDetail } from '@/utils/api'
 
 interface TableStat {
@@ -119,10 +144,11 @@ interface Overview { dbType: string; version: string; totalBytes: number; tableC
 const overview = ref<Overview>({ dbType: '', version: '', totalBytes: 0, tableCount: 0, totalRows: 0, sizeSupported: false })
 const tableData = ref<TableStat[]>([])
 const keyword = ref('')
+const loading = ref(false)
+const error = ref('')
 const drawer = ref(false)
 const current = ref('')
 const detail = ref<TableDetail | null>(null)
-const detailError = ref('')
 
 /** 后端可能返回 null（nil slice），统一归一化为空数组，避免模板读取 length 报错 */
 const detailColumns = computed<ColumnInfo[]>(() => detail.value?.columns ?? [])
@@ -147,6 +173,7 @@ async function loadOverview() {
   try {
     overview.value = await getDbOverview()
   } catch (e) {
+    error.value = '加载数据库概览失败：' + (e instanceof Error ? e.message : String(e))
     console.error(e)
   }
 }
@@ -155,58 +182,72 @@ async function loadTables() {
     const data = await getTables()
     tableData.value = data.items || []
   } catch (e) {
+    error.value = '加载数据表失败：' + (e instanceof Error ? e.message : String(e))
     console.error(e)
+  }
+}
+async function refresh() {
+  loading.value = true
+  error.value = ''
+  try {
+    await Promise.all([loadOverview(), loadTables()])
+  } finally {
+    loading.value = false
   }
 }
 async function openDetail(row: TableStat) {
   current.value = row.name
   detail.value = null
-  detailError.value = ''
   drawer.value = true
   try {
     detail.value = await getTableDetail(row.name)
   } catch (e) {
-    detailError.value = '加载表详情失败：' + (e instanceof Error ? e.message : String(e))
+    ElMessage.error('加载表详情失败：' + (e instanceof Error ? e.message : String(e)))
     console.error(e)
   }
 }
 
 onMounted(() => {
-  loadOverview()
-  loadTables()
+  refresh()
 })
 </script>
 
 <style scoped>
-.overview {
+.metric-strip {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
-  --el-card-padding: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
 }
-.metric-card {
-  flex: 0 0 auto;
-}
-.metric-card :deep(.el-card__body) {
+.metric-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-05);
+  min-width: 0;
   white-space: nowrap;
 }
 .metric-label {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--el-font-size-small);
+  flex-shrink: 0;
 }
 .metric-value {
-  font-size: 18px;
+  color: var(--el-text-color-primary);
+  font-size: var(--el-font-size-base);
   font-weight: 600;
-  margin-top: 2px;
+  min-width: 0;
 }
 .metric-value.text-sm {
-  font-size: 14px;
+  font-size: var(--el-font-size-small);
   font-weight: 500;
 }
-.metric-sub {
-  font-size: 12px;
+.warning-icon {
   color: var(--el-color-warning);
-  margin-top: 4px;
+  font-size: var(--el-font-size-small);
+  cursor: help;
+  flex-shrink: 0;
 }
 .table-card {
   --el-card-padding: 12px;
@@ -216,11 +257,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
-.table-tools {
-  display: flex;
-  align-items: center;
+.filter-input {
+  width: 11.25rem;
+  margin-left: var(--space-sm);
 }
 h4 {
-  margin: 16px 0 8px;
+  margin: var(--space-xl) 0 var(--space-sm);
+  color: var(--el-text-color-primary);
+  font-weight: 600;
 }
 </style>

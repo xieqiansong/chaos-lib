@@ -389,7 +389,7 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column prop="Remark" label="备注" min-width="120"/>
-      <el-table-column label="操作" width="220">
+      <el-table-column label="操作" width="210">
         <template #default="{row}">
           <el-button
               size="small"
@@ -439,7 +439,7 @@ onMounted(() => {
           <span class="font-mono">{{ row.TargetHost }}:{{ row.TargetPort }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="SSH 连接" min-width="140">
+      <el-table-column label="SSH 连接" min-width="70">
         <template #default="{row}">
           <span v-if="row.Direction === 'direct'">-</span>
           <span v-else>{{ connNameById[row.SshConnectionId] || `#${row.SshConnectionId}` }}</span>
@@ -465,7 +465,7 @@ onMounted(() => {
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160">
+      <el-table-column label="操作" width="140">
         <template #default="{row}">
           <el-button size="small" type="primary" @click="openEditForward(row)">编辑</el-button>
           <el-button size="small" type="danger" @click="removeForward(row)">删除</el-button>

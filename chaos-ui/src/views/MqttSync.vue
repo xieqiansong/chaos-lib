@@ -245,9 +245,14 @@ function fmtTime(v: string): string {
   font-size: 12px;
 }
 
+.send-card :deep(.el-card__body) {
+  padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
+}
+
 .send-row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .channel-input {
