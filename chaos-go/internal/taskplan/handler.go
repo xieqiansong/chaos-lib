@@ -1053,7 +1053,7 @@ func GetTaskContributionStats(c *gin.Context) {
 			return
 		}
 		var plan TaskPlan
-		if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		if err := db.Where("id = ? AND is_deleted = ? AND is_suspended = ?", id, false, false).First(&plan).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
 			return
 		}
@@ -1063,7 +1063,7 @@ func GetTaskContributionStats(c *gin.Context) {
 		if rootName == "" {
 			rootName = "每日任务"
 		}
-		if err := db.Where("name = ? AND is_deleted = ?", rootName, false).Find(&roots).Error; err != nil {
+		if err := db.Where("name = ? AND is_deleted = ? AND is_suspended = ?", rootName, false, false).Find(&roots).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询计划失败: " + err.Error()})
 			return
 		}
@@ -1077,7 +1077,7 @@ func GetTaskContributionStats(c *gin.Context) {
 			rootName = root.Name
 		}
 		var children []TaskPlan
-		if err := db.Where("parent_id = ? AND is_deleted = ?", root.ID, false).
+		if err := db.Where("parent_id = ? AND is_deleted = ? AND is_suspended = ?", root.ID, false, false).
 			Order("order_num ASC, id ASC").Find(&children).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询子计划失败: " + err.Error()})
 			return
