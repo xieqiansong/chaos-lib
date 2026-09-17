@@ -242,7 +242,7 @@ function fmtTime(v: string): string {
 
 .mono {
   font-family: monospace;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .send-row {
@@ -251,7 +251,7 @@ function fmtTime(v: string): string {
 }
 
 .channel-input {
-  max-width: 220px;
+  max-width: 13.75rem;
 }
 
 .payload-input {
@@ -264,8 +264,8 @@ function fmtTime(v: string): string {
 
 code {
   background: var(--el-fill-color-light);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
   font-family: monospace;
 }
 
@@ -276,7 +276,7 @@ code {
   white-space: pre-wrap;
   word-break: break-all;
   font-family: monospace;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 

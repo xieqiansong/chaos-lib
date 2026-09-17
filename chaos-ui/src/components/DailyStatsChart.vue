@@ -83,6 +83,6 @@ watch(theme, fetchStats)
 <style scoped>
 .chart-wrapper {
   height: 22vh;
-  min-height: 180px;
+  min-height: 11.25rem;
 }
 </style>

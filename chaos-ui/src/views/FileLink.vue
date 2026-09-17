@@ -213,8 +213,8 @@ onMounted(() => {
     <el-dialog
         v-model="showCreateModal"
         title="创建文件连接"
-        width="600px">
-      <el-form :model="newLink" label-width="100px">
+        width="37.5rem">
+      <el-form :model="newLink" label-width="6.25rem">
         <el-form-item label="源路径">
           <el-input
               v-model="newLink.SourcePath"
@@ -248,8 +248,8 @@ onMounted(() => {
     <el-dialog
         v-model="showEditModal"
         title="编辑文件连接"
-        width="600px">
-      <el-form :model="editLink" label-width="100px">
+        width="37.5rem">
+      <el-form :model="editLink" label-width="6.25rem">
         <el-form-item label="备注">
           <el-input
               v-model="editLink.Remark"

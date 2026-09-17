@@ -261,7 +261,7 @@ onUnmounted(() => {
   align-items: center;
   height: 2.05rem;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--term-border);
+  border-bottom: 0.0625rem solid var(--term-border);
   flex-shrink: 0;
 }
 
@@ -271,7 +271,7 @@ onUnmounted(() => {
   justify-content: space-between;
   height: 2.05rem;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--term-border);
+  border-bottom: 0.0625rem solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
 }
@@ -296,7 +296,7 @@ onUnmounted(() => {
 
 .sidebar-menu :deep(.el-menu-item),
 .sidebar-menu :deep(.el-sub-menu__title) {
-  border-left: 2px solid transparent;
+  border-left: 0.125rem solid transparent;
 }
 
 /* 当前路由高亮 */
@@ -331,7 +331,7 @@ onUnmounted(() => {
   justify-content: space-between;
   height: 2.05rem;
   padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--term-border);
+  border-bottom: 0.0625rem solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
 }
@@ -349,12 +349,12 @@ onUnmounted(() => {
   width: 1.6rem;
   height: 1.6rem;
   background: transparent;
-  border: 1px solid var(--term-border);
+  border: 0.0625rem solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
   font-size: var(--font-xs);
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 0.125rem;
 }
 
 .center-panel-close:hover {
@@ -380,15 +380,15 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
   background: transparent;
-  border: 1px solid var(--term-border);
+  border: 0.0625rem solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
   font-size: var(--font-xs);
-  padding: 2px 8px;
+  padding: 0.125rem 0.5rem;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 0.125rem;
 }
 
 .cmdpalette-hint:hover {

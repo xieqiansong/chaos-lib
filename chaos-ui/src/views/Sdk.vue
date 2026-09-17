@@ -13,7 +13,7 @@
             type="error"
             show-icon
             :closable="false"
-            style="margin-bottom: 16px"
+            style="margin-bottom: 1rem"
         />
 
         <el-row :gutter="16">
@@ -65,7 +65,7 @@
         </el-row>
 
         <!-- 管理来源对话框 -->
-        <el-dialog v-model="manageVisible" title="SDK 来源管理" width="720px">
+        <el-dialog v-model="manageVisible" title="SDK 来源管理" width="45rem">
             <div class="manage-toolbar">
                 <el-button type="primary" :icon="Plus" @click="addDef">新增 SDK 类型</el-button>
             </div>
@@ -100,9 +100,9 @@
         <el-dialog
             v-model="formVisible"
             :title="editingDef ? '编辑 ' + form.Name : '新增 SDK 类型'"
-            width="640px"
+            width="40rem"
         >
-            <el-form :model="form" label-width="90px">
+            <el-form :model="form" label-width="5.625rem">
                 <el-form-item label="类型名" required>
                     <el-input v-model="form.Name" :disabled="!!editingDef" placeholder="如 jdk / maven" />
                 </el-form-item>
@@ -114,7 +114,7 @@
                 <el-form-item label="来源">
                     <div class="source-form-list">
                         <div v-for="(s, i) in form.Sources" :key="i" class="source-form-item">
-                            <el-select v-model="s.kind" style="width: 110px">
+                            <el-select v-model="s.kind" style="width: 6.875rem">
                                 <el-option label="仓库 repo" value="repo" />
                                 <el-option label="单版本 single" value="single" />
                             </el-select>
@@ -335,13 +335,13 @@ onMounted(() => {
     font-size: var(--font-md);
 }
 .sources {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 .source-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
     font-size: var(--font-sm);
 }
 .source-root {
@@ -353,7 +353,7 @@ onMounted(() => {
 .version-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 0.5rem;
 }
 .version-tag.clickable {
     cursor: pointer;
@@ -367,13 +367,13 @@ onMounted(() => {
     font-size: var(--font-sm);
 }
 .manage-toolbar {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 .def-source {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
+    gap: 0.375rem;
+    margin-bottom: 0.25rem;
 }
 .def-root {
     font-size: var(--font-sm);
@@ -382,12 +382,12 @@ onMounted(() => {
 .source-form-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5rem;
     width: 100%;
 }
 .source-form-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
 }
 </style>

@@ -68,7 +68,7 @@ onMounted(async () => {
 }
 
 .markdown-body {
-  max-width: 880px;
+  max-width: 55rem;
   margin: 0 auto;
   padding: 0 var(--space-md);
   font-family: var(--el-font-family);
@@ -110,13 +110,13 @@ onMounted(async () => {
 .markdown-body :deep(code) {
   background: var(--el-fill-color-light);
   padding: 0.1em 0.4em;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   font-size: 0.9em;
 }
 
 .markdown-body :deep(pre) {
   background: var(--el-fill-color-light);
-  padding: 12px;
+  padding: 0.75rem;
   border-radius: var(--el-border-radius-base);
   overflow: auto;
 }
@@ -128,8 +128,8 @@ onMounted(async () => {
 
 .markdown-body :deep(blockquote) {
   margin: 0.6em 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--el-border-color);
+  padding-left: 0.75rem;
+  border-left: 0.1875rem solid var(--el-border-color);
   color: var(--el-text-color-secondary);
 }
 
@@ -141,8 +141,8 @@ onMounted(async () => {
 
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
-  border: 1px solid var(--el-border-color-lighter);
-  padding: 6px 10px;
+  border: 0.0625rem solid var(--el-border-color-lighter);
+  padding: 0.375rem 0.625rem;
 }
 
 .markdown-body :deep(img) {

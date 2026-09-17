@@ -473,8 +473,8 @@ onMounted(() => {
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showConnModal" :title="isEditConn ? '编辑 SSH 连接' : '新建 SSH 连接'" width="620px">
-      <el-form :model="connForm" label-width="100px">
+    <el-dialog v-model="showConnModal" :title="isEditConn ? '编辑 SSH 连接' : '新建 SSH 连接'" width="38.75rem">
+      <el-form :model="connForm" label-width="6.25rem">
         <el-form-item label="名称">
           <el-input v-model="connForm.Name" placeholder="如：跳板机 / 生产服务器"/>
         </el-form-item>
@@ -526,8 +526,8 @@ onMounted(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showForwardModal" :title="isEditForward ? '编辑转发规则' : '新建转发规则'" width="620px">
-      <el-form :model="forwardForm" label-width="110px">
+    <el-dialog v-model="showForwardModal" :title="isEditForward ? '编辑转发规则' : '新建转发规则'" width="38.75rem">
+      <el-form :model="forwardForm" label-width="6.875rem">
         <el-form-item label="名称">
           <el-input v-model="forwardForm.Name" placeholder="留空自动生成"/>
         </el-form-item>

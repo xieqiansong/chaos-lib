@@ -419,8 +419,8 @@ onBeforeUnmount(() => {
 
 .pf-collapse {
   margin-bottom: var(--space-md);
-  border-top: 1px solid var(--term-border);
-  border-bottom: 1px solid var(--term-border);
+  border-top: 0.0625rem solid var(--term-border);
+  border-bottom: 0.0625rem solid var(--term-border);
 }
 
 .pf-collapse :deep(.el-collapse-item__header),
@@ -447,8 +447,8 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--term-border);
-  border-radius: 2px;
+  border: 0.0625rem solid var(--term-border);
+  border-radius: 0.125rem;
 }
 
 .pf-opt-title {
@@ -483,8 +483,8 @@ onBeforeUnmount(() => {
 .pf-panel {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--term-border);
-  border-radius: 2px;
+  border: 0.0625rem solid var(--term-border);
+  border-radius: 0.125rem;
   background: var(--el-bg-color);
   overflow: hidden;
 }
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-05) var(--space-sm);
-  border-bottom: 1px solid var(--term-border);
+  border-bottom: 0.0625rem solid var(--term-border);
   background: var(--el-fill-color-lighter);
   flex-wrap: wrap;
 }
@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: var(--space-sm);
   padding: var(--space-05) var(--space-sm);
-  border-top: 1px solid var(--term-border);
+  border-top: 0.0625rem solid var(--term-border);
   font-size: var(--font-xs);
   color: var(--el-text-color-secondary);
 }

@@ -258,7 +258,7 @@ defineExpose({loadPendingTasks})
     <el-dialog
         v-model="showRatingDialog"
         :title="`完成间隔任务 — ${ratingTargetTask?.PlanName || ''}`"
-        width="480px"
+        width="30rem"
     >
       <el-alert
           type="info"
@@ -283,7 +283,7 @@ defineExpose({loadPendingTasks})
     <el-dialog
         v-model="showPostponeDialog"
         :title="`延期任务 — ${postponeTargetTask?.PlanName || ''}`"
-        width="420px"
+        width="26.25rem"
     >
       <div class="postpone-content">
         <p class="text-secondary mb-sm">选择延期天数，任务开始时间将向后顺延。</p>
@@ -301,7 +301,7 @@ defineExpose({loadPendingTasks})
               :min="1"
               :max="365"
               placeholder="自定义"
-              style="width: 120px"
+              style="width: 7.5rem"
           />
         </div>
       </div>
@@ -322,12 +322,12 @@ defineExpose({loadPendingTasks})
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px 4px;
+  gap: 0.125rem 0.25rem;
 }
 
 .row-actions :deep(.el-button) {
   margin-left: 0;
-  padding: 2px 4px;
+  padding: 0.125rem 0.25rem;
 }
 
 .pending-toolbar {

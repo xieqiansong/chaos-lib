@@ -36,9 +36,9 @@ withDefaults(defineProps<{
   flex-direction: column;
   height: 100%;
   background: var(--term-bg);
-  border: 1px solid var(--term-border);
-  box-shadow: 0 0 0 1px var(--term-shadow-soft),
-  inset 0 0 18px var(--term-scanline);
+  border: 0.0625rem solid var(--term-border);
+  box-shadow: 0 0 0 0.0625rem var(--term-shadow-soft),
+  inset 0 0 1.125rem var(--term-scanline);
   overflow: hidden;
 }
 

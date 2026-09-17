@@ -424,8 +424,8 @@ onMounted(() => {
       </el-col>
     </el-row>
 
-    <el-dialog v-model="showCreateModal" title="登记文件" width="600px">
-      <el-form :model="newFile" label-width="100px">
+    <el-dialog v-model="showCreateModal" title="登记文件" width="37.5rem">
+      <el-form :model="newFile" label-width="6.25rem">
         <el-form-item label="文件路径" required>
           <el-input
               v-model="newFile.FilePath"
@@ -460,7 +460,7 @@ onMounted(() => {
 }
 
 .quickedit-empty {
-  border: 1px dashed var(--el-border-color-lighter);
+  border: 0.0625rem dashed var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
   padding: 5rem 0;
   text-align: center;
@@ -468,7 +468,7 @@ onMounted(() => {
 }
 
 .quickedit-editor-wrap {
-  border: 1px solid var(--el-border-color-lighter);
+  border: 0.0625rem solid var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
   background: var(--el-bg-color);
   overflow: hidden;
@@ -476,7 +476,7 @@ onMounted(() => {
 
 .quickedit-editor-header {
   display: flex;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
   min-height: 2.75rem;
 }
@@ -488,7 +488,7 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-05);
   flex-wrap: wrap;
-  border-right: 1px solid var(--el-border-color-lighter);
+  border-right: 0.0625rem solid var(--el-border-color-lighter);
 }
 
 .quickedit-section-label {

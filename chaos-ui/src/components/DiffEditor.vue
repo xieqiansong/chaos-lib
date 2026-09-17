@@ -104,22 +104,22 @@ function syncScroll(source: 'left' | 'right') {
 <style scoped>
 .diff-wrap {
   display: flex;
-  gap: 12px;
+  gap: 0.75rem;
   height: 100%;
 }
 .pane {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 0.0625rem solid var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
   display: flex;
   flex-direction: column;
 }
 .pane-head {
-  padding: 6px 10px;
+  padding: 0.375rem 0.625rem;
   font-size: var(--el-font-size-extra-small);
   color: var(--el-text-color-secondary);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
   flex-shrink: 0;
 }
@@ -129,16 +129,16 @@ function syncScroll(source: 'left' | 'right') {
   flex: 1;
 }
 .line-nums {
-  width: 42px;
+  width: 2.625rem;
   flex-shrink: 0;
-  padding: 8px 0;
+  padding: 0.5rem 0;
   text-align: right;
   user-select: none;
   font-family: Consolas, 'Courier New', monospace;
   font-size: var(--el-font-size-small);
-  line-height: 20px;
+  line-height: 1.25rem;
   color: var(--el-text-color-secondary);
-  border-right: 1px solid var(--el-border-color-lighter);
+  border-right: 0.0625rem solid var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
   overflow-y: scroll;
   scrollbar-width: none;
@@ -147,7 +147,7 @@ function syncScroll(source: 'left' | 'right') {
   display: none;
 }
 .ln {
-  padding-right: 8px;
+  padding-right: 0.5rem;
 }
 .ln.line-added   { background: var(--el-color-success-light-9); color: var(--el-color-success); }
 .ln.line-del     { background: var(--el-color-danger-light-9); color: var(--el-color-danger); }
@@ -158,10 +158,10 @@ function syncScroll(source: 'left' | 'right') {
   resize: none;
   border: none;
   outline: none;
-  padding: 8px 10px;
+  padding: 0.5rem 0.625rem;
   font-family: Consolas, 'Courier New', monospace;
   font-size: var(--el-font-size-small);
-  line-height: 20px;
+  line-height: 1.25rem;
   background: transparent;
 }
 .pane-ro .edit {

@@ -33,8 +33,8 @@
         <div class="table-header">
           <span>数据表（{{ tableData.length }}）</span>
           <div class="table-tools">
-            <el-input v-model="keyword" placeholder="筛选表名" clearable style="width: 180px; margin-left: 8px" />
-            <el-button style="margin-left: 8px" :icon="Refresh" circle @click="loadOverview(); loadTables()" />
+            <el-input v-model="keyword" placeholder="筛选表名" clearable style="width: 11.25rem; margin-left: 0.5rem" />
+            <el-button style="margin-left: 0.5rem" :icon="Refresh" circle @click="loadOverview(); loadTables()" />
           </div>
         </div>
       </template>
@@ -179,25 +179,25 @@ onMounted(() => {
 
 <style scoped>
 .overview {
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 .metric-label {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .metric-value {
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 600;
-  margin-top: 6px;
+  margin-top: 0.375rem;
 }
 .metric-value.text-sm {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .metric-sub {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--el-color-warning);
-  margin-top: 4px;
+  margin-top: 0.25rem;
 }
 .table-header {
   display: flex;
@@ -209,6 +209,6 @@ onMounted(() => {
   align-items: center;
 }
 h4 {
-  margin: 16px 0 8px;
+  margin: 1rem 0 0.5rem;
 }
 </style>

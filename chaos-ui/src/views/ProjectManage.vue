@@ -448,8 +448,8 @@ onMounted(fetchGroups)
     </el-row>
 
     <!-- 项目组弹窗 -->
-    <el-dialog v-model="showGroupModal" :title="isGroupEdit ? '编辑项目组' : '新建项目组'" width="600px">
-      <el-form :model="groupForm" label-width="100px">
+    <el-dialog v-model="showGroupModal" :title="isGroupEdit ? '编辑项目组' : '新建项目组'" width="37.5rem">
+      <el-form :model="groupForm" label-width="6.25rem">
         <el-form-item label="组名称">
           <el-input v-model="groupForm.Name" placeholder="项目组名称"/>
         </el-form-item>
@@ -470,8 +470,8 @@ onMounted(fetchGroups)
     </el-dialog>
 
     <!-- 项目弹窗 -->
-    <el-dialog v-model="showProjectModal" :title="isProjectEdit ? '编辑项目' : '新建项目'" width="640px">
-      <el-form :model="projectForm" label-width="100px">
+    <el-dialog v-model="showProjectModal" :title="isProjectEdit ? '编辑项目' : '新建项目'" width="40rem">
+      <el-form :model="projectForm" label-width="6.25rem">
         <el-form-item label="项目名称">
           <el-input v-model="projectForm.Name" placeholder="留空则取目录名"/>
         </el-form-item>
@@ -495,8 +495,8 @@ onMounted(fetchGroups)
     </el-dialog>
 
     <!-- 移动弹窗 -->
-    <el-dialog v-model="showMoveModal" title="移动项目" width="600px">
-      <el-form :model="moveForm" label-width="100px">
+    <el-dialog v-model="showMoveModal" title="移动项目" width="37.5rem">
+      <el-form :model="moveForm" label-width="6.25rem">
         <el-form-item label="目标项目组">
           <el-select v-model="moveForm.TargetGroupID" placeholder="选择目标项目组" style="width:100%">
             <el-option v-for="g in groups" :key="g.ID" :label="g.Name" :value="g.ID"/>
@@ -513,7 +513,7 @@ onMounted(fetchGroups)
     </el-dialog>
 
     <!-- 详情弹窗 -->
-    <el-dialog v-model="showDetail" title="项目详情" width="640px">
+    <el-dialog v-model="showDetail" title="项目详情" width="40rem">
       <div v-if="detailItem" class="detail-body">
         <div class="detail-row">
           <span class="detail-label">状态</span>
@@ -571,7 +571,7 @@ onMounted(fetchGroups)
   justify-content: space-between;
   padding-bottom: var(--space-sm);
   margin-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
 }
 
 .group-list {
@@ -585,8 +585,8 @@ onMounted(fetchGroups)
   align-items: center;
   justify-content: space-between;
   padding: var(--space-sm);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border: 0.0625rem solid var(--el-border-color-lighter);
+  border-radius: 0.375rem;
   margin-bottom: var(--space-xs);
   cursor: pointer;
 }
@@ -625,11 +625,11 @@ onMounted(fetchGroups)
   align-items: flex-start;
   gap: var(--space-md);
   padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 0.0625rem solid var(--el-border-color-lighter);
 }
 
 .detail-label {
-  width: 80px;
+  width: 5rem;
   flex-shrink: 0;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-small);

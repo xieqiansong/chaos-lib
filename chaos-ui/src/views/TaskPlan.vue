@@ -755,7 +755,7 @@ watch(taskPlansVersion, () => {
             <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
             <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
             <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
-            <el-dropdown trigger="click" style="margin-left: 4px">
+            <el-dropdown trigger="click" style="margin-left: 0.25rem">
               <el-button size="small" text>更多</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -779,7 +779,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showCreateDialog"
         title="新建任务计划"
-        width="500px"
+        width="31.25rem"
     >
       <el-form label-position="top">
         <el-form-item label="任务名称">
@@ -829,7 +829,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showAddChildDialog"
         :title="`添加子任务 — ${parentPlan?.Name}`"
-        width="500px"
+        width="31.25rem"
     >
       <el-form label-position="top">
         <el-form-item label="任务名称">
@@ -879,7 +879,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showEditDialog"
         title="修改任务计划"
-        width="500px"
+        width="31.25rem"
     >
       <el-form label-position="top">
         <el-form-item label="父任务">
@@ -940,7 +940,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showRatingDialog"
         :title="ratingDialogTitle"
-        width="480px"
+        width="30rem"
     >
       <el-alert
           type="info"
@@ -965,7 +965,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showPriorityDialog"
         :title="`设置优先级 — ${priorityTargetPlan?.Name || ''}`"
-        width="420px"
+        width="26.25rem"
     >
       <div class="postpone-content">
         <p class="text-secondary mb-sm">将递归应用到该计划及其所有子任务计划。</p>
@@ -997,6 +997,6 @@ watch(taskPlansVersion, () => {
 
 .form-row .el-form-item {
   flex: 1;
-  margin-bottom: 18px;
+  margin-bottom: 1.125rem;
 }
 </style>

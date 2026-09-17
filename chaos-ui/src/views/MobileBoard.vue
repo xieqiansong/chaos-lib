@@ -313,10 +313,10 @@ onUnmounted(() => {
 
 .back-btn {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 48px;
-  height: 48px;
+  top: 1rem;
+  left: 1rem;
+  width: 3rem;
+  height: 3rem;
   border: none;
   border-radius: 50%;
   background: var(--board-surface);
@@ -336,12 +336,12 @@ onUnmounted(() => {
 
 .fs-btn {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  height: 48px;
-  padding: 0 16px;
+  top: 1rem;
+  right: 1rem;
+  height: 3rem;
+  padding: 0 1rem;
   border: none;
-  border-radius: 24px;
+  border-radius: 1.5rem;
   background: var(--board-surface);
   color: var(--board-fg);
   font-size: var(--board-btn-size);
@@ -389,7 +389,7 @@ onUnmounted(() => {
   margin-top: 3vh;
   display: flex;
   justify-content: center;
-  padding: 0 16px;
+  padding: 0 1rem;
 }
 
 .stat-card.weather {
@@ -398,7 +398,7 @@ onUnmounted(() => {
   gap: 2.5vw;
   flex-wrap: nowrap;
   padding: 2vh 4vw;
-  border-radius: 16px;
+  border-radius: 1rem;
   background: var(--board-weather-bg);
   white-space: nowrap;
 }
@@ -408,7 +408,7 @@ onUnmounted(() => {
   color: var(--board-fg-soft);
   cursor: pointer;
   text-decoration: underline dotted var(--board-underline);
-  text-underline-offset: 4px;
+  text-underline-offset: 0.25rem;
 }
 
 .w-region:hover {
@@ -449,7 +449,7 @@ onUnmounted(() => {
 
 .screen-res {
   position: absolute;
-  bottom: 12px;
+  bottom: 0.75rem;
   left: 50%;
   transform: translateX(-50%);
   font-size: min(2.8vw, 3.2vh);
@@ -464,7 +464,7 @@ onUnmounted(() => {
   .rotate-hint {
     display: block;
     position: absolute;
-    bottom: 24px;
+    bottom: 1.5rem;
     font-size: 4vw;
     color: var(--board-fg-subtle);
   }
