@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue'
+import {computed, nextTick, onMounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {Refresh, Search, Plus, Setting, Folder, Link, FolderAdd, TopRight, MoreFilled, EditPen, Delete} from '@element-plus/icons-vue'
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/utils/api'
 
 const status = ref<ExtStatus | null>(null)
+const treeRef = ref<any>(null)
 const tree = ref<any[]>([])
 const searchQuery = ref('')
 const searchResults = ref<any[]>([])
@@ -44,6 +45,14 @@ const treeData = computed(() => {
 // 是否文件夹（书签节点带 url，文件夹没有）
 function isFolder(data: any): boolean {
   return !data?.url
+}
+
+// 默认展开「书签栏」：Chrome/Edge 中该文件夹固定为 id "1"；兜底展开第一个顶层节点
+function expandBookmarksBar() {
+  const t = treeData.value
+  if (!t.length) return
+  const bar = t.find((n: any) => n.id === '1') || t[0]
+  if (bar?.id) treeRef.value?.getNode?.(bar.id)?.expand?.()
 }
 
 // 扩展直连 ID（externally_connectable）：从 localStorage 读取
@@ -104,6 +113,9 @@ async function pullTree(silent = false) {
     tree.value = hit.echo || []
     searchResults.value = []
     searchQuery.value = ''
+    // 默认展开「书签栏」（其余保持折叠）
+    await nextTick()
+    expandBookmarksBar()
   } catch (e) {
     if (!silent) ElMessage.error('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
@@ -362,6 +374,7 @@ onMounted(() => {
       <el-empty v-if="!treeData.length" description="暂无书签，点击「刷新」同步浏览器书签"/>
       <el-tree
           v-else
+          ref="treeRef"
           :data="treeData"
           :props="treeProps"
           node-key="id"
