@@ -391,14 +391,17 @@ onMounted(() => {
       <el-table-column prop="Remark" label="备注" min-width="120"/>
       <el-table-column label="操作" width="210">
         <template #default="{row}">
-          <el-button
-              size="small"
-              :loading="testingId === row.Id"
-              @click="testConn(row)">
-            测试
-          </el-button>
-          <el-button size="small" type="primary" @click="openEditConn(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="removeConn(row)">删除</el-button>
+          <div class="op-actions">
+            <el-button
+                size="small"
+                text
+                :loading="testingId === row.Id"
+                @click="testConn(row)">
+              测试
+            </el-button>
+            <el-button size="small" type="primary" text @click="openEditConn(row)">编辑</el-button>
+            <el-button size="small" type="danger" text @click="removeConn(row)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -467,8 +470,10 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="操作" width="140">
         <template #default="{row}">
-          <el-button size="small" type="primary" @click="openEditForward(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="removeForward(row)">删除</el-button>
+          <div class="op-actions">
+            <el-button size="small" type="primary" text @click="openEditForward(row)">编辑</el-button>
+            <el-button size="small" type="danger" text @click="removeForward(row)">删除</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>

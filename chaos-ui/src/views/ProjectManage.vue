@@ -439,7 +439,7 @@ onMounted(fetchGroups)
               <div class="op-actions">
                 <el-button v-if="row.Claimed" size="small" text type="primary" @click="openDetail(row)">详情</el-button>
                 <el-button v-if="row.Claimed" size="small" text @click="copyPath(row)">复制路径</el-button>
-                <el-button v-else size="small" type="success" @click="claimProject(row)">认领</el-button>
+                <el-button v-else size="small" type="success" text @click="claimProject(row)">认领</el-button>
               </div>
             </template>
           </el-table-column>

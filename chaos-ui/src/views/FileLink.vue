@@ -194,18 +194,22 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="操作" width="160">
         <template #default="{row}">
-          <el-button
-              type="primary"
-              size="small"
-              @click="openEditModal(row)">
-            编辑
-          </el-button>
-          <el-button
-              type="danger"
-              size="small"
-              @click="deleteLink(row.ID)">
-            删除
-          </el-button>
+          <div class="op-actions">
+            <el-button
+                type="primary"
+                size="small"
+                text
+                @click="openEditModal(row)">
+              编辑
+            </el-button>
+            <el-button
+                type="danger"
+                size="small"
+                text
+                @click="deleteLink(row.ID)">
+              删除
+            </el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>

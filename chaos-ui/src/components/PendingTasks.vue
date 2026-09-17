@@ -242,7 +242,7 @@ defineExpose({loadPendingTasks})
         </el-table-column>
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
-            <div class="row-actions">
+            <div class="op-actions">
             <el-button v-if="row.RawLink" size="small" type="info" text @click="openPreview(row)">预览</el-button>
             <el-button v-if="row.RawLink && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
             <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
@@ -316,18 +316,6 @@ defineExpose({loadPendingTasks})
 <style scoped>
 .pending-tasks-wrapper {
   height: 100%;
-}
-
-.row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 4px;
-}
-
-.row-actions :deep(.el-button) {
-  margin-left: 0;
-  padding: 2px 4px;
 }
 
 .pending-toolbar {

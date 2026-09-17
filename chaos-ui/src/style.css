@@ -336,8 +336,6 @@ html.dark .el-message-box {
 .flex-wrap       { flex-wrap: wrap; }
 .items-center    { align-items: center; }
 .justify-between { justify-content: space-between; }
-.gap-sm          { gap: 8px; }
-.gap-md          { gap: 16px; }
 .text-right      { text-align: right; }
 .text-center     { text-align: center; }
 .truncate        { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -369,10 +367,12 @@ html.dark .el-message-box {
 .ml-xs { margin-left: var(--space-xs); }
 .ml-05 { margin-left: var(--space-05); }
 .ml-sm { margin-left: var(--space-sm); }
-.ml-md { margin-left: var(--space-lg); }
+.ml-md { margin-left: var(--space-md); }
+.ml-lg { margin-left: var(--space-lg); }
 
 .mr-sm { margin-right: var(--space-sm); }
-.mr-md { margin-right: var(--space-lg); }
+.mr-md { margin-right: var(--space-md); }
+.mr-lg { margin-right: var(--space-lg); }
 
 /* ===== 公共区块标题栏（section-*） ===== */
 .section-toolbar {
@@ -389,6 +389,14 @@ html.dark .el-message-box {
   flex-shrink: 0;
 }
 
+/* 区块副标题：放置于 section-toolbar 内、标题之后，统一灰色小字描述 */
+.section-subtitle {
+  color: var(--el-text-color-secondary);
+  font-size: var(--el-font-size-small);
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .section-actions {
   margin-left: auto;
   display: flex;
@@ -398,6 +406,15 @@ html.dark .el-message-box {
 .empty-wrap {
   text-align: center;
   padding: var(--space-3xl) 0;
+}
+
+/* 数据卡片：表格/列表型区块统一外壳（替代裸 el-card 或自定义 .chart-section）。
+   用法：<el-card class="data-card">；内边距由 --card-padding 统一控制。 */
+.data-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+  --el-card-padding: var(--card-padding);
 }
 
 /* ===== 公共评分选项组（rating-group） ===== */
@@ -415,16 +432,18 @@ html.dark .el-message-box {
   height: 32px;
 }
 
-/* ===== 行内操作按钮组（op-actions） ===== */
+/* ===== 行内操作按钮组（op-actions）：表格操作列统一为纯文本 + 与待办任务一致的紧凑间隙 ===== */
 .op-actions {
   display: flex;
   align-items: center;
-  gap: 0;
+  flex-wrap: wrap;
+  gap: 2px 4px;
 }
 
-.op-actions .el-button--small {
-  padding-left: 2px;
-  padding-right: 0;
+/* 抵消 Element Plus 相邻按钮默认左间距；紧凑内边距与待办任务操作列保持一致 */
+.op-actions .el-button {
+  margin-left: 0;
+  padding: 2px 4px;
 }
 
 /* ===== 垂直对齐 ===== */

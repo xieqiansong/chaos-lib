@@ -322,8 +322,10 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="startEdit(row[0], row[1])" text>编辑</el-button>
-            <el-button size="small" type="danger" @click="deleteVar(row[0])" text>删除</el-button>
+            <div class="op-actions">
+              <el-button size="small" @click="startEdit(row[0], row[1])" text>编辑</el-button>
+              <el-button size="small" type="danger" @click="deleteVar(row[0])" text>删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>

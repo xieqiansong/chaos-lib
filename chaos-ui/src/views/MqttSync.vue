@@ -232,9 +232,11 @@ function fmtTime(v: string): string {
         <el-table-column label="内容" min-width="240" prop="payload" show-overflow-tooltip/>
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="copyPayload(row.payload)">复制</el-button>
-            <el-button size="small" type="primary" @click="showDetail(row)">详情</el-button>
-            <el-button size="small" type="danger" @click="confirmRemove(row)">删除</el-button>
+            <div class="op-actions">
+              <el-button size="small" text @click="copyPayload(row.payload)">复制</el-button>
+              <el-button size="small" type="primary" text @click="showDetail(row)">详情</el-button>
+              <el-button size="small" type="danger" text @click="confirmRemove(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="更新时间" width="180">

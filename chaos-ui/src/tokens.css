@@ -24,4 +24,11 @@
   --font-base: 16px;    /* 正文基准：输入框、标准文本 */
   --font-md:   19.2px;  /* 标题：区块/卡片标题 */
   --font-lg:   23.04px; /* 大标题：页面级标题 */
+
+  /* ===== 组件尺寸（对话框 / 表单 / 卡片）—— 单一来源，视图只引用变量 ===== */
+  --form-label-w: 6.25rem;   /* 100px 表单 label 统一宽度（视图用 label-width="var(--form-label-w)"） */
+  --dialog-sm: 26.25rem;     /* 420px 小弹窗（确认 / 评分 / 延期） */
+  --dialog-md: 37.5rem;      /* 600px 标准弹窗（表单 / 详情） */
+  --dialog-lg: 45rem;        /* 720px 大弹窗（宽表单 / 预览 / 大表格） */
+  --card-padding: var(--space-lg); /* 数据卡片内边距（替代散写的 8px/12px） */
 }
