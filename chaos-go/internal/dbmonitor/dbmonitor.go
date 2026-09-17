@@ -149,10 +149,26 @@ func getOverview() (*DbOverview, error) {
 }
 
 func getTableDetail(name string) (*TableDetail, error) {
+	var (
+		detail *TableDetail
+		err    error
+	)
 	if isSQLite() {
-		return tableDetailSQLite(name)
+		detail, err = tableDetailSQLite(name)
+	} else {
+		detail, err = tableDetailPostgres(name)
 	}
-	return tableDetailPostgres(name)
+	if err != nil {
+		return nil, err
+	}
+	// nil slice 会被编码成 JSON null，前端按数组消费会崩；统一归一化为空数组。
+	if detail.Columns == nil {
+		detail.Columns = []ColumnInfo{}
+	}
+	if detail.Indexes == nil {
+		detail.Indexes = []IndexInfo{}
+	}
+	return detail, nil
 }
 
 // ── 排序 ──

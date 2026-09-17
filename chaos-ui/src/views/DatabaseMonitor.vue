@@ -74,8 +74,8 @@
           <el-descriptions-item v-if="detail.lastAnalyze" label="最近 Analyze">{{ detail.lastAnalyze }}</el-descriptions-item>
         </el-descriptions>
 
-        <h4>列（{{ detail.columns.length }}）</h4>
-        <el-table :data="detail.columns" size="small" stripe max-height="260">
+        <h4>列（{{ detailColumns.length }}）</h4>
+        <el-table :data="detailColumns" size="small" stripe max-height="260">
           <el-table-column prop="name" label="列名" min-width="120" />
           <el-table-column prop="type" label="类型" min-width="120" />
           <el-table-column label="可空" width="70">
@@ -87,8 +87,8 @@
           <el-table-column prop="default" label="默认值" min-width="120" />
         </el-table>
 
-        <h4>索引（{{ detail.indexes.length }}）</h4>
-        <el-table :data="detail.indexes" size="small" stripe max-height="200">
+        <h4>索引（{{ detailIndexes.length }}）</h4>
+        <el-table :data="detailIndexes" size="small" stripe max-height="200">
           <el-table-column prop="name" label="索引名" min-width="160" />
           <el-table-column label="唯一" width="70">
             <template #default="{ row }">{{ row.unique ? '是' : '否' }}</template>
@@ -121,7 +121,7 @@ interface TableStat {
 }
 interface ColumnInfo { name: string; type: string; nullable: boolean; isPk: boolean; default?: string | null }
 interface IndexInfo { name: string; unique: boolean; columns: string }
-interface TableDetail extends TableStat { columns: ColumnInfo[]; indexes: IndexInfo[] }
+interface TableDetail extends TableStat { columns: ColumnInfo[] | null; indexes: IndexInfo[] | null }
 interface Overview { dbType: string; version: string; totalBytes: number; tableCount: number; totalRows: number; sizeSupported: boolean }
 
 const overview = ref<Overview>({ dbType: '', version: '', totalBytes: 0, tableCount: 0, totalRows: 0, sizeSupported: false })
@@ -131,6 +131,10 @@ const drawer = ref(false)
 const current = ref('')
 const detail = ref<TableDetail | null>(null)
 const detailError = ref('')
+
+/** 后端可能返回 null（nil slice），统一归一化为空数组，避免模板读取 length 报错 */
+const detailColumns = computed<ColumnInfo[]>(() => detail.value?.columns ?? [])
+const detailIndexes = computed<IndexInfo[]>(() => detail.value?.indexes ?? [])
 
 function formatBytes(n: number): string {
   if (!n) return '0 B'
