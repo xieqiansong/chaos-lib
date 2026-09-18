@@ -13,7 +13,10 @@
 - **✏️ 快捷编辑**：登记文件 → 编辑保存（自动快照）→ 回滚到任意历史版本；内嵌 Monaco 编辑器（含 diff），环境变量以「虚拟文件」形式接入
 - **📦 SDK 版本切换**：管理 JDK / Maven / Python / Llama 多版本来源，通过符号链接一键切换
 - **🔌 SSH 端口转发**：SSH 连接管理（凭据仅后端使用、响应脱敏）+ local(`ssh -L`) / remote(`ssh -R`) 转发规则，Web 界面启停
-- **🗄️ 数据库监控**：只读自省当前库内表名、行数、表/索引/合计大小、索引数，以及 PostgreSQL 下的扫描与维护统计（兼容 SQLite / PostgreSQL 双后端）
+- **🗄️ 数据监控**：只读自省当前库内表名、行数、表/索引/合计大小、索引数，以及 PostgreSQL 下的扫描与维护统计（兼容 SQLite / PostgreSQL 双后端）
+- **🔖 书签管理**：通过浏览器扩展直连本机浏览器，读取并管理书签树（新建 / 修改 / 删除 / 拖拽排序），支持按标题与 URL 即时筛选（需填写扩展直连 ID）
+- **🔄 格式转换**：JSON / YAML / CSV / XML / INI / CBOR（HEX）/ Java Class / Go Struct 等格式互转，支持自动转换、格式化、格式交换、文件上传与结果复制 / 下载
+- **📡 MQTT 多节点同步**：基于 MQTT Broker 的指令 / 消息广播通道（paho.mqtt.golang），支持连接状态监控、AES 加密（`MQTT_ENCRYPT_KEY`）、发送 / 接收与按 topic 软删除，用于多节点协同
 - **🔔 通知推送**：Windows 系统 Toast + WxPusher 消息推送
 - **📡 数据采集与代理**：浏览器历史记录采集、DeepSeek 余额查询、百度天气代理
 - **🖥️ 界面能力**：终端风格布局、命令面板（Ctrl+K）、主题切换（dark / paper 护眼）、全屏手机看板（`/board`）
@@ -22,25 +25,40 @@
 ## 截图展示
 
 <p align="center"><b>📊 看板</b></p>
-<p align="center"><img src="docs/screenshots/dashboard.png" alt="看板" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/dashboard.png" alt="看板" width="1920" /></p>
 
 <p align="center"><b>📋 任务管理（含 FSRS 复习）</b></p>
-<p align="center"><img src="docs/screenshots/tasks.png" alt="任务管理" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/tasks.png" alt="任务管理" width="1920" /></p>
 
 <p align="center"><b>⚙️ 环境变量管理</b></p>
-<p align="center"><img src="docs/screenshots/env-variables.png" alt="环境变量" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/env-variables.png" alt="环境变量" width="1920" /></p>
 
 <p align="center"><b>✏️ 快捷编辑</b></p>
-<p align="center"><img src="docs/screenshots/quick-edit.png" alt="快速编辑" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/quick-edit.png" alt="快速编辑" width="1920" /></p>
 
 <p align="center"><b>🔗 文件连接</b></p>
-<p align="center"><img src="docs/screenshots/file-links.png" alt="文件连接" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/file-links.png" alt="文件连接" width="1920" /></p>
 
 <p align="center"><b>📁 项目管理</b></p>
-<p align="center"><img src="docs/screenshots/project-manage.png" alt="项目管理" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/project-manage.png" alt="项目管理" width="1920" /></p>
 
 <p align="center"><b>📦 SDK 版本切换</b></p>
-<p align="center"><img src="docs/screenshots/sdk.png" alt="SDK版本" width="1080" /></p>
+<p align="center"><img src="docs/screenshots/sdk.png" alt="SDK版本" width="1920" /></p>
+
+<p align="center"><b>🗄️ 数据监控</b></p>
+<p align="center"><img src="docs/screenshots/database-monitor.png" alt="数据监控" width="1920" /></p>
+
+<p align="center"><b>📡 端口转发</b></p>
+<p align="center"><img src="docs/screenshots/port-forward.png" alt="端口转发" width="1920" /></p>
+
+<p align="center"><b>🔖 书签管理</b></p>
+<p align="center"><img src="docs/screenshots/bookmarks.png" alt="书签管理" width="1920" /></p>
+
+<p align="center"><b>🔄 格式转换</b></p>
+<p align="center"><img src="docs/screenshots/polyform.png" alt="格式转换" width="1920" /></p>
+
+<p align="center"><b>📡 MQTT 多节点同步</b></p>
+<p align="center"><img src="docs/screenshots/mqtt-sync.png" alt="MQTT同步" width="1920" /></p>
 
 ## 技术栈
 
@@ -50,7 +68,7 @@
 | 前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + ECharts 6 + Monaco Editor |
 | 数据库 | SQLite3（`glebarez/sqlite`，默认）/ PostgreSQL（`gorm.io/driver/postgres`） |
 | 任务调度 | robfig/cron v3 + 内置 `scheduler` 周期调度器 |
-| 其他 | 后端：`x/crypto/ssh`（端口转发）、`go-toml`（快照）、`x/sys`（Windows API）；前端：markdown-it + DOMPurify、date-fns |
+| 其他 | 后端：`x/crypto/ssh`（端口转发）、`eclipse/paho.mqtt.golang`（MQTT 同步）、`go-toml`（快照）、`x/sys`（Windows API）；前端：markdown-it + DOMPurify、date-fns、polyform-tools（格式转换） |
 
 ## 快速开始
 
@@ -133,6 +151,9 @@ chaos-lib/
 │   │   ├── quickedit/           # 文件快照 / 回滚
 │   │   ├── proxy/               # SDK 切换 / 浏览器历史 / 天气 / 余额
 │   │   ├── portfwd/             # SSH 连接 + 端口转发
+│   │   ├── mqttsync/            # MQTT 多节点消息广播 + AES 加密
+│   │   ├── extchannel/          # 浏览器扩展直连通道（书签管理）
+│   │   ├── dbmonitor/           # 数据库只读自省
 │   │   ├── notify/              # Windows 通知 / WxPusher
 │   │   ├── deepseek/            # DeepSeek Chat API 客户端
 │   │   ├── supabase/            # Supabase PostgREST 客户端
@@ -162,7 +183,10 @@ chaos-lib/
 | `/portForward` | 端口转发 | SSH 连接与转发规则 |
 | `/quickEdit` | 快速编辑 | 文件编辑与快照回滚 |
 | `/environment` | 环境变量 | 系统 / 用户环境变量管理 |
-| `/databaseMonitor` | 数据库监控 | 表清单 / 大小 / 行数 / 索引与列详情（只读） |
+| `/databaseMonitor` | 数据监控 | 表清单 / 大小 / 行数 / 索引与列详情（只读） |
+| `/bookmarks` | 书签管理 | 浏览器书签树：新建 / 修改 / 删除 / 拖拽排序（需扩展直连 ID） |
+| `/polyform` | 格式转换 | JSON / YAML / CSV / XML / INI / CBOR / Java / Go 互转（polyform-tools） |
+| `/mqttSync` | MQTT同步 | 多节点消息广播：状态 / 发送 / 接收 / 按 topic 删除 |
 | `/browserHistory` | 历史记录 | 浏览器历史（隐藏，Web 端仅占位） |
 | `/example` | 测试例子 | 组件示例（隐藏） |
 | `/board` | 全屏看板 | 手机端时钟 + 天气（隐藏、全屏） |
