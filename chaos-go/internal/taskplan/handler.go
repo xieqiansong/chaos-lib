@@ -3,6 +3,7 @@ package taskplan
 import (
 	"chaos-go/config"
 	"chaos-go/internal/deepseek"
+	"chaos-go/internal/pagination"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -784,6 +785,26 @@ func GetPendingTasks(c *gin.Context) {
 	now := time.Now()
 	early := c.Query("early") == "1"
 
+	// 基础查询（不含排序/分页参数），供 count 与分页查询复用
+	base := config.GetDB().Table("tasks").
+		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
+		Where("tasks.status = ?", TaskStatusActive).
+		Where("tasks.is_deleted = ?", false).
+		Where("task_plans.is_deleted = ?", false).
+		Where("task_plans.is_suspended = ?", false)
+
+	if !early {
+		base = base.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)
+	}
+
+	q := pagination.Parse(c)
+
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		return
+	}
+
 	var rows []struct {
 		Task
 		PlanName    string       ``
@@ -793,20 +814,10 @@ func GetPendingTasks(c *gin.Context) {
 		ContentSize int          ``
 		FsrsReps    int          ``
 	}
-	query := config.GetDB().Table("tasks").
+	if err := base.
 		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.raw_link AS plan_raw_link, task_plans.content_size, task_plans.fsrs_reps").
-		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
-		Where("tasks.status = ?", TaskStatusActive).
-		Where("tasks.is_deleted = ?", false).
-		Where("task_plans.is_deleted = ?", false).
-		Where("task_plans.is_suspended = ?", false)
-
-	if !early {
-		query = query.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)
-	}
-
-	if err := query.
 		Order("task_plans.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC").
+		Scopes(q.Scope).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
 		return
@@ -827,7 +838,8 @@ func GetPendingTasks(c *gin.Context) {
 		result = append(result, pt)
 	}
 
-	c.JSON(http.StatusOK, result)
+	// 统一分页响应：{ items, total, page, size }
+	c.JSON(http.StatusOK, pagination.New(result, total, q))
 }
 
 // finishTask 标记任务完成、驱动 FSRS（interval 类型）并生成下一条任务。

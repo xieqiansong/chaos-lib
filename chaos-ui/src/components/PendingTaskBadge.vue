@@ -6,7 +6,7 @@ import {sendMessage} from '@/utils/api'
 import {pendingTasksVersion} from '@/utils/pendingTasksStore'
 
 // 页头「待办任务」入口：红色数量角标（同消息未读样式），点击进入待办任务页。
-// 数量取 /tasks/pending 列表长度（与待办页同一口径，不含「提前查询」的未到点任务），
+// 数量取 /tasks/pending 分页响应的 total（与待办页同一口径，不含「提前查询」的未到点任务），
 // 30s 轮询兜底；完成 / 取消 / 延期 / 评分后由全局刷新信号即时同步，无需等下一轮轮询。
 const POLL_INTERVAL = 30000
 const MAX_DISPLAY = 99
@@ -20,8 +20,9 @@ let stopVersionWatch: () => void
 async function loadCount() {
   try {
     const result = await sendMessage('tasks/pending', 'GET')
-    if (Array.isArray(result)) {
-      count.value = result.length
+    // 后端返回分页结构 { items, total, page, size }，角标取 total 作为待办总数
+    if (result && typeof result.total === 'number') {
+      count.value = result.total
     }
   } catch (e) {
     console.error(e)

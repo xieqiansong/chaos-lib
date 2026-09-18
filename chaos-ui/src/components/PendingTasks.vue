@@ -28,6 +28,28 @@ const pendingTasks = ref<PendingTask[]>([])
 const earlyMode = ref(false)
 const selectedTasks = ref<PendingTask[]>([])
 
+// 服务端分页：配合后端 tasks/pending 的 { items, total, page, size } 响应
+const page = ref(1)
+const size = ref(10)
+const total = ref(0)
+
+function handlePageChange(p: number) {
+  page.value = p
+  loadPendingTasks()
+}
+
+function handleSizeChange(s: number) {
+  size.value = s
+  page.value = 1
+  loadPendingTasks()
+}
+
+function handleEarlyModeChange() {
+  // 切换「提前查询」后数据集合变化，回到第 1 页避免落到空页
+  page.value = 1
+  loadPendingTasks()
+}
+
 function handleSelectionChange(rows: PendingTask[]) {
   selectedTasks.value = rows
 }
@@ -82,10 +104,16 @@ function openLink(link: string) {
 
 async function loadPendingTasks() {
   try {
-    const url = earlyMode.value ? 'tasks/pending?early=1' : 'tasks/pending'
+    const url = `tasks/pending?early=${earlyMode.value ? 1 : 0}&page=${page.value}&size=${size.value}`
     const result = await sendMessage(url, 'GET')
-    if (Array.isArray(result)) {
-      pendingTasks.value = result
+    if (result && Array.isArray(result.items)) {
+      pendingTasks.value = result.items
+      total.value = result.total
+      // 当前页被取空且非首页（通常是完成/取消后数据变少），回退一页再拉取
+      if (pendingTasks.value.length === 0 && page.value > 1) {
+        page.value -= 1
+        return loadPendingTasks()
+      }
     }
   } catch (e) {
     console.error(e)
@@ -234,7 +262,7 @@ defineExpose({loadPendingTasks})
       <el-switch
           v-model="earlyMode"
           active-text="提前查询"
-          @change="loadPendingTasks"
+          @change="handleEarlyModeChange"
       />
       <div class="toolbar-actions">
         <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
@@ -302,6 +330,18 @@ defineExpose({loadPendingTasks})
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pager">
+        <el-pagination
+            :current-page="page"
+            :page-size="size"
+            :total="total"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            @current-change="handlePageChange"
+            @size-change="handleSizeChange"
+        />
+      </div>
     </div>
 
     <el-dialog
@@ -387,6 +427,12 @@ defineExpose({loadPendingTasks})
 
 .pending-empty {
   margin-top: var(--space-2xl);
+}
+
+.pager {
+  margin-top: var(--space-sm);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .postpone-content {
