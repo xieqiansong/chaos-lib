@@ -1,0 +1,57 @@
+body {
+    padding: 0;
+    margin: 0;
+}
+
+/* ===== 字体尺寸 ===== */
+.text-xs   { font-size: var(--el-font-size-extra-small); }
+.text-sm   { font-size: var(--el-font-size-small); }
+.text-base { font-size: var(--el-font-size-base); }
+.text-md   { font-size: var(--el-font-size-medium); }
+
+/* ===== 排版 ===== */
+.flex            { display: flex; }
+.flex-wrap       { flex-wrap: wrap; }
+.items-center    { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm          { gap: 0.5rem; }
+.gap-md          { gap: 1rem; }
+.text-right      { text-align: right; }
+.text-center     { text-align: center; }
+.truncate        { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-mono       { font-family: 'Consolas', 'Courier New', monospace; }
+.flex-1          { flex: 1; }
+.min-w-0         { min-width: 0; }
+.flex-shrink-0   { flex-shrink: 0; }
+.whitespace-nowrap { white-space: nowrap; }
+
+/* ===== 间距 ===== */
+.mb-sm { margin-bottom: 0.5rem; }
+.mb-md { margin-bottom: 1rem; }
+.mt-sm { margin-top: 0.5rem; }
+.ml-sm { margin-left: 0.5rem; }
+.ml-md { margin-left: 1rem; }
+.mr-sm { margin-right: 0.5rem; }
+.mr-md { margin-right: 1rem; }
+
+/* ===== 垂直对齐 ===== */
+.align-middle { vertical-align: middle; }
+
+/* ===== 树形表格图标对齐 ===== */
+.el-table__expand-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+/* ===== 文字颜色（语义化，基于 Element Plus 变量） ===== */
+.text-primary    { color: var(--el-text-color-primary); }
+.text-regular    { color: var(--el-text-color-regular); }
+.text-secondary  { color: var(--el-text-color-secondary); }
+.text-placeholder { color: var(--el-text-color-placeholder); }
+
+/* ===== 背景色 ===== */
+.bg-lighter { background: var(--el-fill-color-lighter); }
+
+/* ===== 边框 ===== */
+.border-light { border: 1px solid var(--el-border-color-lighter); }
