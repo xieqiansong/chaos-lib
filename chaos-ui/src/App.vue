@@ -167,7 +167,7 @@ onUnmounted(() => {
       <TerminalFrame :title="currentTitle" prompt="chaos@main" hide-titlebar>
         <header class="app-header">
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{path: '/dashboard'}">首页</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{path: '/'}">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-for="crumb in breadcrumbs" :key="crumb.path">
               {{ crumb.title }}
             </el-breadcrumb-item>

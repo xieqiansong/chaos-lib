@@ -341,6 +341,24 @@ export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
     return sendMessage('tasks/batch-postpone', 'POST', { ids, days })
 }
 
+// ---- 浏览器历史（由扩展周期性备份到 DB）----
+
+export interface BrowserHistoryItem {
+  ID: string
+  LastVisitTime: number
+  Title: string
+  TypeCount: number
+  Url: string
+  VisitCount: number
+}
+
+/** 拉取浏览器历史；limit 控制返回最近多少条（后端按 last_visit_time DESC 排序）。 */
+export function getBrowserHistories(limit?: number): Promise<BrowserHistoryItem[]> {
+  const query: Record<string, any> = {}
+  if (limit && limit > 0) query.limit = limit
+  return sendMessage('browserHistories', 'GET', query)
+}
+
 // ---- 主机名（用作浏览器标签标题） ----
 
 export interface HostnameInfo {

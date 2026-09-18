@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm/clause"
@@ -35,7 +36,13 @@ type BrowserHistoryVisit struct {
 
 func GetBrowserHistories(c *gin.Context) {
 	var histories []BrowserHistory
-	config.GetDB().Find(&histories)
+	q := config.GetDB().Order("last_visit_time DESC")
+	if limit := c.Query("limit"); limit != "" {
+		if n, err := strconv.Atoi(limit); err == nil && n > 0 {
+			q = q.Limit(n)
+		}
+	}
+	q.Find(&histories)
 	c.JSON(200, histories)
 }
 

@@ -19,6 +19,12 @@ declare module 'vue-router' {
  */
 export const appRoutes: RouteRecordRaw[] = [
   {
+    path: '/',
+    name: 'home',
+    component: () => import('@/views/Home.vue'),
+    meta: {title: '首页', icon: 'HomeFilled'},
+  },
+  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/Dashboard.vue'),
@@ -123,9 +129,8 @@ export const appRoutes: RouteRecordRaw[] = [
 ]
 
 const routes: RouteRecordRaw[] = [
-  {path: '/', redirect: '/dashboard'},
   ...appRoutes,
-  {path: '/:pathMatch(.*)*', redirect: '/dashboard'},
+  {path: '/:pathMatch(.*)*', redirect: '/'},
 ]
 
 export interface MenuNode {
