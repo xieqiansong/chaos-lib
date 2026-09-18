@@ -110,6 +110,7 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			tasks.PATCH("/:id/complete", taskplan.CompleteTask)
 			tasks.PATCH("/:id/cancel", taskplan.CancelTask)
 			tasks.PATCH("/:id/postpone", taskplan.PostponeTask)
+			tasks.POST("/batch-postpone", taskplan.BatchPostponeTasks)
 		}
 
 		notify := api.Group("/notify")

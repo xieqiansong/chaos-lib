@@ -75,6 +75,18 @@
 - **WHEN** 对 cron 类型 Task 调用 postpone
 - **THEN** 拒绝；对 todo/interval 按天数平移 startedAt 与 deadline
 
+#### Scenario: Batch postpone same-day shift
+- **WHEN** `POST /api/tasks/batch-postpone` 传入若干 todo/interval 的 active 任务 ids 与正整数 days
+- **THEN** 每条任务的 startedAt 与 deadline（若存在）各平移 days 天；响应 postponed=成功数、skipped=0
+
+#### Scenario: Batch postpone skips unsupported
+- **WHEN** 传入 ids 含已完成/已取消、cron 类型或无可延期时间的任务
+- **THEN** 这些任务计入 skipped 并在 details 给出 reason，其余照常延期，postponed=实际成功数
+
+#### Scenario: Batch postpone invalid request
+- **WHEN** days<=0 或 ids 为空
+- **THEN** 返回 400，不执行任何延期
+
 ### Requirement: Pending task query
 系统 SHALL 提供联表待办查询，排除已挂起计划并标记逾期。
 
@@ -124,6 +136,7 @@ GET    /api/tasks/activeStats
 PATCH  /api/tasks/:id/complete
 PATCH  /api/tasks/:id/cancel
 PATCH  /api/tasks/:id/postpone
+POST   /api/tasks/batch-postpone
 ```
 
 ## Out of Scope

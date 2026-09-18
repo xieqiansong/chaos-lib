@@ -331,6 +331,16 @@ export function getTableDetail(name: string): Promise<TableDetail> {
     return sendMessage(`dbMonitor/tables/${encodeURIComponent(name)}`, 'GET')
 }
 
+// ---- 待办任务 ----
+
+export function postponeTask(id: number, days: number): Promise<any> {
+    return sendMessage(`tasks/${id}/postpone`, 'PATCH', { days })
+}
+
+export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
+    return sendMessage('tasks/batch-postpone', 'POST', { ids, days })
+}
+
 // ---- 主机名（用作浏览器标签标题） ----
 
 export interface HostnameInfo {

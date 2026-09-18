@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import {computed, nextTick, onMounted, ref} from 'vue'
+import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {Refresh, Search, Plus, Setting, Folder, Link, FolderAdd, TopRight, MoreFilled, EditPen, Delete} from '@element-plus/icons-vue'
+import {Refresh, Plus, Setting, Folder, Link, FolderAdd, TopRight, MoreFilled, EditPen, Delete} from '@element-plus/icons-vue'
 import {
   refreshExtStatus,
   pushExtCommand,
@@ -9,13 +9,15 @@ import {
   type ExtStatus,
 } from '@/utils/api'
 
+// 顶部全局搜索（与任务管理一致：由 App.vue 顶栏「请输入」输入框传入）
+const props = defineProps<{
+  searchText: string
+}>()
+
 const status = ref<ExtStatus | null>(null)
 const treeRef = ref<any>(null)
 const tree = ref<any[]>([])
-const searchQuery = ref('')
-const searchResults = ref<any[]>([])
 const loadingTree = ref(false)
-const searching = ref(false)
 const refreshing = ref(false)
 
 // 新建 / 新建文件夹 弹窗
@@ -111,8 +113,6 @@ async function pullTree(silent = false) {
       return
     }
     tree.value = hit.echo || []
-    searchResults.value = []
-    searchQuery.value = ''
     // 默认展开「书签栏」（其余保持折叠）
     await nextTick()
     expandBookmarksBar()
@@ -134,33 +134,51 @@ async function refresh() {
   }
 }
 
-// 搜索书签
-async function doSearch() {
-  const q = searchQuery.value.trim()
-  if (!q) {
-    searchResults.value = []
-    return
+// 搜索书签（关键词来自顶栏搜索框）：直接筛选已加载的书签树
+function doSearch() {
+  const q = props.searchText.trim()
+  if (!treeRef.value) return
+  treeRef.value.filter(q)
+  if (q) {
+    // 展开全部分支，使命中节点可见
+    setAllExpand(true)
+  } else {
+    // 清空：折叠全部，恢复默认仅展开「书签栏」
+    setAllExpand(false)
+    expandBookmarksBar()
   }
-  if (!ensureConnected()) return
-  searching.value = true
-  try {
-    const res = await pushExtCommand({type: 'bookmarks:search', query: q, id: `search-${Date.now()}`})
-    const hit = res.response
-    if (!hit || !hit.ok) {
-      ElMessage.error('搜索失败：' + (hit?.error || ''))
-      return
-    }
-    searchResults.value = hit.echo?.nodes || []
-  } catch (e) {
-    ElMessage.error('搜索失败：' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    searching.value = false
-  }
+}
+
+// 展开 / 折叠树中所有节点
+function setAllExpand(expand: boolean) {
+  const nodes = treeRef.value?.store?._getAllNodes?.() || []
+  nodes.forEach((n: any) => (n.expanded = expand))
+}
+
+// el-tree 节点过滤：标题 / URL 命中即保留；父级只要任一子节点命中便自动保留
+function filterNode(value: string, data: any): boolean {
+  if (!value) return true
+  const kw = value.toLowerCase()
+  const title = (data.title || '').toLowerCase()
+  const url = (data.url || '').toLowerCase()
+  return title.includes(kw) || url.includes(kw)
 }
 
 // 打开书签 URL（前端直接开新标签，无需扩展）
 function openNode(url?: string) {
   if (url) window.open(url, '_blank')
+}
+
+// 单击节点：文件夹切换展开/折叠，书签（带 URL）直接跳转
+function onNodeClick(data: any) {
+  if (data.url) {
+    openNode(data.url)
+    return
+  }
+  const node = treeRef.value?.getNode?.(data.id)
+  if (node) {
+    node.expanded ? node.collapse() : node.expand()
+  }
 }
 
 // 更多菜单命令（修改 / 删除）
@@ -285,6 +303,11 @@ onMounted(() => {
   // 进入页面默认拉取
   refresh()
 })
+
+// 顶栏搜索词变化时即时搜索（与任务管理保持一致）
+watch(() => props.searchText, () => {
+  doSearch()
+})
 </script>
 
 <template>
@@ -315,6 +338,8 @@ onMounted(() => {
         </el-popover>
       </div>
       <div class="section-actions">
+        <el-button size="small" :icon="Plus" @click="openCreate(null, 'bookmark')">新建书签</el-button>
+        <el-button size="small" :icon="Plus" @click="openCreate(null, 'folder')">新建文件夹</el-button>
         <el-button size="small" type="primary" :icon="Refresh" :loading="refreshing" @click="refresh">刷新</el-button>
       </div>
     </div>
@@ -328,62 +353,22 @@ onMounted(() => {
         title="未连接扩展：请确认浏览器插件已加载，并点击「直连 ID」填写正确的扩展 ID"
     />
 
-    <el-card shadow="never" class="search-card">
-      <div class="search-row">
-        <el-input
-            v-model="searchQuery"
-            class="search-input"
-            placeholder="搜索书签标题 / URL"
-            :prefix-icon="Search"
-            clearable
-            @keyup.enter="doSearch"
-            @clear="searchResults = []"
-        />
-        <el-button :icon="Search" :loading="searching" @click="doSearch">搜索</el-button>
-        <el-button :icon="Plus" @click="openCreate(null, 'bookmark')">新建书签</el-button>
-        <el-button :icon="Plus" @click="openCreate(null, 'folder')">新建文件夹</el-button>
-      </div>
-    </el-card>
-
-    <!-- 搜索结果 -->
-    <el-card v-if="searchResults.length" shadow="never" class="tree-card">
-      <template #header>
-        <span class="text-primary text-sm">搜索结果（{{ searchResults.length }}）</span>
-      </template>
-      <el-table :data="searchResults" stripe style="width: 100%">
-        <el-table-column label="标题" min-width="200" prop="title" show-overflow-tooltip/>
-        <el-table-column label="URL" min-width="280" prop="url" show-overflow-tooltip/>
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <div class="op-actions">
-              <el-button v-if="row.url" text size="small" :icon="TopRight" title="打开" @click="openNode(row.url)"/>
-              <el-button text size="small" :icon="EditPen" title="修改" @click="openEdit(row)"/>
-              <el-button text size="small" type="danger" :icon="Delete" title="删除" @click="deleteNode(row.id, row.title, row.url)"/>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 书签树（支持拖拽修改父节点） -->
-    <el-card shadow="never" class="tree-card">
-      <template #header>
-        <span class="text-primary text-sm">书签树</span>
-        <span style="margin-left:8px; font-size:12px; color:#909399;">可拖拽书签 / 文件夹到目标文件夹以修改父节点</span>
-      </template>
-      <el-empty v-if="!treeData.length" description="暂无书签，点击「刷新」同步浏览器书签"/>
-      <el-tree
-          v-else
-          ref="treeRef"
-          :data="treeData"
-          :props="treeProps"
-          node-key="id"
-          :indent="0"
-          :expand-on-click-node="false"
-          draggable
-          :allow-drop="allowDrop"
-          @node-drop="onNodeDrop"
-      >
+    <!-- 书签树（支持拖拽修改父节点；顶栏搜索框直接筛选树） -->
+    <el-empty v-if="!treeData.length" description="暂无书签，点击「刷新」同步浏览器书签"/>
+    <el-tree
+        v-else
+        ref="treeRef"
+        :data="treeData"
+        :props="treeProps"
+        node-key="id"
+        :indent="0"
+        :expand-on-click-node="false"
+        :filter-node-method="filterNode"
+        draggable
+        :allow-drop="allowDrop"
+        @node-click="onNodeClick"
+        @node-drop="onNodeDrop"
+    >
         <template #default="{ data }">
           <div class="bm-node">
             <el-icon class="bm-icon" :class="data.url ? 'is-bookmark' : 'is-folder'">
@@ -407,7 +392,6 @@ onMounted(() => {
           </div>
         </template>
       </el-tree>
-    </el-card>
 
     <!-- 新建弹窗 -->
     <el-dialog
@@ -471,27 +455,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.search-card {
-  --el-card-padding: 12px;
-  margin-bottom: var(--space-lg);
-}
-
-.search-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 240px;
-}
-
-.tree-card {
-  --el-card-padding: 12px;
-}
-
 .mb-sm {
   margin-bottom: var(--space-sm);
 }
@@ -551,12 +514,12 @@ onMounted(() => {
 }
 
 /* 层级缩进辅助线：子节点容器左内边距形成缩进，并在父级箭头处画一条竖线 */
-.tree-card :deep(.el-tree-node__children) {
+:deep(.el-tree-node__children) {
   position: relative;
   padding-left: 16px;
 }
 
-.tree-card :deep(.el-tree-node__children)::before {
+:deep(.el-tree-node__children)::before {
   content: '';
   position: absolute;
   top: 0;

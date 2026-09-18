@@ -1153,6 +1153,33 @@ func GetTaskContributionStats(c *gin.Context) {
 	})
 }
 
+// computePostponeUpdates 计算单条任务的延期更新字段，返回 updates、是否可延期与跳过原因。
+// 仅 active 状态且所属 plan 为 todo/interval 类型的任务可延期，平移 started_at 与 deadline。
+func computePostponeUpdates(task *Task, days int) (map[string]interface{}, bool, string) {
+	if task.Status != TaskStatusActive {
+		return nil, false, "任务已完成或已取消"
+	}
+	var plan TaskPlan
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
+		return nil, false, "所属任务计划不存在"
+	}
+	if plan.PlanType != TaskPlanTypeTodo && plan.PlanType != TaskPlanTypeInterval {
+		return nil, false, "仅待办和间隔类型任务支持延期"
+	}
+	offset := time.Duration(days) * 24 * time.Hour
+	updates := map[string]interface{}{}
+	if task.StartedAt != nil {
+		updates["started_at"] = task.StartedAt.Add(offset)
+	}
+	if task.Deadline != nil {
+		updates["deadline"] = task.Deadline.Add(offset)
+	}
+	if len(updates) == 0 {
+		return nil, false, "任务没有可延期的时间"
+	}
+	return updates, true, ""
+}
+
 func PostponeTask(c *gin.Context) {
 	id, ok := getTaskID(c)
 	if !ok {
@@ -1173,36 +1200,9 @@ func PostponeTask(c *gin.Context) {
 		return
 	}
 
-	if task.Status != TaskStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "任务已完成或已取消"})
-		return
-	}
-
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "所属任务计划不存在"})
-		return
-	}
-
-	if plan.PlanType != TaskPlanTypeTodo && plan.PlanType != TaskPlanTypeInterval {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "仅待办和间隔类型任务支持延期"})
-		return
-	}
-
-	offset := time.Duration(req.Days) * 24 * time.Hour
-	updates := map[string]interface{}{}
-
-	if task.StartedAt != nil {
-		newStarted := task.StartedAt.Add(offset)
-		updates["started_at"] = newStarted
-	}
-	if task.Deadline != nil {
-		newDeadline := task.Deadline.Add(offset)
-		updates["deadline"] = newDeadline
-	}
-
-	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "任务没有可延期的时间"})
+	updates, ok2, reason := computePostponeUpdates(&task, req.Days)
+	if !ok2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": reason})
 		return
 	}
 
@@ -1214,6 +1214,61 @@ func PostponeTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("已延期 %d 天", req.Days),
 		"days":    req.Days,
+	})
+}
+
+// BatchPostponeTasks 批量延期：对同一组任务应用相同天数延期，逐条跳过不可延期的任务。
+// 返回每条任务的处理结果（postponed / skipped 及跳过原因），便于前端展示部分成功。
+func BatchPostponeTasks(c *gin.Context) {
+	var req struct {
+		IDs  []int `json:"ids"`
+		Days int   `json:"days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Days <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "延期天数必须为正整数"})
+		return
+	}
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择至少一个任务"})
+		return
+	}
+
+	db := config.GetDB()
+	type ItemResult struct {
+		ID     int    `json:"id"`
+		Status string `json:"status"`
+		Reason string `json:"reason,omitempty"`
+	}
+	results := make([]ItemResult, 0, len(req.IDs))
+	postponed := 0
+	skipped := 0
+
+	for _, id := range req.IDs {
+		var task Task
+		if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+			results = append(results, ItemResult{ID: id, Status: "skipped", Reason: "任务不存在"})
+			skipped++
+			continue
+		}
+		updates, ok, reason := computePostponeUpdates(&task, req.Days)
+		if !ok {
+			results = append(results, ItemResult{ID: id, Status: "skipped", Reason: reason})
+			skipped++
+			continue
+		}
+		if err := db.Model(&task).Updates(updates).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "延期失败: " + err.Error()})
+			return
+		}
+		results = append(results, ItemResult{ID: id, Status: "postponed"})
+		postponed++
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"postponed": postponed,
+		"skipped":   skipped,
+		"details":   results,
+		"message":   fmt.Sprintf("已延期 %d 个任务，跳过 %d 个", postponed, skipped),
 	})
 }
 

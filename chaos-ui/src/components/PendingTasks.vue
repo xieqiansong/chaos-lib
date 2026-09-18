@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {onMounted, onUnmounted, ref, watch} from 'vue'
-import {sendMessage} from '@/utils/api'
+import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
+import {sendMessage, batchPostponeTasks} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format} from 'date-fns'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
@@ -26,6 +26,15 @@ interface PendingTask {
 
 const pendingTasks = ref<PendingTask[]>([])
 const earlyMode = ref(false)
+const selectedTasks = ref<PendingTask[]>([])
+
+function handleSelectionChange(rows: PendingTask[]) {
+  selectedTasks.value = rows
+}
+
+function isPostponable(row: PendingTask): boolean {
+  return row.PlanType === 'todo' || row.PlanType === 'interval'
+}
 
 const showRatingDialog = ref(false)
 const ratingTargetTask = ref<PendingTask | null>(null)
@@ -151,6 +160,20 @@ async function postponeTask(task: PendingTask) {
   showPostponeDialog.value = true
 }
 
+async function batchPostpone() {
+  if (selectedTasks.value.length === 0) return
+  postponeTargetTask.value = null
+  postponeDays.value = 1
+  showPostponeDialog.value = true
+}
+
+const postponeDialogTitle = computed(() => {
+  if (postponeTargetTask.value) {
+    return `延期任务 — ${postponeTargetTask.value.PlanName}`
+  }
+  return `批量延期（已选 ${selectedTasks.value.length} 个）`
+})
+
 async function submitPostponeDialog() {
   if (postponeDays.value <= 0) {
     ElMessage.error('延期天数必须大于0')
@@ -162,9 +185,19 @@ async function submitPostponeDialog() {
         days: postponeDays.value,
       })
       ElMessage.success(`已延期 ${postponeDays.value} 天`)
+    } else if (selectedTasks.value.length > 0) {
+      const ids = selectedTasks.value.map(t => t.ID)
+      const res = await batchPostponeTasks(ids, postponeDays.value)
+      const msg = res?.message || `已延期 ${postponeDays.value} 天`
+      if (res && res.skipped > 0) {
+        ElMessage.warning(msg)
+      } else {
+        ElMessage.success(msg)
+      }
     }
     showPostponeDialog.value = false
     postponeTargetTask.value = null
+    selectedTasks.value = []
     refreshPendingTasks()
 
   } catch (e: any) {
@@ -203,12 +236,28 @@ defineExpose({loadPendingTasks})
           active-text="提前查询"
           @change="loadPendingTasks"
       />
+      <div class="toolbar-actions">
+        <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
+        <el-button
+            type="primary"
+            :disabled="selectedTasks.length === 0"
+            @click="batchPostpone"
+        >批量延期</el-button>
+      </div>
     </div>
 
     <el-empty v-if="pendingTasks.length === 0" description="暂无待办" class="pending-empty"/>
 
     <div v-else>
-      <el-table :data="pendingTasks" border stripe class="mb-sm">
+      <el-table
+          :data="pendingTasks"
+          border
+          stripe
+          class="mb-sm"
+          row-key="ID"
+          @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="48" :selectable="isPostponable" reserve-selection />
         <el-table-column label="类型" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
@@ -282,7 +331,7 @@ defineExpose({loadPendingTasks})
 
     <el-dialog
         v-model="showPostponeDialog"
-        :title="`延期任务 — ${postponeTargetTask?.PlanName || ''}`"
+        :title="postponeDialogTitle"
         width="26.25rem"
     >
       <div class="postpone-content">
@@ -322,6 +371,18 @@ defineExpose({loadPendingTasks})
   display: flex;
   align-items: center;
   margin-bottom: var(--space-sm);
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+.selected-count {
+  color: var(--el-text-color-secondary);
+  font-size: 0.85rem;
 }
 
 .pending-empty {
