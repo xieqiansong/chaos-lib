@@ -8,6 +8,7 @@ import {
   pushExtCommand,
   getExtensionId,
   getBrowserHistories,
+  searchBrowserHistories,
   type ExtStatus,
   type BrowserHistoryItem,
 } from '@/utils/api'
@@ -15,6 +16,9 @@ import {
 const props = defineProps<{
   searchText?: string
 }>()
+
+// 当前搜索词（小写、去空格）；空串表示未搜索
+const search = computed(() => (props.searchText || '').trim().toLowerCase())
 
 // ── 常用书签：仿浏览器书签栏（横向展示书签栏内容，文件夹点击竖向下拉）──
 const status = ref<ExtStatus | null>(null)
@@ -24,14 +28,16 @@ const extId = ref(getExtensionId())
 // 当前在书签栏上打开下拉的文件夹 id（同一时刻仅一个）
 const openFolderId = ref<string | null>(null)
 
-// 书签栏直接子节点（含文件夹），顶栏搜索词即时筛选
-const barChildren = computed<any[]>(() => {
-  const q = (props.searchText || '').trim().toLowerCase()
-  const list = bookmarksBarChildren.value || []
-  if (!q) return list
-  return list.filter((n: any) =>
-    (n.title || '').toLowerCase().includes(q) || (n.url || '').toLowerCase().includes(q),
-  )
+// 书签栏直接子节点（含文件夹），未搜索时用于横向展示
+const barChildren = computed<any[]>(() => bookmarksBarChildren.value || [])
+
+// 搜索态：递归全树收集命中书签（标题 / URL），不限层级
+const bookmarkSearchResults = computed(() => {
+  const q = search.value
+  if (!q) return []
+  return flattenBookmarks(bookmarksBarChildren.value)
+    .filter((b: any) => (b.title || '').toLowerCase().includes(q) || (b.url || '').toLowerCase().includes(q))
+    .map((b: any) => ({id: b.id, title: b.title || b.url, url: b.url, favicon: favicon(b.url)}))
 })
 
 function hostnameOf(url: string): string {
@@ -107,9 +113,9 @@ function flattenBookmarks(nodes: any[], out: any[] = []): any[] {
 }
 
 const frequentBookmarks = computed(() => {
-  const q = (props.searchText || '').trim().toLowerCase()
+  const q = search.value
   const histMap = new Map(historyAll.value.map(h => [h.Url, h]))
-  return flattenBookmarks(bookmarksBarChildren.value)
+  let list = flattenBookmarks(bookmarksBarChildren.value)
     .map((b: any) => {
       const h = histMap.get(b.url)
       return {
@@ -121,10 +127,16 @@ const frequentBookmarks = computed(() => {
         last: h?.LastVisitTime || 0,
       }
     })
-    .filter(b => b.count > 0) // 仅保留浏览器中有访问记录的书签
-    .filter(b => !q || b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))
+  if (q) {
+    // 搜索态：匹配全部书签（含无访问记录的），结果放宽到 100 条
+    list = list.filter(b => b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))
+  } else {
+    // 常态：仅保留有访问记录的书签，取 Top 20
+    list = list.filter(b => b.count > 0)
+  }
+  return list
     .sort((a, b) => b.count - a.count || b.last - a.last) // 频率优先，其次最近访问
-    .slice(0, 20)
+    .slice(0, q ? 100 : 20)
 })
 
 async function loadFrequent() {
@@ -141,14 +153,12 @@ async function loadFrequent() {
 // ── 浏览器历史：最近 20 条（可滑动）──
 const historyLoading = ref(false)
 const histories = ref<BrowserHistoryItem[]>([])
+// 搜索态：后端按关键词返回的命中结果（不限 20 条）
+const searchHistories = ref<BrowserHistoryItem[]>([])
 
-const displayHistories = computed<BrowserHistoryItem[]>(() => {
-  const q = (props.searchText || '').trim().toLowerCase()
-  if (!q) return histories.value
-  return histories.value.filter(h =>
-    (h.Title || '').toLowerCase().includes(q) || (h.Url || '').toLowerCase().includes(q),
-  )
-})
+const displayHistories = computed<BrowserHistoryItem[]>(() =>
+  search.value ? searchHistories.value : histories.value,
+)
 
 // Chrome lastVisitTime 为「自 1601-01-01 起的微秒数」，换算为 JS 时间戳（毫秒）
 function formatHistoryTime(t: number): string {
@@ -176,14 +186,24 @@ async function loadHistory() {
   }
 }
 
+// 顶栏搜索：历史走后端关键词查询；书签/常用书签由 computed 实时递归筛选
+watch(() => props.searchText, async (v) => {
+  const q = (v || '').trim()
+  if (q) {
+    try {
+      searchHistories.value = await searchBrowserHistories(q)
+    } catch {
+      searchHistories.value = []
+    }
+  } else {
+    searchHistories.value = []
+  }
+})
+
 onMounted(() => {
   loadBookmarks()
   loadFrequent()
   loadHistory()
-})
-
-watch(() => props.searchText, () => {
-  /* 列表均用 computed 即时筛选，无需重新拉取 */
 })
 </script>
 
@@ -224,35 +244,53 @@ watch(() => props.searchText, () => {
         title="未连接扩展：请点击「直连 ID」填写正确的扩展 ID 并确保插件已加载"
     />
 
-    <!-- 书签栏：横向展示；文件夹点击在其下方竖向下拉 -->
-    <div v-loading="bookmarksLoading" class="bm-bar">
-      <el-empty v-if="!bookmarksLoading && !barChildren.length" description="暂无书签，点击「刷新」同步浏览器书签栏"/>
-      <template v-for="node in barChildren" :key="node.id">
+    <!-- 书签栏：未搜索时横向展示（文件夹点击竖向下拉）；搜索时递归全树列出命中书签 -->
+    <div v-loading="bookmarksLoading">
+      <div v-if="search" class="hist-list bm-search-list">
+        <el-empty v-if="!bookmarkSearchResults.length" description="未找到匹配的书签"/>
         <a
-            v-if="node.url"
-            class="bm-chip"
-            :href="node.url"
+            v-for="b in bookmarkSearchResults"
+            :key="b.id"
+            class="hist-item"
+            :href="b.url"
             target="_blank"
             rel="noopener"
-            :title="node.url"
+            :title="b.url"
         >
-          <img class="bm-chip-fav" :src="favicon(node.url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
-          <span class="bm-chip-label">{{ node.title || node.url }}</span>
+          <img class="hist-favicon" :src="b.favicon" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
+          <span class="hist-title">{{ b.title }}</span>
+          <span class="hist-host">{{ hostnameOf(b.url) }}</span>
         </a>
-        <div
-            v-else
-            class="bm-chip bm-chip-folder"
-            :class="{open: openFolderId === node.id}"
-            @click="toggleFolder(node.id)"
-        >
-          <el-icon class="bm-chip-fav"><Folder/></el-icon>
-          <span class="bm-chip-label">{{ node.title || '(无标题)' }}</span>
-          <span class="bm-chip-caret">▾</span>
-          <div v-if="openFolderId === node.id" class="bm-dropdown" @click.stop>
-            <BookmarkMenu :nodes="node.children || []"/>
+      </div>
+      <div v-else class="bm-bar">
+        <el-empty v-if="!barChildren.length" description="暂无书签，点击「刷新」同步浏览器书签栏"/>
+        <template v-for="node in barChildren" :key="node.id">
+          <a
+              v-if="node.url"
+              class="bm-chip"
+              :href="node.url"
+              target="_blank"
+              rel="noopener"
+              :title="node.url"
+          >
+            <img class="bm-chip-fav" :src="favicon(node.url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
+            <span class="bm-chip-label">{{ node.title || node.url }}</span>
+          </a>
+          <div
+              v-else
+              class="bm-chip bm-chip-folder"
+              :class="{open: openFolderId === node.id}"
+              @click="toggleFolder(node.id)"
+          >
+            <el-icon class="bm-chip-fav"><Folder/></el-icon>
+            <span class="bm-chip-label">{{ node.title || '(无标题)' }}</span>
+            <span class="bm-chip-caret">▾</span>
+            <div v-if="openFolderId === node.id" class="bm-dropdown" @click.stop>
+              <BookmarkMenu :nodes="node.children || []"/>
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
+      </div>
     </div>
     <!-- 下拉打开时，透明遮罩拦截外部点击以关闭 -->
     <div v-if="openFolderId" class="bm-overlay" @click="openFolderId = null"/>

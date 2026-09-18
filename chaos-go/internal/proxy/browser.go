@@ -36,8 +36,15 @@ type BrowserHistoryVisit struct {
 
 func GetBrowserHistories(c *gin.Context) {
 	var histories []BrowserHistory
-	q := config.GetDB().Order("last_visit_time DESC")
-	if limit := c.Query("limit"); limit != "" {
+	q := config.GetDB().Model(&BrowserHistory{})
+	search := c.Query("search")
+	if search != "" {
+		like := "%" + search + "%"
+		q = q.Where("title ILIKE ? OR url ILIKE ?", like, like)
+	}
+	q = q.Order("last_visit_time DESC")
+	// 仅未指定关键词时（首页「最近 20 条」场景）限制条数；搜索返回全部命中
+	if limit := c.Query("limit"); limit != "" && search == "" {
 		if n, err := strconv.Atoi(limit); err == nil && n > 0 {
 			q = q.Limit(n)
 		}

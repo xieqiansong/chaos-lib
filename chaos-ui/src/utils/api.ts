@@ -359,6 +359,11 @@ export function getBrowserHistories(limit?: number): Promise<BrowserHistoryItem[
   return sendMessage('browserHistories', 'GET', query)
 }
 
+/** 按关键词全文搜索浏览器历史（标题 / URL，不限条数）。 */
+export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
+  return sendMessage('browserHistories', 'GET', {search: q})
+}
+
 // ---- 主机名（用作浏览器标签标题） ----
 
 export interface HostnameInfo {
