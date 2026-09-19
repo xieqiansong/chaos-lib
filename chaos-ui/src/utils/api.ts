@@ -352,16 +352,17 @@ export interface BrowserHistoryItem {
   VisitCount: number
 }
 
-/** 拉取浏览器历史；limit 控制返回最近多少条（后端按 last_visit_time DESC 排序）。 */
-export function getBrowserHistories(limit?: number): Promise<BrowserHistoryItem[]> {
-  const query: Record<string, any> = {}
-  if (limit && limit > 0) query.limit = limit
-  return sendMessage('browserHistories', 'GET', query)
+/** 拉取浏览器历史；size 控制返回条数（后端按 last_visit_time DESC 排序）。
+ *  后端遵循统一分页规范，返回 { items, total, page, size }，此处仅取出 items。
+ *  无 size 时取 MaxSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
+export function getBrowserHistories(size?: number): Promise<BrowserHistoryItem[]> {
+  const query: Record<string, any> = { size: size && size > 0 ? size : 200 }
+  return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.items ?? res)
 }
 
-/** 按关键词全文搜索浏览器历史（标题 / URL，不限条数）。 */
+/** 按关键词全文搜索浏览器历史（标题 / URL）。取较大分页近似「全部命中」，避免前端搜索态截断。 */
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
-  return sendMessage('browserHistories', 'GET', {search: q})
+  return sendMessage('browserHistories', 'GET', {search: q, size: 200}).then((res: any) => res?.items ?? res)
 }
 
 // ---- 主机名（用作浏览器标签标题） ----

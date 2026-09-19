@@ -2,10 +2,10 @@ package proxy
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/pagination"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm/clause"
@@ -35,22 +35,25 @@ type BrowserHistoryVisit struct {
 // ── Handlers ──────────────────────────────────────────────────────
 
 func GetBrowserHistories(c *gin.Context) {
-	var histories []BrowserHistory
-	q := config.GetDB().Model(&BrowserHistory{})
+	q := pagination.Parse(c)
 	search := c.Query("search")
+
+	// 统一分页：page/size 由 pagination 模块解析（size 强制约束在 [1, MaxSize]）
+	base := config.GetDB().Model(&BrowserHistory{})
 	if search != "" {
 		like := "%" + search + "%"
-		q = q.Where("title ILIKE ? OR url ILIKE ?", like, like)
+		base = base.Where("title ILIKE ? OR url ILIKE ?", like, like)
 	}
-	q = q.Order("last_visit_time DESC")
-	// 仅未指定关键词时（首页「最近 20 条」场景）限制条数；搜索返回全部命中
-	if limit := c.Query("limit"); limit != "" && search == "" {
-		if n, err := strconv.Atoi(limit); err == nil && n > 0 {
-			q = q.Limit(n)
-		}
+	base = base.Order("last_visit_time DESC")
+
+	var histories []BrowserHistory
+	total, err := pagination.Paginate(base, &histories, q)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "查询失败: " + err.Error()})
+		return
 	}
-	q.Find(&histories)
-	c.JSON(200, histories)
+	// 响应统一为 { items, total, page, size }
+	c.JSON(200, pagination.New(histories, total, q))
 }
 
 func SaveBrowserHistory(c *gin.Context) {
