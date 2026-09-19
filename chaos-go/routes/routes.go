@@ -32,6 +32,10 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.POST("/browserHistories", proxy.SaveBrowserHistory)
 		api.POST("/browserHistoryVisits", proxy.SaveBrowserHistoryVisits)
 
+		// 常用书签：独立接口（书签 ∪ 历史访问次数，按访问频率排序，分页）
+		api.GET("/frequentBookmarks", proxy.GetFrequentBookmarks)
+		api.POST("/bookmarks", proxy.SaveBookmarks)
+
 		api.GET("/sdks", proxy.GetSdkVersions)
 		api.GET("/sdks/:type", proxy.GetSdkVersion)
 		api.PATCH("/sdks/:type/switch", proxy.UpdateSdkVersion)

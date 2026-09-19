@@ -365,6 +365,32 @@ export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]>
   return sendMessage('browserHistories', 'GET', {search: q, size: 200}).then((res: any) => res?.items ?? res)
 }
 
+// ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
+
+export interface FrequentBookmarkItem {
+  id: string
+  title: string
+  url: string
+  /** 关联的历史访问次数 */
+  count: number
+  /** 关联的历史最近访问时间（Chrome 微秒时间戳） */
+  last: number
+}
+
+export interface PagedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
+/** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。 */
+export function getFrequentBookmarks(page = 1, size = 20, search?: string): Promise<PagedResult<FrequentBookmarkItem>> {
+  const query: Record<string, any> = {page, size}
+  if (search) query.search = search
+  return sendMessage('frequentBookmarks', 'GET', query)
+}
+
 // ---- 主机名（用作浏览器标签标题） ----
 
 export interface HostnameInfo {

@@ -2,6 +2,7 @@
 // @ts-ignore
 import browser from "webextension-polyfill";
 import {saveBrowserHistory} from "./background/browser-history-backup";
+import {saveBookmarks} from "./background/bookmark-backup";
 import {API_BASE} from "@/utils/api";
 
 export default defineBackground(() => {
@@ -45,6 +46,11 @@ export default defineBackground(() => {
                 console.error("saveBrowserHistory (alarm) failed:", err);
             });
         }
+        if (alarm.name === 'saveBookmarks') {
+            return saveBookmarks().catch((err) => {
+                console.error("saveBookmarks (alarm) failed:", err);
+            });
+        }
     });
 
     // 启动即触发一次（兜底，真正的周期任务由下方 alarm 保证）。
@@ -55,6 +61,15 @@ export default defineBackground(() => {
     browser.alarms.create('saveBrowserHistory', {
         delayInMinutes: 0,
         periodInMinutes: 1,
+    });
+
+    // 书签变更频率远低于历史，5 分钟备份一次即可。
+    saveBookmarks().catch((err) => {
+        console.error("saveBookmarks (startup) failed:", err);
+    });
+    browser.alarms.create('saveBookmarks', {
+        delayInMinutes: 0,
+        periodInMinutes: 5,
     });
 });
 

@@ -119,6 +119,7 @@ func main() {
 		&project.Project{},
 		&proxy.BrowserHistory{},
 		&proxy.BrowserHistoryVisit{},
+		&proxy.Bookmark{},
 		&portfwd.PortForwarding{},
 		&portfwd.SshConnection{},
 		&filelink.FileLink{},

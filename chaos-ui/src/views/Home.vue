@@ -9,8 +9,10 @@ import {
   getExtensionId,
   getBrowserHistories,
   searchBrowserHistories,
+  getFrequentBookmarks,
   type ExtStatus,
   type BrowserHistoryItem,
+  type FrequentBookmarkItem,
 } from '@/utils/api'
 
 const props = defineProps<{
@@ -90,52 +92,17 @@ function toggleFolder(id: string) {
   openFolderId.value = openFolderId.value === id ? null : id
 }
 
-// ── 常用书签：全部书签按浏览器访问频率排序（数据来自扩展备份的 history.VisitCount），受顶部搜索影响 ──
+// ── 常用书签：独立接口（书签 ∪ 历史访问次数，按访问频率降序），分页默认前 20 条，受顶部搜索影响 ──
 const frequentLoading = ref(false)
-const historyAll = ref<BrowserHistoryItem[]>([])
+const frequentBookmarks = ref<FrequentBookmarkItem[]>([])
 
-// 深度优先收集书签树中的全部书签节点（含各层文件夹内）
-function flattenBookmarks(nodes: any[], out: any[] = []): any[] {
-  for (const n of nodes || []) {
-    if (n.url) out.push(n)
-    if (n.children) flattenBookmarks(n.children, out)
-  }
-  return out
-}
-
-const frequentBookmarks = computed(() => {
-  const q = search.value
-  const histMap = new Map(historyAll.value.map(h => [h.Url, h]))
-  let list = flattenBookmarks(bookmarksBarChildren.value)
-    .map((b: any) => {
-      const h = histMap.get(b.url)
-      return {
-        id: b.id,
-        title: b.title || b.url,
-        url: b.url,
-        favicon: favicon(b.url),
-        count: h?.VisitCount || 0,
-        last: h?.LastVisitTime || 0,
-      }
-    })
-  if (q) {
-    // 搜索态：匹配全部书签（含无访问记录的），结果放宽到 100 条
-    list = list.filter(b => b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))
-  } else {
-    // 常态：仅保留有访问记录的书签，取 Top 20
-    list = list.filter(b => b.count > 0)
-  }
-  return list
-    .sort((a, b) => b.count - a.count || b.last - a.last) // 频率优先，其次最近访问
-    .slice(0, q ? 100 : 20)
-})
-
-async function loadFrequent() {
+async function loadFrequent(search?: string) {
   frequentLoading.value = true
   try {
-    historyAll.value = await getBrowserHistories()
+    const res = await getFrequentBookmarks(1, 20, search || undefined)
+    frequentBookmarks.value = res?.items ?? []
   } catch {
-    historyAll.value = []
+    frequentBookmarks.value = []
   } finally {
     frequentLoading.value = false
   }
@@ -190,8 +157,10 @@ watch(() => props.searchText, (v) => {
       } catch {
         searchHistories.value = []
       }
+      await loadFrequent(q)
     } else {
       searchHistories.value = []
+      await loadFrequent()
     }
   }, 200)
 })
@@ -279,7 +248,7 @@ onMounted(() => {
       <div class="panel-col">
         <div class="section-toolbar">
           <span class="text-primary text-base section-title">常用书签</span>
-          <span class="section-subtitle">按访问频率 · 最近 20 条</span>
+          <span class="section-subtitle">按访问频率 · 前 20 条</span>
           <div class="section-actions">
             <el-button size="small" type="primary" :icon="Refresh" :loading="frequentLoading" @click="loadFrequent">
               刷新
@@ -298,7 +267,7 @@ onMounted(() => {
               rel="noopener"
               :title="b.url"
           >
-            <img class="hist-favicon" :src="b.favicon" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
+            <img class="hist-favicon" :src="favicon(b.url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
             <span class="hist-title">{{ b.title }}</span>
             <span class="hist-host">{{ hostnameOf(b.url) }}</span>
             <span class="hist-count">{{ b.count }} 次</span>
