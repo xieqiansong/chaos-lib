@@ -387,7 +387,7 @@ export interface PagedResult<T> {
 /** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。 */
 export function getFrequentBookmarks(page = 1, size = 20, search?: string): Promise<PagedResult<FrequentBookmarkItem>> {
   const query: Record<string, any> = {page, size}
-  if (search) query.search = search
+  if (search && search instanceof String) query.search = search
   return sendMessage('frequentBookmarks', 'GET', query)
 }
 
