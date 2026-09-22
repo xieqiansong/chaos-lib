@@ -84,7 +84,7 @@ export function getSdkVersions(): Promise<Record<string, SdkInfo>> {
 }
 
 export function updateSdkVersion(type: string, version: string): Promise<any> {
-    return sendMessage(`sdks/${type}/switch`, 'PATCH', { version })
+    return sendMessage(`sdks/${type}/switch`, 'PATCH', {version})
 }
 
 // ---- SDK 类型 / 来源管理 (defs) ----
@@ -263,7 +263,7 @@ export function getMqttMessages(): Promise<MqttMessage[]> {
 }
 
 export function sendMqttMessage(payload: string, channel?: string): Promise<MqttMessage> {
-    return sendMessage('mqttSync/messages', 'POST', { payload, channel })
+    return sendMessage('mqttSync/messages', 'POST', {payload, channel})
 }
 
 export function deleteMqttMessagesByChannel(channel: string): Promise<{ channel: string; deleted: number }> {
@@ -334,61 +334,63 @@ export function getTableDetail(name: string): Promise<TableDetail> {
 // ---- 待办任务 ----
 
 export function postponeTask(id: number, days: number): Promise<any> {
-    return sendMessage(`tasks/${id}/postpone`, 'PATCH', { days })
+    return sendMessage(`tasks/${id}/postpone`, 'PATCH', {days})
 }
 
 export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
-    return sendMessage('tasks/batch-postpone', 'POST', { ids, days })
+    return sendMessage('tasks/batch-postpone', 'POST', {ids, days})
 }
 
 // ---- 浏览器历史（由扩展周期性备份到 DB）----
 
 export interface BrowserHistoryItem {
-  ID: string
-  LastVisitTime: number
-  Title: string
-  TypeCount: number
-  Url: string
-  VisitCount: number
+    ID: string
+    LastVisitTime: number
+    Title: string
+    TypeCount: number
+    Url: string
+    VisitCount: number
 }
 
 /** 拉取浏览器历史；size 控制返回条数（后端按 last_visit_time DESC 排序）。
  *  后端遵循统一分页规范，返回 { items, total, page, size }，此处仅取出 items。
  *  无 size 时取 MaxSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
 export function getBrowserHistories(size?: number): Promise<BrowserHistoryItem[]> {
-  const query: Record<string, any> = { size: size && size > 0 ? size : 200 }
-  return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.items ?? res)
+    const query: Record<string, any> = {size: size && size > 0 ? size : 200}
+    return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.items ?? res)
 }
 
 /** 按关键词全文搜索浏览器历史（标题 / URL）。取较大分页近似「全部命中」，避免前端搜索态截断。 */
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
-  return sendMessage('browserHistories', 'GET', {search: q, size: 200}).then((res: any) => res?.items ?? res)
+    return sendMessage('browserHistories', 'GET', {search: q, size: 200}).then((res: any) => res?.items ?? res)
 }
 
 // ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
 
 export interface FrequentBookmarkItem {
-  id: string
-  title: string
-  url: string
-  /** 关联的历史访问次数 */
-  count: number
-  /** 关联的历史最近访问时间（Chrome 微秒时间戳） */
-  last: number
+    id: string
+    title: string
+    url: string
+    /** 关联的历史访问次数 */
+    count: number
+    /** 关联的历史最近访问时间（Chrome 微秒时间戳） */
+    last: number
 }
 
 export interface PagedResult<T> {
-  items: T[]
-  total: number
-  page: number
-  size: number
+    items: T[]
+    total: number
+    page: number
+    size: number
 }
 
 /** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。 */
-export function getFrequentBookmarks(page = 1, size = 20, search?: string): Promise<PagedResult<FrequentBookmarkItem>> {
-  const query: Record<string, any> = {page, size}
-  if (search && search instanceof String) query.search = search
-  return sendMessage('frequentBookmarks', 'GET', query)
+export function getFrequentBookmarks(page = 1, size = 20, search?: any): Promise<PagedResult<FrequentBookmarkItem>> {
+    const query: Record<string, any> = {page, size}
+    if (search && typeof search === "string") {
+        query.search = search
+    }
+    return sendMessage('frequentBookmarks', 'GET', query)
 }
 
 // ---- 主机名（用作浏览器标签标题） ----
@@ -416,6 +418,7 @@ export interface ExtCommand {
     url?: string
     text?: string
     id?: string
+
     [key: string]: any
 }
 

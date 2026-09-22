@@ -128,11 +128,6 @@ function formatHistoryTime(t: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function faviconOf(url: string): string {
-  const host = hostnameOf(url)
-  return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=32` : ''
-}
-
 async function loadHistory() {
   historyLoading.value = true
   try {
@@ -152,6 +147,7 @@ watch(() => props.searchText, (v) => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(async () => {
     if (q) {
+      loadFrequent(q)
       try {
         searchHistories.value = await searchBrowserHistories(q)
       } catch {
@@ -299,7 +295,7 @@ onMounted(() => {
               rel="noopener"
               :title="h.Url"
           >
-            <img class="hist-favicon" :src="faviconOf(h.Url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
+            <img class="hist-favicon" :src="favicon(h.Url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
             <span class="hist-title">{{ h.Title || h.Url }}</span>
             <span class="hist-host">{{ hostnameOf(h.Url) }}</span>
             <span class="hist-time">{{ formatHistoryTime(h.LastVisitTime) }}</span>
