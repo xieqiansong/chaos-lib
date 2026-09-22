@@ -95,7 +95,6 @@ onMounted(() => {
         </div>
       </el-col>
     </el-row>
-
     <el-row :gutter="8" class="mb-sm">
       <el-col :span="12">
         <div class="chart-section">

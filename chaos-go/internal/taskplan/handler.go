@@ -936,7 +936,14 @@ func CompleteTask(c *gin.Context) {
 func GetTaskDailyStats(c *gin.Context) {
 	db := config.GetDB()
 	now := time.Now()
-	cutoff := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, -29)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+
+	days, err := parseDaysParam(c, 29)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cutoff := today.AddDate(0, 0, -days)
 
 	type Row struct {
 		CompletedAt time.Time
@@ -960,9 +967,9 @@ func GetTaskDailyStats(c *gin.Context) {
 		rowMap[key]++
 	}
 
-	result := make([]map[string]interface{}, 0, 30)
-	for i := 29; i >= 0; i-- {
-		d := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local).AddDate(0, 0, -i)
+	result := make([]map[string]interface{}, 0, days+1)
+	for i := days; i >= 0; i-- {
+		d := today.AddDate(0, 0, -i)
 		dateStr := d.Format("2006-01-02")
 		count := 0
 		if v, ok := rowMap[dateStr]; ok {
@@ -977,11 +984,29 @@ func GetTaskDailyStats(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// parseDaysParam 解析前端传入的 days（正整数），缺省时回退到默认值。
+func parseDaysParam(c *gin.Context, def int) (int, error) {
+	v := c.Query("days")
+	if v == "" {
+		return def, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return def, fmt.Errorf("参数 days 必须为正整数")
+	}
+	return n, nil
+}
+
 func GetTaskActiveStats(c *gin.Context) {
 	db := config.GetDB()
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
-	cutoff := today.AddDate(0, 0, -6)
+
+	start, end, err := parseRange(c, today)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	type Row struct {
 		StartedAt time.Time
@@ -990,8 +1015,8 @@ func GetTaskActiveStats(c *gin.Context) {
 	if err := db.Table("tasks").
 		Select("started_at").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
-		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ?",
-			TaskStatusActive, false, cutoff).
+		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ? AND tasks.started_at < ?",
+			TaskStatusActive, false, start, end.AddDate(0, 0, 1)).
 		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
@@ -1006,8 +1031,7 @@ func GetTaskActiveStats(c *gin.Context) {
 	}
 
 	result := make([]map[string]interface{}, 0, 30)
-	for i := -6; i <= 24; i++ {
-		d := today.AddDate(0, 0, i)
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
 		dateStr := d.Format("2006-01-02")
 		count := 0
 		if v, ok := rowMap[dateStr]; ok {
@@ -1020,6 +1044,38 @@ func GetTaskActiveStats(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+// parseRange 解析前端传入的 start/end（YYYY-MM-DD），缺省时回退到默认范围
+// （今天-6 天到今天+24 天），保持改动前的展示效果。
+func parseRange(c *gin.Context, today time.Time) (start, end time.Time, err error) {
+	defaultStart := today.AddDate(0, 0, -6)
+	defaultEnd := today.AddDate(0, 0, 24)
+
+	start, err = parseDateParam(c, "start", defaultStart)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	end, err = parseDateParam(c, "end", defaultEnd)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if end.Before(start) {
+		return time.Time{}, time.Time{}, fmt.Errorf("结束日期不能早于开始日期")
+	}
+	return start, end, nil
+}
+
+func parseDateParam(c *gin.Context, name string, def time.Time) (time.Time, error) {
+	v := c.Query(name)
+	if v == "" {
+		return def, nil
+	}
+	t, err := time.ParseInLocation("2006-01-02", v, time.Local)
+	if err != nil {
+		return def, fmt.Errorf("参数 %s 格式应为 YYYY-MM-DD", name)
+	}
+	return t, nil
 }
 
 // buildContributionSeries 按天补齐 [start, today] 区间，生成单个统计项的贡献序列。

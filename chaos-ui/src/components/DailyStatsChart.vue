@@ -3,7 +3,7 @@ import {onMounted, ref, watch} from 'vue'
 import {format} from 'date-fns'
 import VChart from 'vue-echarts'
 import '../plugins/echarts'
-import {theme} from '../theme'
+import {theme} from '@/theme'
 import {
   MAX_VISUAL,
   capTooltip,
@@ -16,9 +16,12 @@ import {
 // 近一年每日完成任务数的折线图（带面积渐变）
 const chartOption = ref({})
 
+// 查询天数，默认 44（即今天往前共 45 天）
+const days = 44
+
 async function fetchStats() {
   try {
-    const res = await fetch('/api/tasks/dailyStats')
+    const res = await fetch(`/api/tasks/dailyStats?days=${days}`)
     const data: { date: string; count: number }[] = await res.json()
     const capped: CappedItem[] = capValues(data.map(d => d.count))
     const colors = themeColors()

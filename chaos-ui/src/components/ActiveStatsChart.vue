@@ -1,24 +1,21 @@
 <script setup lang="ts">
 import {onMounted, ref, watch} from 'vue'
-import {format} from 'date-fns'
+import {addDays, format, subDays} from 'date-fns'
 import VChart from 'vue-echarts'
 import '../plugins/echarts'
-import {theme} from '../theme'
-import {
-  MAX_VISUAL,
-  capTooltip,
-  capValues,
-  capYAxis,
-  themeColors,
-  type CappedItem,
-} from './chartHelpers'
+import {theme} from '@/theme'
+import {type CappedItem, capTooltip, capValues, capYAxis, MAX_VISUAL, themeColors,} from './chartHelpers'
 
-// 近一年每日待办任务数的直方图：过期（早于今天）标红，未过期标琥珀
+// 每日待办任务数的直方图：过期（早于今天）标红，未过期标琥珀
 const chartOption = ref({})
+
+const startDate = ref(format(subDays(new Date(), 6), 'yyyy-MM-dd'))
+const endDate = ref(format(addDays(new Date(), 39), 'yyyy-MM-dd'))
 
 async function fetchStats() {
   try {
-    const res = await fetch('/api/tasks/activeStats')
+    const params = new URLSearchParams({start: startDate.value, end: endDate.value})
+    const res = await fetch(`/api/tasks/activeStats?${params.toString()}`)
     const data: { date: string; count: number }[] = await res.json()
 
     const today = new Date().toISOString().slice(0, 10)
@@ -70,6 +67,8 @@ async function fetchStats() {
 
 onMounted(fetchStats)
 
+// 起止日期变化时重新拉取
+watch([startDate, endDate], fetchStats)
 // 主题切换时重新拉取，使图表随主题取色
 watch(theme, fetchStats)
 </script>
