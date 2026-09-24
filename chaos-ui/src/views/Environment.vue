@@ -22,6 +22,8 @@ const loading = ref(false)
 const activeTab = ref<'system' | 'user'>('user')
 
 const filteredVariables = computed(() => {
+  // 关闭编辑 否则切换tab时会编辑框不会关闭
+  editingKey.value = ''
   const section = activeTab.value === 'system' ? data.value?.System : data.value?.User
   if (!section) return []
   const q = props.searchText.trim().toLowerCase()
@@ -257,78 +259,78 @@ onMounted(() => {
         </el-tabs>
 
         <el-table :data="filteredVariables" size="small" stripe height="100%" class="env-table">
-        <el-table-column prop="0" label="变量名" min-width="120" sortable>
-          <template #default="{ row }">
-            <code>{{ row[0] }}</code>
-          </template>
-        </el-table-column>
-        <el-table-column prop="1" label="值" min-width="300" sortable>
-          <template #default="{ row }">
-            <template v-if="editingKey === row[0]">
-              <div class="edit-container">
-                <div class="edit-mode-toggle">
-                  <el-radio-group v-model="editMode" size="small" @change="onEditModeChange">
-                    <el-radio-button value="text">文本</el-radio-button>
-                    <el-radio-button value="array">数组</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <template v-if="editMode === 'text'">
-                  <el-input
-                      v-model="editValue"
-                      type="textarea"
-                      :rows="4"
-                      :autosize="{ minRows: 4, maxRows: 12 }"
-                  />
-                </template>
-                <template v-else>
-                  <div class="array-editor">
-                    <div
-                        v-for="(item, idx) in editArrayItems"
-                        :key="idx"
-                        class="array-item-row"
-                        :class="{ 'array-item-dragging': draggingArrayIndex === idx }"
-                        draggable="true"
-                        @dragstart="onArrayDragStart(idx, $event)"
-                        @dragover="onArrayDragOver($event)"
-                        @drop="onArrayDrop(idx)"
-                        @dragend="onArrayDragEnd"
-                    >
+          <el-table-column prop="0" label="变量名" min-width="120" sortable>
+            <template #default="{ row }">
+              <code>{{ row[0] }}</code>
+            </template>
+          </el-table-column>
+          <el-table-column prop="1" label="值" min-width="300" sortable>
+            <template #default="{ row }">
+              <template v-if="editingKey === row[0]">
+                <div class="edit-container">
+                  <div class="edit-mode-toggle">
+                    <el-radio-group v-model="editMode" size="small" @change="onEditModeChange">
+                      <el-radio-button value="text">文本</el-radio-button>
+                      <el-radio-button value="array">数组</el-radio-button>
+                    </el-radio-group>
+                  </div>
+                  <template v-if="editMode === 'text'">
+                    <el-input
+                        v-model="editValue"
+                        type="textarea"
+                        :rows="4"
+                        :autosize="{ minRows: 4, maxRows: 12 }"
+                    />
+                  </template>
+                  <template v-else>
+                    <div class="array-editor">
+                      <div
+                          v-for="(item, idx) in editArrayItems"
+                          :key="idx"
+                          class="array-item-row"
+                          :class="{ 'array-item-dragging': draggingArrayIndex === idx }"
+                          draggable="true"
+                          @dragstart="onArrayDragStart(idx, $event)"
+                          @dragover="onArrayDragOver($event)"
+                          @drop="onArrayDrop(idx)"
+                          @dragend="onArrayDragEnd"
+                      >
                       <span class="array-drag-handle">
                         <el-icon><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5"
                                                                                                                                             r="1.5"/><circle
                             cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19"
                                                                                                                              r="1.5"/></svg></el-icon>
                       </span>
-                      <el-input v-model="editArrayItems[idx]" size="small"/>
-                      <el-button size="small" type="danger" @click="removeArrayItem(idx)" circle text>
-                        <el-icon>
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                          </svg>
-                        </el-icon>
-                      </el-button>
+                        <el-input v-model="editArrayItems[idx]" size="small"/>
+                        <el-button size="small" type="danger" @click="removeArrayItem(idx)" circle text>
+                          <el-icon>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                          </el-icon>
+                        </el-button>
+                      </div>
+                      <el-button size="small" @click="addArrayItem" class="array-add-btn">+ 添加条目</el-button>
                     </div>
-                    <el-button size="small" @click="addArrayItem" class="array-add-btn">+ 添加条目</el-button>
+                  </template>
+                  <div class="edit-actions">
+                    <el-button size="small" type="primary" @click="saveEdit" :loading="editSaving">保存</el-button>
+                    <el-button size="small" @click="cancelEdit">取消</el-button>
                   </div>
-                </template>
-                <div class="edit-actions">
-                  <el-button size="small" type="primary" @click="saveEdit" :loading="editSaving">保存</el-button>
-                  <el-button size="small" @click="cancelEdit">取消</el-button>
                 </div>
+              </template>
+              <span v-else class="env-value">{{ row[1] }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="140" fixed="right">
+            <template #default="{ row }">
+              <div class="op-actions">
+                <el-button size="small" @click="startEdit(row[0], row[1])" text>编辑</el-button>
+                <el-button size="small" type="danger" @click="deleteVar(row[0])" text>删除</el-button>
               </div>
             </template>
-            <span v-else class="env-value">{{ row[1] }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <div class="op-actions">
-              <el-button size="small" @click="startEdit(row[0], row[1])" text>编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteVar(row[0])" text>删除</el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+          </el-table-column>
+        </el-table>
       </div>
     </template>
 
