@@ -3,6 +3,7 @@ import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {sendMessage, batchPostponeTasks} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format} from 'date-fns'
+import {CircleClose} from '@element-plus/icons-vue'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {openCenterPanel} from '@/utils/centerPanel'
 
@@ -25,13 +26,71 @@ interface PendingTask {
 }
 
 const pendingTasks = ref<PendingTask[]>([])
-const earlyMode = ref(false)
+const earlyMode = ref(true)
 const selectedTasks = ref<PendingTask[]>([])
 
 // 服务端分页：配合后端 tasks/pending 的 { items, total, page, size } 响应
 const page = ref(1)
 const size = ref(10)
 const total = ref(0)
+
+// 任务计划筛选：点击展开计划树（最多两层），选中后按该计划及其子孙计划过滤
+interface PlanTreeNode {
+  value: number
+  label: string
+  children?: PlanTreeNode[]
+}
+
+const planTree = ref<PlanTreeNode[]>([])
+const filterPlanId = ref<number | null>(null)
+const filterPlanLabel = ref('')
+const planPopoverVisible = ref(false)
+
+/** 裁剪为两层：根计划 + 其直接子计划（更深层级由后端在筛选时一并包含） */
+function toPlanTreeOptions(nodes: any[]): PlanTreeNode[] {
+  return (nodes || []).map(node => {
+    const children: PlanTreeNode[] = (node.Children || []).map((child: any) => ({
+      value: child.ID,
+      label: child.Name,
+    }))
+    return children.length > 0
+        ? {value: node.ID, label: node.Name, children}
+        : {value: node.ID, label: node.Name}
+  })
+}
+
+async function loadPlanTree() {
+  try {
+    const result = await sendMessage('taskPlans/tree', 'GET')
+    if (Array.isArray(result)) {
+      planTree.value = toPlanTreeOptions(result)
+    }
+  } catch (e) {
+    // 计划树加载失败不阻塞待办列表，仅退化为「无法按计划筛选」
+    console.error(e)
+  }
+}
+
+function handlePlanFilterChange() {
+  // 切换筛选后数据集合变化，回到第 1 页避免落到空页
+  page.value = 1
+  loadPendingTasks()
+}
+
+// 点击计划树节点（含第一层根计划）：选中并关闭面板
+function onPlanNodeClick(node: PlanTreeNode) {
+  filterPlanId.value = node.value
+  filterPlanLabel.value = node.label
+  planPopoverVisible.value = false
+  handlePlanFilterChange()
+}
+
+// 清空筛选：恢复全量待办
+function clearPlanFilter() {
+  filterPlanId.value = null
+  filterPlanLabel.value = ''
+  handlePlanFilterChange()
+}
 
 function handlePageChange(p: number) {
   page.value = p
@@ -104,7 +163,8 @@ function openLink(link: string) {
 
 async function loadPendingTasks() {
   try {
-    const url = `tasks/pending?early=${earlyMode.value ? 1 : 0}&page=${page.value}&size=${size.value}`
+    const planParam = filterPlanId.value ? `&planId=${filterPlanId.value}` : ''
+    const url = `tasks/pending?early=${earlyMode.value ? 1 : 0}&page=${page.value}&size=${size.value}${planParam}`
     const result = await sendMessage(url, 'GET')
     if (result && Array.isArray(result.items)) {
       pendingTasks.value = result.items
@@ -238,6 +298,7 @@ let pendingTimer: ReturnType<typeof setInterval>
 let stopVersionWatch: () => void
 
 onMounted(() => {
+  loadPlanTree()
   loadPendingTasks()
   pendingTimer = setInterval(() => {
     loadPendingTasks()
@@ -264,6 +325,41 @@ defineExpose({loadPendingTasks})
           active-text="提前查询"
           @change="handleEarlyModeChange"
       />
+      <el-popover
+          v-model:visible="planPopoverVisible"
+          placement="bottom-start"
+          :width="260"
+          trigger="click"
+      >
+        <template #reference>
+          <el-input
+              :model-value="filterPlanLabel"
+              readonly
+              class="plan-filter"
+              placeholder="按任务计划筛选"
+          >
+            <!-- readonly 输入框不展示 el-input 自带的 clearable 图标，此处自绘清除按钮 -->
+            <template #suffix>
+              <el-icon
+                  v-if="filterPlanId"
+                  class="plan-filter-clear"
+                  title="清除筛选"
+                  @click.stop.prevent="clearPlanFilter"
+              >
+                <CircleClose/>
+              </el-icon>
+            </template>
+          </el-input>
+        </template>
+        <el-tree
+            :data="planTree"
+            node-key="value"
+            :current-node-key="filterPlanId ?? undefined"
+            :expand-on-click-node="false"
+            highlight-current
+            @node-click="onPlanNodeClick"
+        />
+      </el-popover>
       <div class="toolbar-actions">
         <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
         <el-button
@@ -274,7 +370,11 @@ defineExpose({loadPendingTasks})
       </div>
     </div>
 
-    <el-empty v-if="pendingTasks.length === 0" description="暂无待办" class="pending-empty"/>
+    <el-empty
+        v-if="pendingTasks.length === 0"
+        :description="filterPlanId ? '该计划下暂无待办' : '暂无待办'"
+        class="pending-empty"
+    />
 
     <div v-else>
       <el-table
@@ -411,6 +511,20 @@ defineExpose({loadPendingTasks})
   display: flex;
   align-items: center;
   margin-bottom: var(--space-sm);
+}
+
+.plan-filter {
+  width: 14rem;
+  margin-left: var(--space-sm);
+}
+
+.plan-filter-clear {
+  cursor: pointer;
+  color: var(--el-text-color-placeholder);
+}
+
+.plan-filter-clear:hover {
+  color: var(--el-text-color-secondary);
 }
 
 .toolbar-actions {

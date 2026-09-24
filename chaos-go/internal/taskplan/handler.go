@@ -797,6 +797,21 @@ func GetPendingTasks(c *gin.Context) {
 		base = base.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)
 	}
 
+	// 可选：按任务计划筛选（含该计划的全部子孙计划）
+	if raw := strings.TrimSpace(c.Query("planId")); raw != "" {
+		planID, err := strconv.Atoi(raw)
+		if err != nil || planID <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的计划ID"})
+			return
+		}
+		planIDs, err := collectPlanWithDescendants(planID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子计划失败: " + err.Error()})
+			return
+		}
+		base = base.Where("tasks.plan_id IN ?", planIDs)
+	}
+
 	q := pagination.Parse(c)
 
 	var total int64
