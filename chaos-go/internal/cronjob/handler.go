@@ -284,10 +284,10 @@ func PreviewCron(c *gin.Context) {
 	}
 	runs, err := NextRuns(req.CronExpr, req.Count)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error(), "NextRuns": []time.Time{}})
+		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error(), "nextRuns": []time.Time{}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"valid": true, "NextRuns": runs})
+	c.JSON(http.StatusOK, gin.H{"valid": true, "nextRuns": runs})
 }
 
 // SeedDefaults 在库内无任何定时任务时，写入由原系统内置周期任务转换而来的默认任务，
@@ -306,7 +306,7 @@ func SeedDefaults() {
 		{Name: "任务计划扫描", CronExpr: "*/1 * * * *", ActionType: ActionTypeHTTP, ActionConfig: mustJSON(HTTPAction{Method: http.MethodPost, URL: "/api/systemJobs/sweep"}), Enabled: true, TimeoutSec: 30},
 		{Name: "端口转发自愈", CronExpr: "*/5 * * * *", ActionType: ActionTypeHTTP, ActionConfig: mustJSON(HTTPAction{Method: http.MethodPost, URL: "/api/systemJobs/portForwardSelfHeal"}), Enabled: true, TimeoutSec: 60},
 		{Name: "STUN 规则同步", CronExpr: "*/1 * * * *", ActionType: ActionTypeHTTP, ActionConfig: mustJSON(HTTPAction{Method: http.MethodPost, URL: "/api/systemJobs/stunRuleSync"}), Enabled: true, TimeoutSec: 30},
-		{Name: "STUN 端口转发同步", CronExpr: "*/1 * * * *", ActionType: ActionTypeHTTP, ActionConfig: mustJSON(HTTPAction{Method: http.MethodPost, URL: "/api/systemJobs/stunPortForwardSync"}), Enabled: true, TimeoutSec: 30},
+		{Name: "STUN 端口转发同步", CronExpr: "*/30 * * * * *", ActionType: ActionTypeHTTP, ActionConfig: mustJSON(HTTPAction{Method: http.MethodPost, URL: "/api/systemJobs/stunPortForwardSync"}), Enabled: true, TimeoutSec: 30},
 	}
 	if err := db.Create(&defaults).Error; err != nil {
 		slog.Error("写入默认定时任务失败", "err", err)

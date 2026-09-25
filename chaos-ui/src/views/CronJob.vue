@@ -173,12 +173,14 @@ function buildActionConfig(): string {
       workDir: formData.value.WorkDir,
     })
   }
-  return JSON.stringify({
+  const cfg: Record<string, unknown> = {
     method: formData.value.Method || 'POST',
     url: formData.value.URL,
-    headers: parseHeaders(formData.value.Headers),
-    body: formData.value.Body,
-  })
+  }
+  const headers = parseHeaders(formData.value.Headers)
+  if (Object.keys(headers).length > 0) cfg.headers = headers
+  if (formData.value.Body && formData.value.Body.trim() !== '') cfg.body = formData.value.Body
+  return JSON.stringify(cfg)
 }
 
 async function runPreview() {
@@ -330,8 +332,8 @@ onMounted(fetchJobs)
     </div>
 
     <el-table :data="jobs" v-loading="loading" border stripe class="task-table">
-      <el-table-column label="名称" width="140" prop="Name"/>
-      <el-table-column label="Cron 表达式" width="140" prop="CronExpr"/>
+      <el-table-column label="名称" width="160" prop="Name"/>
+      <el-table-column label="Cron 表达式" width="160" prop="CronExpr"/>
       <el-table-column label="动作" min-width="140">
         <template #default="{ row }">
           <el-tag size="small" :type="actionTypeMap[row.ActionType]?.type || 'info'">
@@ -345,23 +347,21 @@ onMounted(fetchJobs)
           <el-switch :model-value="row.Enabled" @change="toggleJob(row)"/>
         </template>
       </el-table-column>
-      <el-table-column label="上次运行" width="200">
-        <template #default="{ row }">{{ fmtTime(row.LastRunAt) }}</template>
-      </el-table-column>
-      <el-table-column label="上次状态" width="100">
+      <el-table-column label="运行状态" width="240">
         <template #default="{ row }">
-          <el-tag size="small" :type="statusMap[row.LastStatus]?.type || 'info'">
-            {{ statusMap[row.LastStatus]?.text || '—' }}
-          </el-tag>
+          <div>
+            <span>{{ fmtTime(row.LastRunAt) }}</span>
+            <el-tag size="small" class="ml-sm" :type="statusMap[row.LastStatus]?.type || 'info'">
+              {{ statusMap[row.LastStatus]?.text || '—' }}
+            </el-tag>
+          </div>
+          <div class="mt-xs">
+            <span v-if="row.Enabled" class="text-secondary">{{ fmtTime(row.NextRun) }}</span>
+            <span v-else class="text-secondary">已停用</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="下次执行" width="200">
-        <template #default="{ row }">
-          <span v-if="row.Enabled">{{ fmtTime(row.NextRun) }}</span>
-          <span v-else class="text-secondary">已停用</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <div class="op-actions">
             <el-button size="small" type="primary" text @click="runJob(row)">运行</el-button>
@@ -373,30 +373,31 @@ onMounted(fetchJobs)
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showDialog" :title="editingId ? '编辑定时任务' : '新建定时任务'" width="34rem">
+    <el-dialog v-model="showDialog" :title="editingId ? '编辑定时任务' : '新建定时任务'" width="48rem">
       <el-form label-position="top">
-        <el-form-item label="任务名称">
-          <el-input v-model="formData.Name" placeholder="请输入任务名称"/>
-        </el-form-item>
+        <div class="form-row">
+          <el-form-item label="任务名称">
+            <el-input v-model="formData.Name" placeholder="请输入任务名称"/>
+          </el-form-item>
+          <el-form-item label="动作类型">
+            <el-select v-model="formData.ActionType">
+              <el-option label="HTTP 请求 / Webhook" value="http"/>
+              <el-option label="执行命令 / 脚本（预留）" value="shell"/>
+            </el-select>
+          </el-form-item>
+        </div>
         <el-form-item label="Cron 表达式">
-          <el-input v-model="formData.CronExpr" placeholder="如: */5 * * * * (每5分钟)"/>
+          <el-input v-model="formData.CronExpr" placeholder="5字段(分 时 日 月 周)如 */5 * * * *；6字段含秒(秒 分 时 日 月 周)如 */30 * * * * * (每30秒)"/>
           <div class="cron-preview mt-xs">
             <span v-if="!formData.CronExpr.trim()" class="text-secondary text-xs">输入表达式后实时校验并预览下次执行时间</span>
             <template v-else>
               <span v-if="previewValid" class="text-success text-xs">✓ 表达式有效</span>
               <span v-else class="text-danger text-xs">✗ {{ previewError }}</span>
               <div v-if="previewValid && previewRuns.length" class="text-xs text-secondary mt-xs">
-                未来 5 次：<br/>
-                <div v-for="(r, i) in previewRuns" :key="i">{{ i + 1 }}. {{ r }}</div>
+                未来 5 次：{{ previewRuns.join(' · ') }}
               </div>
             </template>
           </div>
-        </el-form-item>
-        <el-form-item label="动作类型">
-          <el-select v-model="formData.ActionType">
-            <el-option label="HTTP 请求 / Webhook" value="http"/>
-            <el-option label="执行命令 / 脚本（预留）" value="shell"/>
-          </el-select>
         </el-form-item>
 
         <el-alert v-if="formData.ActionType === 'shell'" type="warning" :closable="false" show-icon
@@ -416,30 +417,36 @@ onMounted(fetchJobs)
             <el-form-item label="超时(秒)">
               <el-input-number v-model="formData.TimeoutSec" :min="1" :max="600" controls-position="right" style="width: 100%"/>
             </el-form-item>
+            <el-form-item label="启用" class="form-item-narrow">
+              <el-switch v-model="formData.Enabled"/>
+            </el-form-item>
           </div>
           <el-form-item label="URL（以 / 开头表示调用本机同名接口）">
             <el-input v-model="formData.URL" placeholder="https://example.com/hook 或 /api/systemJobs/sweep"/>
           </el-form-item>
-          <el-form-item label="请求头（JSON 或每行 Key: Value）">
-            <el-input v-model="formData.Headers" type="textarea" :rows="3" placeholder='{"Authorization":"Bearer x"}'/>
-          </el-form-item>
-          <el-form-item label="请求体">
-            <el-input v-model="formData.Body" type="textarea" :rows="3" placeholder="可选"/>
-          </el-form-item>
+          <div class="form-row">
+            <el-form-item label="请求头（JSON 或每行 Key: Value）">
+              <el-input v-model="formData.Headers" type="textarea" :rows="2" placeholder='{"Authorization":"Bearer x"}'/>
+            </el-form-item>
+            <el-form-item label="请求体">
+              <el-input v-model="formData.Body" type="textarea" :rows="2" placeholder="可选"/>
+            </el-form-item>
+          </div>
         </template>
 
         <template v-else>
-          <el-form-item label="命令">
-            <el-input v-model="formData.Command" placeholder="如: echo hello 或 C:\\scripts\\backup.bat"/>
-          </el-form-item>
-          <el-form-item label="工作目录（可选）">
-            <el-input v-model="formData.WorkDir" placeholder="可选"/>
-          </el-form-item>
+          <div class="form-row">
+            <el-form-item label="命令">
+              <el-input v-model="formData.Command" placeholder="如: echo hello 或 C:\\scripts\\backup.bat"/>
+            </el-form-item>
+            <el-form-item label="工作目录（可选）">
+              <el-input v-model="formData.WorkDir" placeholder="可选"/>
+            </el-form-item>
+            <el-form-item label="启用" class="form-item-narrow">
+              <el-switch v-model="formData.Enabled"/>
+            </el-form-item>
+          </div>
         </template>
-
-        <el-form-item label="启用">
-          <el-switch v-model="formData.Enabled"/>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showDialog = false">取消</el-button>
@@ -483,6 +490,10 @@ onMounted(fetchJobs)
 .form-row .el-form-item {
   flex: 1;
   margin-bottom: 18px;
+}
+
+.form-row .form-item-narrow {
+  flex: 0 0 90px;
 }
 
 .cron-preview {

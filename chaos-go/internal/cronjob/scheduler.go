@@ -15,7 +15,9 @@ import (
 )
 
 var (
-	cronParser   = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	// SecondOptional：同时支持 5 字段（分 时 日 月 周）与 6 字段（秒 分 时 日 月 周），
+	// 即 cron 表达式可精确到秒级（如 "*/30 * * * * *" 表示每 30 秒）。
+	cronParser   = cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	cronInstance *cron.Cron
 	cronMu       sync.Mutex
 	entryIDs     = map[int]cron.EntryID{}
