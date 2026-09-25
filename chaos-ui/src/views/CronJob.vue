@@ -2,6 +2,7 @@
 import {onMounted, ref, watch} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {format as formatDate, parseISO} from 'date-fns'
 
 interface CronJob {
   ID: number
@@ -66,14 +67,14 @@ const statusMap: Record<string, {text: string; type: string}> = {
 
 function fmtTime(s: string | null): string {
   if (!s) return '—'
-  const d = new Date(s)
+  const d = parseISO(s)
   if (isNaN(d.getTime())) return s
-  return d.toLocaleString()
+  return formatDate(d, 'yyyy-MM-dd HH:mm:ss')
 }
 
 function duration(start: string, end: string | null): string {
-  const s = new Date(start).getTime()
-  const e = end ? new Date(end).getTime() : Date.now()
+  const s = parseISO(start).getTime()
+  const e = end ? parseISO(end).getTime() : Date.now()
   const ms = Math.max(0, e - s)
   if (ms < 1000) return ms + 'ms'
   return (ms / 1000).toFixed(1) + 's'
@@ -328,13 +329,10 @@ onMounted(fetchJobs)
       </div>
     </div>
 
-    <el-alert type="info" :closable="false" show-icon class="mb-sm"
-              title="本页是完全独立的定时任务（cron job），与任务计划/待办任务无关：按 cron 表达式在后台触发动作并记录运行日志。4 个原内置周期任务已默认转成本页的 cron 任务。"/>
-
     <el-table :data="jobs" v-loading="loading" border stripe class="task-table">
-      <el-table-column label="名称" min-width="160" prop="Name"/>
-      <el-table-column label="Cron 表达式" min-width="130" prop="CronExpr"/>
-      <el-table-column label="动作" min-width="200">
+      <el-table-column label="名称" width="140" prop="Name"/>
+      <el-table-column label="Cron 表达式" width="140" prop="CronExpr"/>
+      <el-table-column label="动作" min-width="140">
         <template #default="{ row }">
           <el-tag size="small" :type="actionTypeMap[row.ActionType]?.type || 'info'">
             {{ actionTypeMap[row.ActionType]?.text || row.ActionType }}
@@ -347,23 +345,23 @@ onMounted(fetchJobs)
           <el-switch :model-value="row.Enabled" @change="toggleJob(row)"/>
         </template>
       </el-table-column>
-      <el-table-column label="上次运行" width="170">
+      <el-table-column label="上次运行" width="200">
         <template #default="{ row }">{{ fmtTime(row.LastRunAt) }}</template>
       </el-table-column>
-      <el-table-column label="上次状态" width="90">
+      <el-table-column label="上次状态" width="100">
         <template #default="{ row }">
           <el-tag size="small" :type="statusMap[row.LastStatus]?.type || 'info'">
             {{ statusMap[row.LastStatus]?.text || '—' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="下次执行" width="170">
+      <el-table-column label="下次执行" width="200">
         <template #default="{ row }">
           <span v-if="row.Enabled">{{ fmtTime(row.NextRun) }}</span>
           <span v-else class="text-secondary">已停用</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
           <div class="op-actions">
             <el-button size="small" type="primary" text @click="runJob(row)">运行</el-button>

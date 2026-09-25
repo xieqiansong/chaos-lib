@@ -30,7 +30,7 @@ func ListCronJobs(c *gin.Context) {
 	}
 	type item struct {
 		CronJob
-		NextRun *time.Time `json:"nextRun"`
+		NextRun *time.Time ``
 	}
 	items := make([]item, 0, len(jobs))
 	for _, j := range jobs {
@@ -284,10 +284,10 @@ func PreviewCron(c *gin.Context) {
 	}
 	runs, err := NextRuns(req.CronExpr, req.Count)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error(), "nextRuns": []time.Time{}})
+		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error(), "NextRuns": []time.Time{}})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"valid": true, "nextRuns": runs})
+	c.JSON(http.StatusOK, gin.H{"valid": true, "NextRuns": runs})
 }
 
 // SeedDefaults 在库内无任何定时任务时，写入由原系统内置周期任务转换而来的默认任务，
