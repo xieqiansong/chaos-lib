@@ -137,9 +137,7 @@ function refresh() {
   <div>
     <DataTable ref="tableRef" :columns="columns" :api="fetchApi" row-key="ID">
       <template #toolbar>
-        <div class="section-actions">
-          <el-button size="small" type="primary" @click="showCreateModal = true">+ 创建新连接</el-button>
-        </div>
+        <el-button size="small" type="primary" @click="showCreateModal = true">+ 创建新连接</el-button>
       </template>
 
       <template #LinkStatus="{ row }">

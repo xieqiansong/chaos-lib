@@ -31,7 +31,7 @@ const props = withDefaults(
       pageSizeOptions: () => [10, 20, 50, 100],
       selection: false,
       stripe: true,
-      border: false,
+      border: true,
     },
 )
 
@@ -61,7 +61,7 @@ defineExpose({refresh, getData})
 
 <template>
   <section class="section-toolbar datatable-toolbar">
-    <div class="toolbar-left">
+    <div v-if="$slots.toolbar" class="toolbar-left">
       <slot name="toolbar"/>
     </div>
     <div v-if="searchableColumns.length" class="toolbar-search">
@@ -82,36 +82,16 @@ defineExpose({refresh, getData})
     </div>
   </section>
 
-  <el-table
-      v-loading="loading"
-      :data="tableData"
-      :row-key="rowKey"
-      :tree-props="treeProps"
-      :stripe="stripe"
-      :border="border"
-      class="datatable"
-      @sort-change="handleSortChange"
-  >
+  <el-table v-loading="loading" :data="tableData" :row-key="rowKey" :tree-props="treeProps" :stripe="stripe" :border="border" class="datatable"
+            @sort-change="handleSortChange" size="small">
     <el-table-column v-if="selection" type="selection" width="48"/>
 
-    <el-table-column
-        v-for="col in renderColumns"
-        :key="col.field"
-        :prop="col.field"
-        :label="col.title"
-        :width="col.width"
-        :min-width="col.minWidth"
-        :align="col.align"
-        :fixed="col.fixed === true ? 'left' : col.fixed"
-        :sortable="col.sortable ? (api ? 'custom' : true) : false"
-    >
+    <el-table-column v-for="col in renderColumns"
+                     :key="col.field" :prop="col.field" :label="col.title" :width="col.width"
+                     :min-width="col.minWidth" :align="col.align" :fixed="col.fixed === true ? 'left' : col.fixed"
+                     :sortable="col.sortable ? (api ? 'custom' : true) : false">
       <template #default="scope">
-        <slot
-            v-if="$slots[col.field]"
-            :name="col.field"
-            :row="scope.row"
-            :value="scope.row[col.field]"
-        />
+        <slot v-if="$slots[col.field]" :name="col.field" :row="scope.row" :value="scope.row[col.field]"/>
         <template v-else-if="col.type === 'actions'">
           <div class="op-actions">
             <slot name="actions" :row="scope.row"/>
@@ -125,9 +105,7 @@ defineExpose({refresh, getData})
 
   <div v-if="total > 0" class="pager">
     <el-pagination
-        :current-page="page"
-        :page-size="pageSize"
-        :total="total"
+        :current-page="page" :page-size="pageSize" :total="total"
         :page-sizes="pageSizeOptions"
         layout="total, sizes, prev, pager, next, jumper"
         @current-change="handlePageChange"
@@ -137,8 +115,23 @@ defineExpose({refresh, getData})
 </template>
 
 <style scoped>
+/* 工具栏分两行：搜索行在上，插槽操作（如"创建"按钮）另起一行在下 */
 .datatable-toolbar {
   flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: var(--space-sm);
+}
+
+.datatable-toolbar .toolbar-search {
+  order: 1;
+  flex: 1 1 100%;
+}
+
+.datatable-toolbar .toolbar-left {
+  order: 2;
+  flex: 1 1 100%;
+  display: flex;
+  justify-content: flex-start;
 }
 
 .datatable {
