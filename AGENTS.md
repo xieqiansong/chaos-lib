@@ -50,6 +50,31 @@
 - 用户提需求后，主动提醒是否需要补充测试用例（后端配套 `_test.go`），由用户决定是否添加，不自动强写
 - 涉及前端（chaos-ui）的改动不引入测试框架；change 的 tasks.md 必须附「前端手动验证清单」，由用户人工验收
 
+## 标准参考表（配置驱动 CRUD 基准）
+
+`standardDatas` / 表 `standard_datas` 是所有「简单表」的基准范式：后端零 handler、前端配置驱动。
+新增同类表时**照此复制**，不要为每个表手写 handler。参考实现：`internal/standarddatas/standarddata.go` + `src/views/StandardDatas.vue` + `src/api/standardDatas.ts`。
+
+### 后端（chaos-go）
+- 在 `internal/<模块>/<资源>.go` 定义模型：嵌入 `crud.BaseModel`（自动获得 ID / CreatedAt / UpdatedAt / IsDeleted），
+  字段示例见 `internal/standarddatas/standarddata.go`（Name/Code/Description/Category string，Quantity int，Price float64，Enabled bool，Config string，EffectiveAt *time.Time，Sort int）。
+- 实现 `TableName() string`（snake_case）与 `Register(rg *gin.RouterGroup)`，内部调用
+  `crud.Register(rg, "<resource>", &Model{}, crud.Opts{Searchable, Sortable, HasStatus})`。
+- 在 `routes/routes.go` 增加 `xxx.Register(api)`，并在 `cmd/server/main.go` 的 `AutoMigrate` 登记模型。
+- **不写任何 handler**：7 个 REST 路由（list / get / create / update / delete / status 列表 / status 更新）由 `crud.Register` 反射生成。
+
+### 前端（chaos-ui）
+- `src/api/<resource>.ts`：定义 `interface <Resource>`（含基字段 ID / CreatedAt / UpdatedAt / IsDeleted）+ `export const <resource>Api = useRestApi<Resource>('<resource>')`。
+- `src/views/<Resource>.vue`：用通用 `DataTable`（`border` 默认开、`#toolbar` 插槽放「创建」按钮、搜索行在上操作行在下），
+  表单用 `el-dialog`；路由在 `src/router/index.ts` 的 `appRoutes` 追加。
+- 增删改走 `useRestApi` 自动拼 `/api/<resource>`。
+
+### 约定
+- 资源名：前端 camelCase（`standardDatas`），表名 snake_case（`standard_datas`）。
+- **时间列必须用 RFC3339 带时区**：`el-date-picker` 的 `value-format="YYYY-MM-DDTHH:mm:ssZ"`，
+  否则 Go `time.Time` 反序列化报 `cannot parse "" as "Z07:00"`。
+- 软删除统一 `IsDeleted bool`，列表查询手动过滤 `is_deleted = false`。
+
 ## 构建与部署
 
 - 提交前必须 `go build ./...` 无编译错误；后端逻辑改动后跑 `go test ./...`

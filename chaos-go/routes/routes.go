@@ -11,6 +11,7 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
+	"chaos-go/internal/standarddatas"
 	"chaos-go/internal/stunpf"
 	stunsync "chaos-go/internal/stunsync"
 	"chaos-go/internal/taskplan"
@@ -53,6 +54,9 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.DELETE("/fileLinks/:id", filelink.DeleteFileLink)
 		api.PATCH("/fileLinks/:id", filelink.UpdateFileLink)
 		api.PATCH("/fileLinks/:id/status", filelink.UpdateFileLinkStatus)
+
+		// 标准参考表：资源接口自包含，本行仅做编排调用（路由实现在 internal/standarddatas）
+		standarddatas.Register(api)
 
 		quickEdits := api.Group("/quickEdits")
 		{
