@@ -23,16 +23,16 @@ const columns: DataTableColumn[] = [
 
 // 表单字段配置（与 columns 对应，驱动 DataTable 内置的 DataFormDialog）
 const fields: FormField[] = [
-  {field: 'Name', title: '名称', type: 'text', required: true, placeholder: '请输入名称'},
-  {field: 'Code', title: '编码', type: 'text', required: true, placeholder: '请输入编码'},
-  {field: 'Category', title: '分类', type: 'text', placeholder: '可选分类'},
+  {field: 'Name', title: '名称', type: 'text', span: 12, required: true, placeholder: '请输入名称'},
+  {field: 'Code', title: '编码', type: 'text', span: 12, required: true, placeholder: '请输入编码'},
+  {field: 'Category', title: '分类', type: 'text', span: 12, placeholder: '可选分类'},
+  {field: 'Sort', title: '排序', type: 'number', span: 12, min: 0},
+  {field: 'Quantity', title: '数量', type: 'number', span: 12, min: 0},
+  {field: 'Price', title: '金额', type: 'number', span: 12, min: 0, precision: 2, step: 0.01},
+  {field: 'Enabled', title: '启用', type: 'switch', span: 12},
+  {field: 'EffectiveAt', title: '生效时间', type: 'datetime', span: 12},
   {field: 'Description', title: '描述', type: 'textarea', rows: 2, placeholder: '可选描述'},
-  {field: 'Quantity', title: '数量', type: 'number', min: 0},
-  {field: 'Price', title: '金额', type: 'number', min: 0, precision: 2, step: 0.01},
-  {field: 'Enabled', title: '启用', type: 'switch'},
   {field: 'Config', title: '配置(JSON)', type: 'json', rows: 3, placeholder: '如 {"k":"v"}'},
-  {field: 'EffectiveAt', title: '生效时间', type: 'datetime'},
-  {field: 'Sort', title: '排序', type: 'number', min: 0},
 ]
 
 // 启停开关（type: 'switch'）与行内时间（type: 'datetime'）已由 DataTable 内置处理：
