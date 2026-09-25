@@ -69,7 +69,9 @@ CREATE TABLE public.file_links (
     status boolean,
     remark text,
     sort integer DEFAULT 0,
-    is_deleted boolean DEFAULT false
+    is_deleted boolean DEFAULT false,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone
 );
 
 

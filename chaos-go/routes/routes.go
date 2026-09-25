@@ -49,11 +49,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.PATCH("/sdks/defs/:name", proxy.UpdateSdkSource)
 		api.DELETE("/sdks/defs/:name", proxy.DeleteSdkSource)
 
-		api.GET("/fileLinks", filelink.GetFileLinks)
-		api.POST("/fileLinks", filelink.CreateFileLink)
-		api.DELETE("/fileLinks/:id", filelink.DeleteFileLink)
-		api.PATCH("/fileLinks/:id", filelink.UpdateFileLink)
-		api.PATCH("/fileLinks/:id/status", filelink.UpdateFileLinkStatus)
+		// 文件连接：资源接口自包含，本行仅做编排调用（路由实现在 internal/filelink）
+		filelink.Register(api)
 
 		// 标准参考表：资源接口自包含，本行仅做编排调用（路由实现在 internal/standarddata）
 		standarddata.Register(api)

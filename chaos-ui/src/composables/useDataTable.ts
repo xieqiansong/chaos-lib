@@ -13,6 +13,8 @@ interface UseDataTableProps {
   api?: (params: DataTableApiParams) => Promise<DataTableApiResult>
   pageSize?: number
   pageSizeOptions?: number[]
+  /** 初始排序：首次取数即带上 sort 参数，无需用户点表头 */
+  defaultSort?: { field: string; order: 'ascending' | 'descending' }
 }
 
 export function useDataTable(props: UseDataTableProps) {
@@ -22,7 +24,9 @@ export function useDataTable(props: UseDataTableProps) {
   const rows = ref<any[]>([])
   const loading = ref(false)
   const searchState = reactive<Record<string, any>>({})
-  const sortState = ref<{ field: string; order: 'ascending' | 'descending' | null } | null>(null)
+  const sortState = ref<{ field: string; order: 'ascending' | 'descending' | null } | null>(
+      props.defaultSort ? {field: props.defaultSort.field, order: props.defaultSort.order} : null,
+  )
 
   const apiMode = computed(() => !!props.api)
   const searchableColumns = computed(() => props.columns.filter((c) => c.searchable))

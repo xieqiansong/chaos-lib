@@ -1,339 +1,76 @@
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
-import {sendMessage} from '@/utils/api'
+// 文件连接界面：参考标准数据，由通用 DataTable（内置查看/编辑/删除 + 弹窗）驱动完整 CRUD。
+// 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
+//
+// 本资源相对标准基线有两个「自定义」点：
+//   1. 状态（LinkStatus）由后端在返回时按文件系统实时计算，不落库 —— 前端只负责渲染。
+//   2. 启用开关有副作用（建/删联接点）且带校验，走自定义 /:id/status 接口，
+//      由 switch-handler 回调注入（与标准数据的 status 同一套范式）。
+import DataTable from '@/components/DataTable.vue'
+import type {DataTableColumn} from '@/components/dataTable/types'
+import type {FormField} from '@/components/DataFormDialog.vue'
+import {fileLinkApi, type FileLink} from '@/api/fileLink'
 
-const props = defineProps<{
-  searchText: string
-}>()
+// 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）
+defineProps<{ searchText?: string }>()
 
-interface FileLink {
-  ID: number
-  SourcePath: string
-  TargetPath: string
-  Status: boolean
-  Remark: string
-  Sort: number
-  LinkStatus: string
-}
+const columns: DataTableColumn[] = [
+  {field: 'SourcePath', title: '源路径', minWidth: 200, searchable: true},
+  {field: 'TargetPath', title: '目标路径', minWidth: 200, searchable: true},
+  {field: 'Remark', title: '备注', minWidth: 120, searchable: true},
+  {field: 'Sort', title: '排序', width: 80, sortable: true},
+  {field: 'LinkStatus', title: '状态', width: 100},
+  {field: 'Status', title: '启用', width: 80, type: 'switch'},
+]
 
-const fileLinks = ref<FileLink[]>([])
-const error = ref('')
-const loading = ref(false)
-const showCreateModal = ref(false)
-const showEditModal = ref(false)
+// 表单字段配置（与 columns 对应，驱动 DataTable 内置的 DataFormDialog）
+const fields: FormField[] = [
+  {field: 'SourcePath', title: '源路径', type: 'text', required: true, placeholder: '请输入源文件/目录路径'},
+  {field: 'TargetPath', title: '目标路径', type: 'text', required: true, placeholder: '请输入目标符号链接路径'},
+  {field: 'Remark', title: '备注', type: 'textarea', rows: 2, placeholder: '可选备注信息'},
+  {field: 'Sort', title: '排序', type: 'number', span: 12, min: 0},
+]
 
-// 服务端分页：配合后端 fileLinks 的 { items, total, page, size } 响应
-const page = ref(1)
-const size = ref(10)
-const total = ref(0)
+// 后端默认按 id 排序；本页按业务语义默认使用 Sort 字段升序
+const defaultSort = {field: 'Sort', order: 'ascending'} as const
 
-const newLink = ref({
-  SourcePath: '',
-  TargetPath: '',
-  Remark: '',
-  Sort: 0
-})
-
-const editLink = ref({
-  ID: 0,
-  Remark: '',
-  Sort: 0
-})
-
-function openEditModal(link: FileLink) {
-  editLink.value = {
-    ID: link.ID,
-    Remark: link.Remark,
-    Sort: link.Sort
-  }
-  showEditModal.value = true
-}
-
-const linkStatusMap: Record<string, { text: string, type: string }> = {
+const linkStatusMap: Record<string, { text: string; type: string }> = {
   normal: {text: '正常', type: 'success'},
   missing: {text: '目标缺失', type: 'danger'},
   none: {text: '未启用', type: 'info'},
   invalid: {text: '无效', type: 'warning'},
-  conflict: {text: '冲突', type: 'danger'}
+  conflict: {text: '冲突', type: 'danger'},
 }
 
-async function fetchFileLinks() {
-  loading.value = true
-  error.value = ''
-  try {
-    const search = props.searchText.trim()
-    const query: Record<string, any> = {page: page.value, size: size.value}
-    if (search) {
-      query.search = search
-    }
-    const result = await sendMessage('fileLinks', 'GET', query)
-    if (result && Array.isArray(result.items)) {
-      fileLinks.value = result.items
-      total.value = result.total
-      // 当前页被取空且非首页（通常是删除后数据变少），回退一页再拉取
-      if (fileLinks.value.length === 0 && page.value > 1) {
-        page.value -= 1
-        return fetchFileLinks()
-      }
-    }
-  } catch (e) {
-    error.value = '获取文件连接失败'
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
+// 状态切换：交给 fileLinkApi 的自定义 setStatus（DataTable 负责刷新与提示）
+function onStatusChange(row: FileLink, next: boolean) {
+  return fileLinkApi.setStatus(row.ID, next)
 }
-
-function handlePageChange(p: number) {
-  page.value = p
-  fetchFileLinks()
-}
-
-function handleSizeChange(s: number) {
-  size.value = s
-  page.value = 1
-  fetchFileLinks()
-}
-
-async function createLink() {
-  if (!newLink.value.SourcePath.trim() || !newLink.value.TargetPath.trim()) {
-    error.value = '请填写源路径和目标路径'
-    return
-  }
-
-  try {
-    await sendMessage('fileLinks', 'POST', newLink.value)
-    showCreateModal.value = false
-    newLink.value = {SourcePath: '', TargetPath: '', Remark: '', Sort: 0}
-    page.value = 1
-    await fetchFileLinks()
-  } catch (e) {
-    error.value = '创建文件连接失败'
-    console.error(e)
-  }
-}
-
-async function updateEditLink() {
-  try {
-    await sendMessage(`fileLinks/${editLink.value.ID}`, 'PATCH', {
-      Remark: editLink.value.Remark,
-      Sort: editLink.value.Sort
-    })
-    showEditModal.value = false
-    await fetchFileLinks()
-  } catch (e) {
-    error.value = '更新失败'
-    console.error(e)
-  }
-}
-
-async function toggleLinkStatus(link: FileLink, newStatus: boolean) {
-  const oldStatus = !newStatus
-  link.Status = newStatus
-  try {
-    await sendMessage(`fileLinks/${link.ID}/status`, 'PATCH', {status: newStatus})
-    await fetchFileLinks()
-  } catch (e) {
-    link.Status = oldStatus
-    error.value = '更新状态失败'
-    console.error(e)
-  }
-}
-
-async function deleteLink(id: number) {
-  try {
-    await ElMessageBox.confirm(
-      '确认删除该文件连接？删除后无法恢复。',
-      '警告',
-      {
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-  } catch {
-    return
-  }
-
-  try {
-    await sendMessage(`fileLinks/${id}`, 'DELETE')
-    await fetchFileLinks()
-  } catch (e) {
-    error.value = '删除失败'
-    console.error(e)
-  }
-}
-
-watch(() => props.searchText, () => {
-  page.value = 1
-  fetchFileLinks()
-})
-
-onMounted(() => {
-  fetchFileLinks()
-})
 </script>
 
 <template>
-  <div>
-    <div class="section-toolbar">
-      <span class="text-primary text-base section-title">文件连接管理</span>
-      <span class="text-secondary text-xs">管理本地文件符号链接</span>
-      <div class="section-actions">
-        <el-button size="small" type="primary" @click="showCreateModal = true">+ 创建新连接</el-button>
-      </div>
-    </div>
-
-    <el-alert
-        v-if="error"
-        type="error"
-        :message="error"
-        show-icon
-        class="mb-sm"
-        @close="error = ''"
-    />
-
-    <el-skeleton
-        v-if="loading"
-        :rows="3"
-        animated
-    />
-
-    <template v-else>
-      <div v-if="fileLinks.length === 0" class="empty-wrap">
-        <el-empty description="暂无文件连接"/>
-      </div>
-
-      <template v-else>
-        <el-table :data="fileLinks" class="filelink-table">
-      <el-table-column prop="SourcePath" label="源路径" min-width="200"/>
-      <el-table-column prop="TargetPath" label="目标路径" min-width="200"/>
-      <el-table-column prop="Remark" label="备注" min-width="120"/>
-      <el-table-column prop="Sort" label="排序" width="80" sortable/>
-      <el-table-column label="状态" width="100">
-        <template #default="{row}">
-          <el-tag :type="linkStatusMap[row.LinkStatus]?.type || 'info'">
-            {{ linkStatusMap[row.LinkStatus]?.text || row.LinkStatus }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="启用" width="80">
-        <template #default="{row}">
-          <el-switch
-              :model-value="row.Status"
-              @update:model-value="(val: boolean) => toggleLinkStatus(row, val)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="160">
-        <template #default="{row}">
-          <div class="op-actions">
-            <el-button
-                type="primary"
-                size="small"
-                text
-                @click="openEditModal(row)">
-              编辑
-            </el-button>
-            <el-button
-                type="danger"
-                size="small"
-                text
-                @click="deleteLink(row.ID)">
-              删除
-            </el-button>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-
-        <div class="pager">
-          <el-pagination :current-page="page" :page-size="size" :total="total"
-                         :page-sizes="[10, 20, 50, 100]"
-                         layout="total, sizes, prev, pager, next, jumper"
-                         @current-change="handlePageChange"
-                         @size-change="handleSizeChange"
-          />
-        </div>
+  <div class="filelink-view">
+    <DataTable
+        :columns="columns"
+        :api="fileLinkApi"
+        :fields="fields"
+        title="文件连接"
+        row-key="ID"
+        :default-sort="defaultSort"
+        :switch-handler="onStatusChange"
+    >
+      <template #LinkStatus="{ row }">
+        <el-tag :type="(linkStatusMap[row.LinkStatus]?.type as any) || 'info'">
+          {{ linkStatusMap[row.LinkStatus]?.text || row.LinkStatus }}
+        </el-tag>
       </template>
-    </template>
-
-    <el-dialog
-        v-model="showCreateModal"
-        title="创建文件连接"
-        width="37.5rem">
-      <el-form :model="newLink" label-width="6.25rem">
-        <el-form-item label="源路径">
-          <el-input
-              v-model="newLink.SourcePath"
-              placeholder="请输入源文件/目录路径"/>
-        </el-form-item>
-        <el-form-item label="目标路径">
-          <el-input
-              v-model="newLink.TargetPath"
-              placeholder="请输入目标符号链接路径"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-              v-model="newLink.Remark"
-              type="textarea"
-              :rows="2"
-              placeholder="可选备注信息"/>
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number
-              v-model="newLink.Sort"
-              :min="0"
-              controls-position="right"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateModal = false">取消</el-button>
-        <el-button type="primary" @click="createLink">创建</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog
-        v-model="showEditModal"
-        title="编辑文件连接"
-        width="37.5rem">
-      <el-form :model="editLink" label-width="6.25rem">
-        <el-form-item label="备注">
-          <el-input
-              v-model="editLink.Remark"
-              type="textarea"
-              :rows="2"
-              placeholder="可选备注信息"/>
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number
-              v-model="editLink.Sort"
-              :min="0"
-              controls-position="right"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditModal = false">取消</el-button>
-        <el-button type="primary" @click="updateEditLink">保存</el-button>
-      </template>
-    </el-dialog>
+    </DataTable>
   </div>
 </template>
 
 <style scoped>
-.filelink-table {
-  width: 100%;
-}
-
-.pager {
-  margin-top: var(--space-sm);
-  display: flex;
-  justify-content: flex-end;
-}
-
-.filelink-table :deep(.cell),
-.filelink-table :deep(td.el-table__cell) {
+.filelink-view :deep(.datatable .cell),
+.filelink-view :deep(.datatable td.el-table__cell) {
   color: var(--term-green) !important;
 }
 </style>

@@ -34,6 +34,8 @@ const props = withDefaults(
       border?: boolean
       /** type=switch 列切换时的回调：返回 Promise，成功后自动刷新并提示；未提供则开关禁用 */
       switchHandler?: (row: any, next: boolean) => Promise<void> | void
+      /** 初始排序：首次取数即带 sort 参数（后端默认按 id 排，需要按业务字段排时由此指定） */
+      defaultSort?: { field: string; order: 'ascending' | 'descending' }
     }>(),
     {
       data: undefined,
@@ -82,6 +84,7 @@ const {
     : undefined,
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
+  defaultSort: props.defaultSort,
 })
 
 onMounted(() => getData())
@@ -235,6 +238,7 @@ defineExpose({refresh, getData})
   </section>
 
   <el-table v-loading="loading" :data="tableData" :row-key="rowKey" :tree-props="treeProps" :stripe="stripe" :border="border" class="datatable"
+            :default-sort="defaultSort ? {prop: defaultSort.field, order: defaultSort.order} : undefined"
             @sort-change="handleSortChange" size="small">
     <el-table-column v-if="selection" type="selection" width="48"/>
 

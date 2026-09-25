@@ -7,7 +7,6 @@ import type {FormField} from '@/components/DataFormDialog.vue'
 import {standardDataApi, type StandardData} from '@/api/standardData'
 
 const columns: DataTableColumn[] = [
-  {field: 'ID', title: 'ID', width: 70, sortable: true},
   {field: 'Name', title: '名称', minWidth: 160, searchable: true},
   {field: 'Code', title: '编码', width: 140, searchable: true},
   {field: 'Category', title: '分类', width: 120},
@@ -16,7 +15,6 @@ const columns: DataTableColumn[] = [
   {field: 'Enabled', title: '启用', width: 80, type: 'switch'},
   {field: 'Config', title: '配置(JSON)', minWidth: 160},
   {field: 'EffectiveAt', title: '生效时间', width: 170, type: 'datetime'},
-  {field: 'Sort', title: '排序', width: 80, sortable: true},
   {field: 'CreatedAt', title: '创建时间', width: 170, type: 'datetime'},
   {field: 'UpdatedAt', title: '更新时间', width: 170, type: 'datetime'},
 ]

@@ -190,3 +190,7 @@ COMMENT ON COLUMN public.bookmarks.date_added IS '书签创建时间戳（毫秒
 
 ALTER TABLE ONLY public.bookmarks ADD CONSTRAINT bookmarks_pkey PRIMARY KEY (id);
 CREATE INDEX idx_bookmarks_url ON public.bookmarks USING btree (url) WHERE (url <> '');
+
+-- 文件连接接入标准 CRUD 基线（模型嵌入 crud.BaseModel）：补创建/更新时间
+ALTER TABLE public.file_links ADD COLUMN IF NOT EXISTS created_at timestamp with time zone;
+ALTER TABLE public.file_links ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone;

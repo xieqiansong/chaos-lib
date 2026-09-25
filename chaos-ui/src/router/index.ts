@@ -67,13 +67,6 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '文件连接', icon: 'Link'},
   },
   {
-    // 临时测试界面：用通用 DataTable 组件复刻文件连接，验证配置驱动表格方案
-    path: '/fileLinkTest',
-    name: 'fileLinkTest',
-    component: () => import('@/views/FileLinkTest.vue'),
-    meta: {title: '文件连接-临时测试', icon: 'Link'},
-  },
-  {
     path: '/portForward',
     name: 'portForward',
     component: () => import('@/views/PortForward.vue'),
