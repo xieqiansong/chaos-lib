@@ -11,7 +11,7 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
-	"chaos-go/internal/standarddatas"
+	"chaos-go/internal/standarddata"
 	_ "chaos-go/internal/stunsync"
 	_ "chaos-go/internal/stunpf"
 	"chaos-go/internal/taskplan"
@@ -132,7 +132,7 @@ func main() {
 		&mqttsync.MqttSyncNode{},
 		&cronjob.CronJob{},
 		&cronjob.CronJobRun{},
-		&standarddatas.StandardData{},
+		&standarddata.StandardData{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}

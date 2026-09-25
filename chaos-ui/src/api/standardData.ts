@@ -1,4 +1,4 @@
-// 标准参考表（standardDatas）的接口门户：本文件集中承载该资源的「接口契约」。
+// 标准参考表（standardData）的接口门户：本文件集中承载该资源的「接口契约」。
 // 视图只从这里导入类型与 api 对象，搜索该业务时一键定位。
 import {useRestApi} from '@/composables/useRestApi'
 
@@ -19,4 +19,4 @@ export interface StandardData {
   IsDeleted: boolean
 }
 
-export const standardDatasApi = useRestApi<StandardData>('standardDatas')
+export const standardDataApi = useRestApi<StandardData>('standardData')

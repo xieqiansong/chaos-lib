@@ -1,13 +1,13 @@
 <script setup lang="ts">
-// 标准参考表界面：用通用 DataTable + 每资源 api（src/api/standardDatas.ts）实现完整 CRUD。
+// 标准参考表界面：用通用 DataTable + 每资源 api（src/api/standardData.ts）实现完整 CRUD。
 // 作为「简单表只定义 API 前缀即可一键化处理」的基准范式：
-//   - 列表/搜索/排序：DataTable + standardDatasApi.fetch（无需 fetchApi 样板）
-//   - 增/改/删/状态：standardDatasApi.create/update/remove/setStatus
+//   - 列表/搜索/排序：DataTable + standardDataApi.fetch（无需 fetchApi 样板）
+//   - 增/改/删/状态：standardDataApi.create/update/remove/setStatus
 import {reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn} from '@/components/dataTable/types'
-import {standardDatasApi, type StandardData} from '@/api/standardDatas'
+import {standardDataApi, type StandardData} from '@/api/standardData'
 
 const tableRef = ref<InstanceType<typeof DataTable>>()
 
@@ -83,10 +83,10 @@ async function save() {
   saving.value = true
   try {
     if (dialogMode.value === 'create') {
-      await standardDatasApi.create({...form})
+      await standardDataApi.create({...form})
       ElMessage.success('创建成功')
     } else if (editingId.value != null) {
-      await standardDatasApi.update(editingId.value, {...form})
+      await standardDataApi.update(editingId.value, {...form})
       ElMessage.success('更新成功')
     }
     showDialog.value = false
@@ -100,7 +100,7 @@ async function save() {
 
 async function setStatus(row: StandardData, next: boolean) {
   try {
-    await standardDatasApi.setStatus(row.ID, next)
+    await standardDataApi.setStatus(row.ID, next)
     ElMessage.success('状态已更新')
     tableRef.value?.refresh()
   } catch (e: any) {
@@ -119,7 +119,7 @@ async function remove(row: StandardData) {
     return
   }
   try {
-    await standardDatasApi.remove(row.ID)
+    await standardDataApi.remove(row.ID)
     ElMessage.success('删除成功')
     tableRef.value?.refresh()
   } catch (e: any) {
@@ -130,7 +130,7 @@ async function remove(row: StandardData) {
 
 <template>
   <div>
-    <DataTable ref="tableRef" :columns="columns" :api="standardDatasApi.fetch" row-key="ID">
+    <DataTable ref="tableRef" :columns="columns" :api="standardDataApi.fetch" row-key="ID">
       <template #toolbar>
         <el-button size="small" type="primary" @click="openCreate">+ 新建标准数据</el-button>
       </template>

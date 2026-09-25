@@ -52,12 +52,12 @@
 
 ## 标准参考表（配置驱动 CRUD 基准）
 
-`standardDatas` / 表 `standard_datas` 是所有「简单表」的基准范式：后端零 handler、前端配置驱动。
-新增同类表时**照此复制**，不要为每个表手写 handler。参考实现：`internal/standarddatas/standarddata.go` + `src/views/StandardDatas.vue` + `src/api/standardDatas.ts`。
+`standardData` / 表 `standard_datas` 是所有「简单表」的基准范式：后端零 handler、前端配置驱动。
+新增同类表时**照此复制**，不要为每个表手写 handler。参考实现：`internal/standarddata/standarddata.go` + `src/views/StandardData.vue` + `src/api/standardData.ts`。
 
 ### 后端（chaos-go）
 - 在 `internal/<模块>/<资源>.go` 定义模型：嵌入 `crud.BaseModel`（自动获得 ID / CreatedAt / UpdatedAt / IsDeleted），
-  字段示例见 `internal/standarddatas/standarddata.go`（Name/Code/Description/Category string，Quantity int，Price float64，Enabled bool，Config string，EffectiveAt *time.Time，Sort int）。
+  字段示例见 `internal/standarddata/standarddata.go`（Name/Code/Description/Category string，Quantity int，Price float64，Enabled bool，Config string，EffectiveAt *time.Time，Sort int）。
 - 实现 `TableName() string`（snake_case）与 `Register(rg *gin.RouterGroup)`，内部调用
   `crud.Register(rg, "<resource>", &Model{}, crud.Opts{Searchable, Sortable, HasStatus})`。
 - 在 `routes/routes.go` 增加 `xxx.Register(api)`，并在 `cmd/server/main.go` 的 `AutoMigrate` 登记模型。
@@ -70,7 +70,7 @@
 - 增删改走 `useRestApi` 自动拼 `/api/<resource>`。
 
 ### 约定
-- 资源名：前端 camelCase（`standardDatas`），表名 snake_case（`standard_datas`）。
+- 资源名：前端 camelCase（`standardData`），表名 snake_case（`standard_datas`）。
 - **时间列必须用 RFC3339 带时区**：`el-date-picker` 的 `value-format="YYYY-MM-DDTHH:mm:ssZ"`，
   否则 Go `time.Time` 反序列化报 `cannot parse "" as "Z07:00"`。
 - 软删除统一 `IsDeleted bool`，列表查询手动过滤 `is_deleted = false`。

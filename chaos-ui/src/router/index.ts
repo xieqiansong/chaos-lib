@@ -140,10 +140,10 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '定时任务', icon: 'AlarmClock'},
   },
   {
-    // 标准参考表：配置驱动表格 + 一键 CRUD 的基准界面（前端 src/api/standardDatas.ts）
-    path: '/standardDatas',
-    name: 'standardDatas',
-    component: () => import('@/views/StandardDatas.vue'),
+    // 标准参考表：配置驱动表格 + 一键 CRUD 的基准界面（前端 src/api/standardData.ts）
+    path: '/standardData',
+    name: 'standardData',
+    component: () => import('@/views/StandardData.vue'),
     meta: {title: '标准数据', icon: 'Grid'},
   },
 ]
