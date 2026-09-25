@@ -219,6 +219,13 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", content)
 	})
 
+	r.GET("/favicon.svg", func(c *gin.Context) {
+		serveUIFile(c, webFS, "favicon.svg", "image/svg+xml")
+	})
+	r.GET("/favicon.ico", func(c *gin.Context) {
+		serveUIFile(c, webFS, "favicon.ico", "image/x-icon")
+	})
+
 	r.GET("/assets/*filepath", func(c *gin.Context) {
 		filePath := c.Param("filepath")
 		if strings.HasPrefix(filePath, "/") {
@@ -249,6 +256,18 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 	})
 
 	return r
+}
+
+// serveUIFile 从前端产物根目录读取静态文件并以指定 content-type 返回（favicon 等）。
+func serveUIFile(c *gin.Context, webFS fs.FS, name, contentType string) {
+	f, err := webFS.Open(name)
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+	content, _ := io.ReadAll(f)
+	c.Data(http.StatusOK, contentType, content)
 }
 
 func getContentType(filename string) string {

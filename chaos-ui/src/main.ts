@@ -17,6 +17,7 @@ import {
     Delete,
     EditPen,
     Folder,
+    Grid,
     HomeFilled,
     Link,
     MagicStick,
@@ -25,8 +26,8 @@ import {
     Odometer,
     Plus,
     Setting,
-    Star,
     Sort,
+    Star,
     Sunny,
     Tickets
 } from '@element-plus/icons-vue';
@@ -42,7 +43,29 @@ initTheme();
 const app = createApp(App);
 
 // 全局注册用到的 Element Plus 图标（白名单），供路由 meta.icon 按名称动态渲染
-const usedIcons = {AlarmClock, Clock, Coin, Collection, Connection, Delete, EditPen, Folder, HomeFilled, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Star, Sunny, Tickets}
+const usedIcons = {
+    AlarmClock,
+    Clock,
+    Coin,
+    Collection,
+    Connection,
+    Delete,
+    EditPen,
+    Folder,
+    HomeFilled,
+    Link,
+    MagicStick,
+    Monitor,
+    Moon,
+    Odometer,
+    Plus,
+    Setting,
+    Sort,
+    Star,
+    Sunny,
+    Tickets,
+    Grid
+}
 for (const [key, component] of Object.entries(usedIcons)) {
     app.component(key, component);
 }

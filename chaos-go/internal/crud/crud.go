@@ -107,7 +107,7 @@ func (h *handler) toPtrSlice(slice any) any {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
-	ptrs := reflect.MakeSlice(reflect.SliceOf(reflect.PtrTo(h.elemType())), 0, v.Len())
+	ptrs := reflect.MakeSlice(reflect.SliceOf(reflect.PointerTo(h.elemType())), 0, v.Len())
 	for i := 0; i < v.Len(); i++ {
 		ptrs = reflect.Append(ptrs, v.Index(i).Addr())
 	}
