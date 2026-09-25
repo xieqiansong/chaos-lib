@@ -1,7 +1,8 @@
 // 通用 REST 数据接口：把一个「标准 CRUD 资源」封装成 DataTable / 表单可直接消费的对象。
 //
 // 与后端 internal/crud 严格对应：GET 列表（page/size/sort/order/<搜索字段>）、
-// POST 创建、PATCH 部分更新、DELETE 软删、PATCH /:id/status 状态切换。
+// POST 创建、PATCH 部分更新、DELETE 软删。
+// 状态切换等扩展接口不属于标准基线，由各业务 api 文件（如 api/standardData.ts）自行追加。
 // 视图层只需 `const api = useRestApi<Xxx>('xxx')`，无需再写 fetchApi 样板。
 import {sendMessage} from '@/utils/api'
 import type {DataTableApiParams} from '@/components/dataTable/types'
@@ -17,7 +18,6 @@ export interface RestApi<T extends { ID: number }> {
   create: (data: Partial<T>) => Promise<any>
   update: (id: number, data: Partial<T>) => Promise<any>
   remove: (id: number) => Promise<any>
-  setStatus: (id: number, status: boolean) => Promise<any>
 }
 
 export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T> {
@@ -51,9 +51,5 @@ export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T>
     return sendMessage(`${prefix}/${id}`, 'DELETE')
   }
 
-  function setStatus(id: number, status: boolean) {
-    return sendMessage(`${prefix}/${id}/status`, 'PATCH', {status})
-  }
-
-  return {fetch, create, update, remove, setStatus}
+  return {fetch, create, update, remove}
 }

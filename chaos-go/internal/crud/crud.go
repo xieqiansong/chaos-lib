@@ -9,7 +9,9 @@
 //   - 创建 POST /<prefix>           body: 创建字段
 //   - 更新 PATCH /<prefix>/:id      body: 部分字段
 //   - 删除 DELETE /<prefix>/:id     软删除（is_deleted = true）
-//   - 状态 PATCH /<prefix>/:id/status  body: {status:bool}  （仅当 HasStatus）
+//
+// 状态切换等扩展能力不内置在基线里，而是由业务包按需以「自定义路由」自行实现并挂载
+// （见各业务包的 Register）。这样基线只负责纯 CRUD，扩展能力下沉到业务包，互不污染。
 //
 // 列表响应统一为分页结构 { items, total, page, size }；单条/创建/更新返回
 // { message, data }；删除返回 { message }；错误返回 { error }。
@@ -43,18 +45,12 @@ type Opts struct {
 	Searchable []string
 	// Sortable: 允许排序的「列名」白名单（snake_case），未列出则忽略 sort 参数。
 	Sortable []string
-	// HasStatus: 是否提供 /:id/status 子路由（切面 Enabled 字段）。
-	HasStatus bool
-	// StatusField: 状态字段名，默认 "enabled"。
-	StatusField string
 }
 
 // Register 在路由组 rg 下为 prefix 注册一套标准 CRUD 路由。
 // model 传入零值指针（如 &StandardData{}），用于反射推导表结构与类型。
+// 状态切换等扩展能力不在基线内，由业务包自行实现并挂载（见各业务包的 Register）。
 func Register(rg *gin.RouterGroup, prefix string, model any, opts Opts) {
-	if opts.StatusField == "" {
-		opts.StatusField = "enabled"
-	}
 	h := &handler{model: model, opts: opts}
 	g := rg.Group("/" + prefix)
 	g.GET("", h.list)
@@ -62,9 +58,6 @@ func Register(rg *gin.RouterGroup, prefix string, model any, opts Opts) {
 	g.POST("", h.create)
 	g.PATCH("/:id", h.update)
 	g.DELETE("/:id", h.delete)
-	if opts.HasStatus {
-		g.PATCH("/:id/status", h.status)
-	}
 }
 
 // handler 持有模型类型信息与资源选项，按方法分发。
@@ -182,30 +175,9 @@ func (h *handler) delete(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
 		return
 	}
-	if err := config.GetDB().Model(ptr).Update("is_deleted", true).Error; err != nil {
+	if err := 	config.GetDB().Model(ptr).Update("is_deleted", true).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
-}
-
-// status 状态切换（仅 HasStatus）。
-func (h *handler) status(c *gin.Context) {
-	var req struct {
-		Status bool `json:"status"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	ptr := h.newModel()
-	if err := config.GetDB().First(ptr, "id = ? AND is_deleted = ?", c.Param("id"), false).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
-		return
-	}
-	if err := config.GetDB().Model(ptr).Update(h.opts.StatusField, req.Status).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "状态更新失败: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "状态更新成功", "data": ptr})
 }

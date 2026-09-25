@@ -2,7 +2,7 @@
 // 配置驱动的通用表格 + 增删改查组件。
 // 由 columns 派生表格列；searchable 列自动生成搜索栏；支持服务端(api)/本地(data)两种分页模式。
 // 自定义单元格优先用具名插槽 #field，其次 formatter，否则纯文本。
-// 操作列：传入完整 RestApi（含 create/update/remove/setStatus）+ fields 时，自动渲染「查看/编辑/删除」并内置弹窗；
+// 操作列：传入完整 RestApi（含 create/update/remove）+ fields 时，自动渲染「查看/编辑/删除」并内置弹窗；
 //         也可自行用 columns 的 { type: 'actions' } + 具名插槽 #actions 自定义（保持向后兼容）。
 import {computed, onMounted, reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
@@ -32,6 +32,8 @@ const props = withDefaults(
       nameField?: string
       stripe?: boolean
       border?: boolean
+      /** type=switch 列切换时的回调：返回 Promise，成功后自动刷新并提示；未提供则开关禁用 */
+      switchHandler?: (row: any, next: boolean) => Promise<void> | void
     }>(),
     {
       data: undefined,
@@ -184,14 +186,17 @@ async function remove(row: any) {
   }
 }
 
-// 行内开关：type=switch 的列调用 api.setStatus 即时切换状态
-function onSwitchChange(row: any, next: boolean) {
-  if (!crudApi.value?.setStatus) return
-  crudApi.value
-      .setStatus(row[props.rowKey], next)
-      .then(() => ElMessage.success('状态已更新'))
-      .catch((e: any) => ElMessage.error(e?.message || '更新状态失败'))
-      .finally(() => refresh())
+// 行内开关：type=switch 的列交由外部 switchHandler 处理；成功后刷新并提示，失败提示。
+// 具体调用哪个接口由消费方决定（标准 CRUD 基线不含状态切换），保持组件通用。
+async function onSwitchChange(row: any, next: boolean) {
+  if (!props.switchHandler) return
+  try {
+    await props.switchHandler(row, next)
+    ElMessage.success('状态已更新')
+    refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '更新状态失败')
+  }
 }
 
 // 行内时间：type=datetime 的列按标准格式序列化显示（fmt 遵循 date-fns 的 token）
@@ -252,7 +257,7 @@ defineExpose({refresh, getData})
         <el-switch
             v-else-if="col.type === 'switch'"
             :model-value="scope.row[col.field]"
-            :disabled="!crudApi?.setStatus"
+            :disabled="!props.switchHandler"
             @update:model-value="(val: boolean) => onSwitchChange(scope.row, val)"
         />
         <span v-else-if="col.formatter">{{ col.formatter(scope.row, scope.row[col.field]) }}</span>

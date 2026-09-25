@@ -4,7 +4,7 @@
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn} from '@/components/dataTable/types'
 import type {FormField} from '@/components/DataFormDialog.vue'
-import {standardDataApi} from '@/api/standardData'
+import {standardDataApi, type StandardData} from '@/api/standardData'
 
 const columns: DataTableColumn[] = [
   {field: 'ID', title: 'ID', width: 70, sortable: true},
@@ -35,12 +35,23 @@ const fields: FormField[] = [
   {field: 'Config', title: '配置(JSON)', type: 'json', rows: 3, placeholder: '如 {"k":"v"}'},
 ]
 
-// 启停开关（type: 'switch'）与行内时间（type: 'datetime'）已由 DataTable 内置处理：
-// 开关自动调用 api.setStatus 并刷新；时间列按标准格式序列化显示。
+// 状态切换（type:'switch' 列）由本页作为「标准 CRUD 之外的自定义逻辑」注入 DataTable：
+// 通过 switch-handler 回调调用 standardDataApi.setStatus，DataTable 负责刷新与提示。
+// 时间列（type:'datetime'）由 DataTable 按标准格式序列化显示，无需页级代码。
+function onEnabledChange(row: StandardData, next: boolean) {
+  return standardDataApi.setStatus(row.ID, next)
+}
 </script>
 
 <template>
   <div>
-    <DataTable :columns="columns" :api="standardDataApi" :fields="fields" title="标准数据" row-key="ID"/>
+    <DataTable
+        :columns="columns"
+        :api="standardDataApi"
+        :fields="fields"
+        title="标准数据"
+        row-key="ID"
+        :switch-handler="onEnabledChange"
+    />
   </div>
 </template>

@@ -59,13 +59,14 @@
 - 在 `internal/<模块>/<资源>.go` 定义模型：嵌入 `crud.BaseModel`（自动获得 ID / CreatedAt / UpdatedAt / IsDeleted），
   字段示例见 `internal/standarddata/standarddata.go`（Name/Code/Description/Category string，Quantity int，Price float64，Enabled bool，Config string，EffectiveAt *time.Time，Sort int）。
 - 实现 `TableName() string`（snake_case）与 `Register(rg *gin.RouterGroup)`，内部调用
-  `crud.Register(rg, "<resource>", &Model{}, crud.Opts{Searchable, Sortable, HasStatus})`。
+  `crud.Register(rg, "<resource>", &Model{}, crud.Opts{Searchable, Sortable})`。
 - 在 `routes/routes.go` 增加 `xxx.Register(api)`，并在 `cmd/server/main.go` 的 `AutoMigrate` 登记模型。
-- **不写任何 handler**：7 个 REST 路由（list / get / create / update / delete / status 列表 / status 更新）由 `crud.Register` 反射生成。
+- **不写任何标准 handler**：5 个 REST 路由（list / get / create / update / delete）由 `crud.Register` 反射生成。
+  状态切换等扩展能力**不属于**通用基线，在 `Register` 内以自定义路由自行实现并挂载（如 `standardData` 的 `status`）。
 
 ### 前端（chaos-ui）
 - `src/api/<resource>.ts`：定义 `interface <Resource>`（含基字段 ID / CreatedAt / UpdatedAt / IsDeleted）+ `export const <resource>Api = useRestApi<Resource>('<resource>')`。
-- `src/views/<Resource>.vue`：用通用 `DataTable`，只需声明 `columns`（表格列）与 `fields`（表单字段，驱动内置弹窗）。`DataTable` 的 `api` 传**完整 `useRestApi` 对象**时，自动内置「查看/编辑/删除」操作列与新建/编辑/查看弹窗（`DataFormDialog`），无需任何增删改查样板；`#field` 具名插槽可自定义单元格（如启用开关）。路由在 `src/router/index.ts` 的 `appRoutes` 追加。
+- `src/views/<Resource>.vue`：用通用 `DataTable`，只需声明 `columns`（表格列）与 `fields`（表单字段，驱动内置弹窗）。`DataTable` 的 `api` 传**完整 `useRestApi` 对象**时，自动内置「查看/编辑/删除」操作列与新建/编辑/查看弹窗（`DataFormDialog`），无需任何增删改查样板；`#field` 具名插槽可自定义单元格。启停开关用列 `type:'switch'` 声明、由 `:switch-handler` 回调接入业务的自定义 setStatus 接口，无需具名插槽。路由在 `src/router/index.ts` 的 `appRoutes` 追加。
 - 增删改走 `useRestApi` 自动拼 `/api/<resource>`。
 
 ### 约定
