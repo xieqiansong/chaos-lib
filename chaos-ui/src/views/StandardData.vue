@@ -1,12 +1,10 @@
 <script setup lang="ts">
 // 标准参考表界面：通用 DataTable（内置查看/编辑/删除 + 弹窗）驱动完整 CRUD。
 // 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
-import {ref} from 'vue'
-import {ElMessage} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn} from '@/components/dataTable/types'
 import type {FormField} from '@/components/DataFormDialog.vue'
-import {standardDataApi, type StandardData} from '@/api/standardData'
+import {standardDataApi} from '@/api/standardData'
 
 const columns: DataTableColumn[] = [
   {field: 'ID', title: 'ID', width: 70, sortable: true},
@@ -15,12 +13,12 @@ const columns: DataTableColumn[] = [
   {field: 'Category', title: '分类', width: 120},
   {field: 'Quantity', title: '数量', width: 90, sortable: true},
   {field: 'Price', title: '金额', width: 100},
-  {field: 'Enabled', title: '启用', width: 80},
+  {field: 'Enabled', title: '启用', width: 80, type: 'switch'},
   {field: 'Config', title: '配置(JSON)', minWidth: 160},
-  {field: 'EffectiveAt', title: '生效时间', width: 170},
+  {field: 'EffectiveAt', title: '生效时间', width: 170, type: 'datetime'},
   {field: 'Sort', title: '排序', width: 80, sortable: true},
-  {field: 'CreatedAt', title: '创建时间', width: 170},
-  {field: 'UpdatedAt', title: '更新时间', width: 170},
+  {field: 'CreatedAt', title: '创建时间', width: 170, type: 'datetime'},
+  {field: 'UpdatedAt', title: '更新时间', width: 170, type: 'datetime'},
 ]
 
 // 表单字段配置（与 columns 对应，驱动 DataTable 内置的 DataFormDialog）
@@ -37,32 +35,12 @@ const fields: FormField[] = [
   {field: 'Sort', title: '排序', type: 'number', min: 0},
 ]
 
-// 启停开关对应后端 setStatus；行内即时反馈由 DataTable 刷新保证，此处仅触发调用
-const tableRef = ref<InstanceType<typeof DataTable>>()
-function setStatus(row: StandardData, next: boolean) {
-  standardDataApi.setStatus(row.ID, next)
-      .then(() => ElMessage.success('状态已更新'))
-      .catch((e: any) => ElMessage.error(e?.message || '更新状态失败'))
-      .finally(() => tableRef.value?.refresh())
-}
+// 启停开关（type: 'switch'）与行内时间（type: 'datetime'）已由 DataTable 内置处理：
+// 开关自动调用 api.setStatus 并刷新；时间列按标准格式序列化显示。
 </script>
 
 <template>
   <div>
-    <DataTable
-        ref="tableRef"
-        :columns="columns"
-        :api="standardDataApi"
-        :fields="fields"
-        title="标准数据"
-        row-key="ID"
-    >
-      <template #Enabled="{ row }">
-        <el-switch
-            :model-value="row.Enabled"
-            @update:model-value="(val: boolean) => setStatus(row, val)"
-        />
-      </template>
-    </DataTable>
+    <DataTable :columns="columns" :api="standardDataApi" :fields="fields" title="标准数据" row-key="ID"/>
   </div>
 </template>

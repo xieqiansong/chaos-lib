@@ -31,7 +31,10 @@ export interface DataTableColumn {
   /** 搜索项细节 */
   search?: DataTableSearchConfig
   /** 标记为操作列，渲染 #actions 插槽 */
-  type?: 'actions'
+  type?: 'actions' | 'switch' | 'datetime'
+  /** type=switch 时调用 api.setStatus 切换状态；该字段应为行内的布尔状态字段 */
+  /** type=datetime 时单元格按标准格式序列化（默认 yyyy-MM-dd HH:mm:ss，可用 datetimeFormat 覆盖，遵循 date-fns token） */
+  datetimeFormat?: string
 }
 
 /** 服务端模式：请求参数 */

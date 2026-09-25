@@ -6,6 +6,7 @@
 //         也可自行用 columns 的 { type: 'actions' } + 具名插槽 #actions 自定义（保持向后兼容）。
 import {computed, onMounted, reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
+import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
 import {type RestApi} from '@/composables/useRestApi'
 import type {DataTableApiParams, DataTableApiResult, DataTableColumn} from '@/components/dataTable/types'
@@ -183,6 +184,24 @@ async function remove(row: any) {
   }
 }
 
+// 行内开关：type=switch 的列调用 api.setStatus 即时切换状态
+function onSwitchChange(row: any, next: boolean) {
+  if (!crudApi.value?.setStatus) return
+  crudApi.value
+      .setStatus(row[props.rowKey], next)
+      .then(() => ElMessage.success('状态已更新'))
+      .catch((e: any) => ElMessage.error(e?.message || '更新状态失败'))
+      .finally(() => refresh())
+}
+
+// 行内时间：type=datetime 的列按标准格式序列化显示（fmt 遵循 date-fns 的 token）
+function formatDateTime(value: any, fmt = 'yyyy-MM-dd HH:mm:ss'): string {
+  if (value === null || value === undefined || value === '') return ''
+  const d = value instanceof Date ? value : parseISO(value)
+  if (isNaN(d.getTime())) return String(value)
+  return format(d, fmt)
+}
+
 defineExpose({refresh, getData})
 </script>
 
@@ -230,7 +249,14 @@ defineExpose({refresh, getData})
             <slot name="actions" :row="scope.row"/>
           </div>
         </template>
+        <el-switch
+            v-else-if="col.type === 'switch'"
+            :model-value="scope.row[col.field]"
+            :disabled="!crudApi?.setStatus"
+            @update:model-value="(val: boolean) => onSwitchChange(scope.row, val)"
+        />
         <span v-else-if="col.formatter">{{ col.formatter(scope.row, scope.row[col.field]) }}</span>
+        <span v-else-if="col.type === 'datetime'">{{ formatDateTime(scope.row[col.field], col.datetimeFormat) }}</span>
         <span v-else>{{ scope.row[col.field] }}</span>
       </template>
     </el-table-column>

@@ -44,11 +44,7 @@ const readonly = computed(() => props.mode === 'view')
 </script>
 
 <template>
-  <el-dialog
-      v-model="visible"
-      :title="title"
-      width="37.5rem"
-  >
+  <el-dialog v-model="visible" :title="title" width="70rem">
     <el-form :model="form" label-width="6.25rem">
       <el-form-item
           v-for="f in fields"
