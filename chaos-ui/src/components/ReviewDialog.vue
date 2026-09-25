@@ -2,8 +2,8 @@
 import {ref, computed, watch, onMounted} from 'vue'
 import {sendMessage} from '@/utils/api'
 import {ElMessage} from 'element-plus'
-import MarkdownIt from 'markdown-it'
-import DOMPurify from 'dompurify'
+import MarkdownPreview from '@/components/MarkdownPreview.vue'
+import {FSRS_RATING_OPTIONS} from '@/constants'
 
 const props = defineProps<{
   visible: boolean
@@ -26,18 +26,6 @@ const rawLink = ref('')
 const content = ref('')
 const answer = ref('')
 
-const md = new MarkdownIt({html: true, linkify: true, breaks: true})
-
-// raw_link 以 .md / .markdown 结尾时按 Markdown 渲染
-const isMarkdown = computed(() => {
-  const url = rawLink.value.split(/[?#]/)[0].toLowerCase()
-  return url.endsWith('.md') || url.endsWith('.markdown')
-})
-
-const renderedHtml = computed(() => {
-  if (!isMarkdown.value) return ''
-  return DOMPurify.sanitize(md.render(content.value || ''))
-})
 const revealed = ref(false)
 const submitting = ref(false)
 const selectedRating = ref<number | null>(null)
@@ -49,13 +37,6 @@ const aiResult = ref<{
   coverage: number
   suggestedRating: number
 } | null>(null)
-
-const ratingOptions = [
-  {value: 1, label: 'Again', desc: '完全想不起来', type: 'danger'},
-  {value: 2, label: 'Hard', desc: '记得但很吃力', type: 'warning'},
-  {value: 3, label: 'Good', desc: '基本完整', type: 'primary'},
-  {value: 4, label: 'Easy', desc: '毫不费力', type: 'success'},
-]
 
 watch(() => props.visible, (v) => {
   if (v) {
@@ -108,7 +89,7 @@ async function aiScore() {
 }
 
 function ratingLabel(v: number): string {
-  return ratingOptions.find(o => o.value === v)?.label || 'Good'
+  return FSRS_RATING_OPTIONS.find(o => o.value === v)?.label || 'Good'
 }
 
 async function loadRaw() {
@@ -162,8 +143,12 @@ async function submit() {
           <el-tag v-else size="small" type="info">已隐藏</el-tag>
         </div>
         <div class="pane-body">
-          <div v-if="isMarkdown" class="markdown-body" :class="{blurred: !revealed}" v-html="renderedHtml"></div>
-          <pre v-else class="raw-content" :class="{blurred: !revealed}">{{ content || '（无原文内容）' }}</pre>
+          <MarkdownPreview
+            :raw-link="rawLink"
+            :content="content"
+            :blurred="!revealed"
+            class="review-markdown"
+          />
           <div v-if="!revealed" class="mask" @click="reveal">
             <el-button type="primary" size="large" @click.stop="reveal">点击显示答案</el-button>
             <p class="mask-tip">先尽量回忆，再对照原文检查完整性</p>
@@ -230,7 +215,7 @@ async function submit() {
       <div class="rating-area">
         <div class="rating-buttons">
           <el-button
-              v-for="opt in ratingOptions"
+              v-for="opt in FSRS_RATING_OPTIONS"
               :key="opt.value"
               :type="opt.type"
               :plain="selectedRating !== opt.value"
@@ -327,115 +312,7 @@ async function submit() {
   text-align: center;
 }
 
-.raw-content {
-  margin: 0;
-  padding: 12px;
-  height: 100%;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--el-font-family);
-  font-size: 14px;
-  line-height: 1.6;
-  box-sizing: border-box;
-}
-
-.raw-content.blurred {
-  filter: blur(8px);
-  user-select: none;
-}
-
-.markdown-body {
-  height: 100%;
-  overflow: auto;
-  padding: 12px;
-  box-sizing: border-box;
-  font-family: var(--el-font-family);
-  font-size: 14px;
-  line-height: 1.6;
-  word-break: break-word;
-  text-align: left;
-}
-
-.markdown-body.blurred {
-  filter: blur(8px);
-  user-select: none;
-}
-
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4) {
-  margin: 1.1em 0 0.5em;
-  line-height: 1.3;
-}
-
-.markdown-body :deep(h1) {
-  font-size: 1.5em;
-}
-
-.markdown-body :deep(h2) {
-  font-size: 1.3em;
-}
-
-.markdown-body :deep(h3) {
-  font-size: 1.15em;
-}
-
-.markdown-body :deep(p) {
-  margin: 0.5em 0;
-}
-
-.markdown-body :deep(a) {
-  color: var(--el-color-primary);
-}
-
-.markdown-body :deep(code) {
-  background: var(--el-fill-color-light);
-  padding: 0.1em 0.4em;
-  border-radius: 4px;
-  font-size: 0.9em;
-}
-
-.markdown-body :deep(pre) {
-  background: var(--el-fill-color-light);
-  padding: 12px;
-  border-radius: var(--el-border-radius-base);
-  overflow: auto;
-}
-
-.markdown-body :deep(pre code) {
-  background: transparent;
-  padding: 0;
-}
-
-.markdown-body :deep(blockquote) {
-  margin: 0.5em 0;
-  padding-left: 12px;
-  border-left: 3px solid var(--el-border-color);
-  color: var(--el-text-color-secondary);
-}
-
-.markdown-body :deep(table) {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 0.5em 0;
-}
-
-.markdown-body :deep(th),
-.markdown-body :deep(td) {
-  border: 1px solid var(--el-border-color-lighter);
-  padding: 6px 10px;
-}
-
-.markdown-body :deep(img) {
-  max-width: 100%;
-}
-
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  padding-left: 1.4em;
-}
+/* 原文渲染交由 MarkdownPreview 组件负责，其样式在组件内维护 */
 
 .mask {
   position: absolute;

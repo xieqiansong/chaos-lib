@@ -5,6 +5,9 @@ import {ElMessage, ElMessageBox} from 'element-plus'
 import {openCenterPanel} from '@/utils/centerPanel'
 import {refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {taskPlansVersion} from '@/utils/taskPlansStore'
+import TaskPlanForm from '@/components/TaskPlanForm.vue'
+import RatingDialog from '@/components/RatingDialog.vue'
+import {PLAN_TYPE_MAP} from '@/constants'
 
 const props = defineProps<{
   searchText: string
@@ -44,6 +47,7 @@ const editingPlan = ref<TaskPlan | null>(null)
 const parentPlan = ref<TaskPlan | null>(null)
 
 const showRatingDialog = ref(false)
+const submittingRating = ref(false)
 const ratingAction = ref<'start-plan' | 'complete-plan'>('complete-plan')
 const ratingTargetPlan = ref<TaskPlan | null>(null)
 const ratingValue = ref<number | null>(3)
@@ -52,19 +56,9 @@ const showPriorityDialog = ref(false)
 const priorityTargetPlan = ref<TaskPlan | null>(null)
 const priorityValue = ref<number>(5)
 
-const ratingOptions = [
-  {value: 1, label: 'Again（忘记了）', type: 'danger'},
-  {value: 2, label: 'Hard（记得但困难）', type: 'warning'},
-  {value: 3, label: 'Good（正常记得）', type: 'primary'},
-  {value: 4, label: 'Easy（太简单）', type: 'success'},
-]
-
-const ratingDialogTitle = computed(() => {
-  if (ratingAction.value === 'start-plan') {
-    return `开启间隔任务 — ${ratingTargetPlan.value?.Name || ''}`
-  }
-  return `完成间隔任务 — ${ratingTargetPlan.value?.Name || ''}`
-})
+const ratingDialogTitle = computed(() =>
+  ratingAction.value === 'start-plan' ? '开启间隔任务' : '完成间隔任务',
+)
 
 function openRatingDialog(action: 'start-plan' | 'complete-plan', target: TaskPlan) {
   ratingAction.value = action
@@ -73,21 +67,14 @@ function openRatingDialog(action: 'start-plan' | 'complete-plan', target: TaskPl
   showRatingDialog.value = true
 }
 
-async function submitRatingDialog() {
-  if (ratingValue.value === null) {
-    ElMessage.error('请选择评分')
-    return
-  }
+async function submitRatingDialog(rating: number) {
+  submittingRating.value = true
   try {
     if (ratingAction.value === 'start-plan' && ratingTargetPlan.value) {
-      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/start`, 'PATCH', {
-        rating: ratingValue.value,
-      })
+      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/start`, 'PATCH', {rating})
       ElMessage.success('已开启')
     } else if (ratingAction.value === 'complete-plan' && ratingTargetPlan.value) {
-      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/complete`, 'PATCH', {
-        rating: ratingValue.value,
-      })
+      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/complete`, 'PATCH', {rating})
       ElMessage.success('已完成')
     }
     showRatingDialog.value = false
@@ -97,6 +84,8 @@ async function submitRatingDialog() {
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
+  } finally {
+    submittingRating.value = false
   }
 }
 
@@ -269,12 +258,6 @@ function resetLazyLoadedState(expandedIds: Set<number>) {
   } catch (e) {
     console.error('[tree] resetLazyLoadedState error:', e)
   }
-}
-
-const planTypeMap: Record<string, { text: string, type: string }> = {
-  todo: {text: '待办', type: 'primary'},
-  cron: {text: '周期', type: 'success'},
-  interval: {text: '间隔', type: 'warning'},
 }
 
 const selectableParents = computed(() => {
@@ -715,8 +698,8 @@ watch(taskPlansVersion, () => {
       </el-table-column>
       <el-table-column label="类型" width="80">
         <template #default="{ row }">
-          <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
-            {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
+          <el-tag size="small" :type="PLAN_TYPE_MAP[row.PlanType]?.type || 'info'">
+            {{ PLAN_TYPE_MAP[row.PlanType]?.text || row.PlanType }}
           </el-tag>
         </template>
       </el-table-column>
@@ -781,45 +764,7 @@ watch(taskPlansVersion, () => {
         title="新建任务计划"
         width="31.25rem"
     >
-      <el-form label-position="top">
-        <el-form-item label="任务名称">
-          <el-input v-model="formData.Name" placeholder="请输入任务名称"/>
-        </el-form-item>
-        <el-form-item label="任务类型">
-          <el-select v-model="formData.PlanType">
-            <el-option label="待办任务" value="todo"/>
-            <el-option label="周期重复任务" value="cron"/>
-            <el-option label="间隔任务" value="interval"/>
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'cron'" label="Cron 表达式">
-          <el-input v-model="formData.CronExpr" placeholder="如: 0 8 * * * (每天8:00)"/>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'todo'" label="开始时间">
-          <el-date-picker
-              v-model="formData.StartedAt"
-              type="datetime"
-              format="YYYY-MM-DD HH:mm:ss"
-              value-format="YYYY-MM-DD[T]HH:mm:ssZ"
-              placeholder="选择开始时间"
-              style="width: 100%"
-          />
-        </el-form-item>
-        <div class="form-row">
-          <el-form-item label="优先级">
-            <el-input-number v-model="formData.Priority" :min="0" :controls="false" placeholder="数值越大越优先" style="width: 100%"/>
-          </el-form-item>
-          <el-form-item label="排序">
-            <el-input-number v-model="formData.OrderNum" :min="0" :controls="false" placeholder="控制显示顺序" style="width: 100%"/>
-          </el-form-item>
-        </div>
-        <el-form-item label="关联链接">
-          <el-input v-model="formData.Link" placeholder="可选"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="formData.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
-        </el-form-item>
-      </el-form>
+      <TaskPlanForm :form-data="formData"/>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
         <el-button type="primary" @click="createPlan">创建</el-button>
@@ -831,45 +776,7 @@ watch(taskPlansVersion, () => {
         :title="`添加子任务 — ${parentPlan?.Name}`"
         width="31.25rem"
     >
-      <el-form label-position="top">
-        <el-form-item label="任务名称">
-          <el-input v-model="formData.Name" placeholder="请输入子任务名称"/>
-        </el-form-item>
-        <el-form-item label="任务类型">
-          <el-select v-model="formData.PlanType">
-            <el-option label="待办任务" value="todo"/>
-            <el-option label="周期重复任务" value="cron"/>
-            <el-option label="间隔任务" value="interval"/>
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'cron'" label="Cron 表达式">
-          <el-input v-model="formData.CronExpr" placeholder="如: 0 8 * * * (每天8:00)"/>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'todo'" label="开始时间">
-          <el-date-picker
-              v-model="formData.StartedAt"
-              type="datetime"
-              format="YYYY-MM-DD HH:mm:ss"
-              value-format="YYYY-MM-DD[T]HH:mm:ssZ"
-              placeholder="选择开始时间"
-              style="width: 100%"
-          />
-        </el-form-item>
-        <div class="form-row">
-          <el-form-item label="优先级">
-            <el-input-number v-model="formData.Priority" :min="0" :controls="false" placeholder="数值越大越优先" style="width: 100%"/>
-          </el-form-item>
-          <el-form-item label="排序">
-            <el-input-number v-model="formData.OrderNum" :min="0" :controls="false" placeholder="控制显示顺序" style="width: 100%"/>
-          </el-form-item>
-        </div>
-        <el-form-item label="关联链接">
-          <el-input v-model="formData.Link" placeholder="可选"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="formData.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
-        </el-form-item>
-      </el-form>
+      <TaskPlanForm :form-data="formData"/>
       <template #footer>
         <el-button @click="showAddChildDialog = false; parentPlan = null">取消</el-button>
         <el-button type="primary" @click="createPlan">创建</el-button>
@@ -881,86 +788,20 @@ watch(taskPlansVersion, () => {
         title="修改任务计划"
         width="31.25rem"
     >
-      <el-form label-position="top">
-        <el-form-item label="父任务">
-          <el-tree-select
-              v-model="formData.ParentId"
-              :data="selectableParents"
-              :props="{ label: 'Name', value: 'ID', children: 'Children' }"
-              node-key="ID"
-              check-strictly
-              clearable
-              placeholder="根节点（无父任务）"
-              style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="任务名称">
-          <el-input v-model="formData.Name" placeholder="请输入任务名称"/>
-        </el-form-item>
-        <el-form-item label="任务类型">
-          <el-select v-model="formData.PlanType">
-            <el-option label="待办任务" value="todo"/>
-            <el-option label="周期重复任务" value="cron"/>
-            <el-option label="间隔任务" value="interval"/>
-          </el-select>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'cron'" label="Cron 表达式">
-          <el-input v-model="formData.CronExpr" placeholder="如: 0 8 * * * (每天8:00)"/>
-        </el-form-item>
-        <el-form-item v-if="formData.PlanType === 'todo'" label="开始时间">
-          <el-date-picker
-              v-model="formData.StartedAt"
-              type="datetime"
-              format="YYYY-MM-DD HH:mm:ss"
-              value-format="YYYY-MM-DD[T]HH:mm:ssZ"
-              placeholder="选择开始时间"
-              style="width: 100%"
-          />
-        </el-form-item>
-        <div class="form-row">
-          <el-form-item label="优先级">
-            <el-input-number v-model="formData.Priority" :min="0" :controls="false" placeholder="数值越大越优先" style="width: 100%"/>
-          </el-form-item>
-          <el-form-item label="排序">
-            <el-input-number v-model="formData.OrderNum" :min="0" :controls="false" placeholder="控制显示顺序" style="width: 100%"/>
-          </el-form-item>
-        </div>
-        <el-form-item label="关联链接">
-          <el-input v-model="formData.Link" placeholder="可选"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="formData.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
-        </el-form-item>
-      </el-form>
+      <TaskPlanForm :form-data="formData" show-parent-select :selectable-parents="selectableParents"/>
       <template #footer>
         <el-button @click="showEditDialog = false; editingPlan = null">取消</el-button>
         <el-button type="primary" @click="updatePlan">保存修改</el-button>
       </template>
     </el-dialog>
-    <el-dialog
+    <RatingDialog
         v-model="showRatingDialog"
+        v-model:rating="ratingValue"
         :title="ratingDialogTitle"
-        width="30rem"
-    >
-      <el-alert
-          type="info"
-          :closable="false"
-          show-icon
-          title="阅读场景：提示下次重读的紧迫度。Easy→已烂熟，Good→按节奏，Hard→值得回顾，Again→完全没印象。不影响学习难度，只影响下次出现时间。"
-          class="mb-sm"
-      />
-      <div class="rating-group">
-        <el-radio-group v-model="ratingValue">
-          <el-radio v-for="opt in ratingOptions" :key="opt.value" :value="opt.value" :label="opt.value">
-            {{ opt.label }}
-          </el-radio>
-        </el-radio-group>
-      </div>
-      <template #footer>
-        <el-button @click="showRatingDialog = false; ratingTargetPlan = null">取消</el-button>
-        <el-button type="primary" @click="submitRatingDialog">确认</el-button>
-      </template>
-    </el-dialog>
+        :target-name="ratingTargetPlan?.Name || ''"
+        :loading="submittingRating"
+        @submit="submitRatingDialog"
+    />
 
     <el-dialog
         v-model="showPriorityDialog"
@@ -988,15 +829,5 @@ watch(taskPlansVersion, () => {
 <style scoped>
 .task-table {
   width: 100%;
-}
-
-.form-row {
-  display: flex;
-  gap: var(--space-md);
-}
-
-.form-row .el-form-item {
-  flex: 1;
-  margin-bottom: 18px;
 }
 </style>

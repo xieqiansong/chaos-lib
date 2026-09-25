@@ -6,6 +6,8 @@ import {format as formatDate, parseISO} from 'date-fns'
 import {CircleClose} from '@element-plus/icons-vue'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {openCenterPanel} from '@/utils/centerPanel'
+import RatingDialog from '@/components/RatingDialog.vue'
+import {PLAN_TYPE_MAP} from '@/constants'
 
 interface PendingTask {
   ID: number
@@ -118,6 +120,7 @@ function isPostponable(row: PendingTask): boolean {
 }
 
 const showRatingDialog = ref(false)
+const submittingRating = ref(false)
 const ratingTargetTask = ref<PendingTask | null>(null)
 const ratingValue = ref<number | null>(3)
 
@@ -133,19 +136,6 @@ function openReview(task: PendingTask) {
 function openPreview(task: PendingTask) {
   if (!task.RawLink) return
   openCenterPanel('preview', task.PlanID, task.PlanName)
-}
-
-const ratingOptions = [
-  {value: 1, label: 'Again（忘记了）', type: 'danger'},
-  {value: 2, label: 'Hard（记得但困难）', type: 'warning'},
-  {value: 3, label: 'Good（正常记得）', type: 'primary'},
-  {value: 4, label: 'Easy（太简单）', type: 'success'},
-]
-
-const planTypeMap: Record<string, { text: string, type: string }> = {
-  todo: {text: '待办', type: 'primary'},
-  cron: {text: '周期', type: 'success'},
-  interval: {text: '间隔', type: 'warning'},
 }
 
 function formatTime(timeStr: string | null) {
@@ -220,15 +210,12 @@ async function cancelTask(task: PendingTask) {
   }
 }
 
-async function submitRatingDialog() {
-  if (ratingValue.value === null) {
-    ElMessage.error('请选择评分')
-    return
-  }
+async function submitRatingDialog(rating: number) {
+  submittingRating.value = true
   try {
     if (ratingTargetTask.value) {
       await sendMessage(`tasks/${ratingTargetTask.value.ID}/complete`, 'PATCH', {
-        rating: ratingValue.value,
+        rating,
       })
       ElMessage.success('任务已完成')
     }
@@ -239,6 +226,8 @@ async function submitRatingDialog() {
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
+  } finally {
+    submittingRating.value = false
   }
 }
 
@@ -390,8 +379,8 @@ defineExpose({loadPendingTasks})
         <el-table-column type="selection" width="48" :selectable="isPostponable" reserve-selection/>
         <el-table-column label="类型" width="90">
           <template #default="{ row }">
-            <el-tag size="small" :type="planTypeMap[row.PlanType]?.type || 'info'">
-              {{ planTypeMap[row.PlanType]?.text || row.PlanType }}
+            <el-tag size="small" :type="PLAN_TYPE_MAP[row.PlanType]?.type || 'info'">
+              {{ PLAN_TYPE_MAP[row.PlanType]?.text || row.PlanType }}
             </el-tag>
           </template>
         </el-table-column>
@@ -443,30 +432,14 @@ defineExpose({loadPendingTasks})
       </div>
     </div>
 
-    <el-dialog
+    <RatingDialog
         v-model="showRatingDialog"
-        :title="`完成间隔任务 — ${ratingTargetTask?.PlanName || ''}`"
-        width="30rem"
-    >
-      <el-alert
-          type="info"
-          :closable="false"
-          show-icon
-          title="阅读场景：提示下次重读的紧迫度。Easy→已烂熟，Good→按节奏，Hard→值得回顾，Again→完全没印象。不影响学习难度，只影响下次出现时间。"
-          class="mb-sm"
-      />
-      <div class="rating-group">
-        <el-radio-group v-model="ratingValue">
-          <el-radio v-for="opt in ratingOptions" :key="opt.value" :value="opt.value" :label="opt.value">
-            {{ opt.label }}
-          </el-radio>
-        </el-radio-group>
-      </div>
-      <template #footer>
-        <el-button @click="showRatingDialog = false; ratingTargetTask = null">取消</el-button>
-        <el-button type="primary" @click="submitRatingDialog">确认</el-button>
-      </template>
-    </el-dialog>
+        v-model:rating="ratingValue"
+        title="完成间隔任务"
+        :target-name="ratingTargetTask?.PlanName || ''"
+        :loading="submittingRating"
+        @submit="submitRatingDialog"
+    />
 
     <el-dialog v-model="showPostponeDialog" :title="postponeDialogTitle" width="26.25rem">
       <div class="postpone-content">
