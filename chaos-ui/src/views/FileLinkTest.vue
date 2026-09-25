@@ -127,6 +127,7 @@ async function deleteLink(id: number) {
 
 // DataTable 暴露的 refresh（通过 ref 获取）
 const tableRef = ref<InstanceType<typeof DataTable>>()
+
 function refresh() {
   tableRef.value?.refresh()
 }
@@ -134,15 +135,8 @@ function refresh() {
 
 <template>
   <div>
-    <DataTable
-      ref="tableRef"
-      :columns="columns"
-      :api="fetchApi"
-      row-key="ID"
-    >
+    <DataTable ref="tableRef" :columns="columns" :api="fetchApi" row-key="ID">
       <template #toolbar>
-        <span class="text-primary text-base section-title">文件连接管理（临时测试）</span>
-        <span class="text-secondary text-xs">通用 DataTable 试点</span>
         <div class="section-actions">
           <el-button size="small" type="primary" @click="showCreateModal = true">+ 创建新连接</el-button>
         </div>
@@ -156,8 +150,8 @@ function refresh() {
 
       <template #Status="{ row }">
         <el-switch
-          :model-value="row.Status"
-          @update:model-value="(val: boolean) => toggleLinkStatus(row, val)"
+            :model-value="row.Status"
+            @update:model-value="(val: boolean) => toggleLinkStatus(row, val)"
         />
       </template>
 
