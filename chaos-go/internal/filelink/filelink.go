@@ -2,6 +2,8 @@ package filelink
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/pagination"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,8 +74,23 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 // ── Handlers ──────────────────────────────────────────────────────
 
 func GetFileLinks(c *gin.Context) {
+	q := pagination.Parse(c)
+
+	base := config.GetDB().Model(&FileLink{}).Order("sort ASC, id ASC")
+
+	// 可选：按源路径 / 目标路径 / 备注模糊搜索
+	if raw := strings.TrimSpace(c.Query("search")); raw != "" {
+		like := "%" + raw + "%"
+		base = base.Where("source_path LIKE ? OR target_path LIKE ? OR remark LIKE ?", like, like, like)
+	}
+
 	var links []FileLink
-	config.GetDB().Debug().Order("sort ASC, id ASC").Find(&links)
+	total, err := pagination.Paginate(base, &links, q)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		return
+	}
+
 	responses := make([]FileLinkResponse, 0, len(links))
 	for _, link := range links {
 		responses = append(responses, FileLinkResponse{
@@ -82,7 +99,9 @@ func GetFileLinks(c *gin.Context) {
 			LinkStatus: checkLinkStatus(link.SourcePath, link.TargetPath, link.Status),
 		})
 	}
-	c.JSON(200, responses)
+
+	// 统一分页响应：{ items, total, page, size }
+	c.JSON(http.StatusOK, pagination.New(responses, total, q))
 }
 
 func CreateFileLink(c *gin.Context) {

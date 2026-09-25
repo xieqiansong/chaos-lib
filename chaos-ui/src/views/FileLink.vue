@@ -23,6 +23,11 @@ const loading = ref(false)
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 
+// 服务端分页：配合后端 fileLinks 的 { items, total, page, size } 响应
+const page = ref(1)
+const size = ref(10)
+const total = ref(0)
+
 const newLink = ref({
   SourcePath: '',
   TargetPath: '',
@@ -57,13 +62,38 @@ async function fetchFileLinks() {
   loading.value = true
   error.value = ''
   try {
-    fileLinks.value = await sendMessage('fileLinks', 'GET')
+    const search = props.searchText.trim()
+    const query: Record<string, any> = {page: page.value, size: size.value}
+    if (search) {
+      query.search = search
+    }
+    const result = await sendMessage('fileLinks', 'GET', query)
+    if (result && Array.isArray(result.items)) {
+      fileLinks.value = result.items
+      total.value = result.total
+      // 当前页被取空且非首页（通常是删除后数据变少），回退一页再拉取
+      if (fileLinks.value.length === 0 && page.value > 1) {
+        page.value -= 1
+        return fetchFileLinks()
+      }
+    }
   } catch (e) {
     error.value = '获取文件连接失败'
     console.error(e)
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(p: number) {
+  page.value = p
+  fetchFileLinks()
+}
+
+function handleSizeChange(s: number) {
+  size.value = s
+  page.value = 1
+  fetchFileLinks()
 }
 
 async function createLink() {
@@ -76,6 +106,7 @@ async function createLink() {
     await sendMessage('fileLinks', 'POST', newLink.value)
     showCreateModal.value = false
     newLink.value = {SourcePath: '', TargetPath: '', Remark: '', Sort: 0}
+    page.value = 1
     await fetchFileLinks()
   } catch (e) {
     error.value = '创建文件连接失败'
@@ -135,6 +166,7 @@ async function deleteLink(id: number) {
 }
 
 watch(() => props.searchText, () => {
+  page.value = 1
   fetchFileLinks()
 })
 
@@ -168,11 +200,13 @@ onMounted(() => {
         animated
     />
 
-    <div v-else-if="fileLinks.length === 0" class="empty-wrap">
-      <el-empty description="暂无文件连接"/>
-    </div>
+    <template v-else>
+      <div v-if="fileLinks.length === 0" class="empty-wrap">
+        <el-empty description="暂无文件连接"/>
+      </div>
 
-    <el-table v-else :data="fileLinks" class="filelink-table">
+      <template v-else>
+        <el-table :data="fileLinks" class="filelink-table">
       <el-table-column prop="SourcePath" label="源路径" min-width="200"/>
       <el-table-column prop="TargetPath" label="目标路径" min-width="200"/>
       <el-table-column prop="Remark" label="备注" min-width="120"/>
@@ -213,6 +247,17 @@ onMounted(() => {
         </template>
       </el-table-column>
     </el-table>
+
+        <div class="pager">
+          <el-pagination :current-page="page" :page-size="size" :total="total"
+                         :page-sizes="[10, 20, 50, 100]"
+                         layout="total, sizes, prev, pager, next, jumper"
+                         @current-change="handlePageChange"
+                         @size-change="handleSizeChange"
+          />
+        </div>
+      </template>
+    </template>
 
     <el-dialog
         v-model="showCreateModal"
@@ -279,6 +324,12 @@ onMounted(() => {
 <style scoped>
 .filelink-table {
   width: 100%;
+}
+
+.pager {
+  margin-top: var(--space-sm);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .filelink-table :deep(.cell),
