@@ -126,6 +126,12 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/Bookmarks.vue'),
     meta: {title: '书签管理', icon: 'Star'},
   },
+  {
+    path: '/cronJob',
+    name: 'cronJob',
+    component: () => import('@/views/CronJob.vue'),
+    meta: {title: '定时任务', icon: 'AlarmClock'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

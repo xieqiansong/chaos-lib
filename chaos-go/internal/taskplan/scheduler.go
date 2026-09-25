@@ -2,7 +2,6 @@ package taskplan
 
 import (
 	"chaos-go/config"
-	"chaos-go/scheduler"
 	"log/slog"
 	"time"
 
@@ -15,10 +14,8 @@ const (
 	cronSweepCap      = 50
 )
 
-func init() {
-	scheduler.Register("scheduled-task-scheduler", schedulerInterval, SweepScheduledTaskPlans)
-}
-
+// SweepScheduledTaskPlans 扫描已开启的 cron / interval 计划并生成任务，
+// 现由定时任务模块（/api/systemJobs/sweep）按 cron 触发，不再自动注册到后台调度器。
 func SweepScheduledTaskPlans() {
 	sweepCronPlans()
 	sweepIntervalPlans()

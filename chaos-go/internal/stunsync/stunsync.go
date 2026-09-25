@@ -11,7 +11,6 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/mqttsync"
-	"chaos-go/scheduler"
 	"chaos-go/tools"
 )
 
@@ -54,8 +53,14 @@ func splitHostPort(addr string) (string, string) {
 	return host, port
 }
 
-func init() {
-	scheduler.Register("stun-rule-sync", interval(), run, enabled)
+// RunSync 供定时任务模块通过 HTTP API（/api/systemJobs/stunRuleSync）触发；
+// 未启用（需 MQTT 已启用且配置 LUCKY_OPEN_TOKEN）时直接跳过。
+func RunSync() {
+	if !enabled() {
+		slog.Info("stun 规则同步跳过", "reason", "未启用（需 MQTT 已启用且配置 LUCKY_OPEN_TOKEN）")
+		return
+	}
+	run()
 }
 
 // interval 返回同步间隔：读取配置，非法值时回退到 60 秒。

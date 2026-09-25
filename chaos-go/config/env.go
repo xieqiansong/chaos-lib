@@ -28,6 +28,9 @@ type AppConfig struct {
 
 	FeatureFileLink bool `env:"FEATURE_FILE_LINK" envDefault:"true"`
 
+	// 定时任务模块的「执行命令/脚本」动作总开关，缺省关闭（危险能力，按需开启）。
+	FeatureCronShell bool `env:"FEATURE_CRON_SHELL" envDefault:"false"`
+
 	DeepSeekAPIKey string `env:"DEEPSEEK_API_KEY"`
 	BaiduAK        string `env:"BAIDU_AK"`
 

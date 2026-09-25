@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"chaos-go/internal/cronjob"
 	"chaos-go/internal/dbmonitor"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
@@ -10,6 +11,8 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
+	"chaos-go/internal/stunpf"
+	stunsync "chaos-go/internal/stunsync"
 	"chaos-go/internal/taskplan"
 	"io"
 	"io/fs"
@@ -115,6 +118,41 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			tasks.PATCH("/:id/cancel", taskplan.CancelTask)
 			tasks.PATCH("/:id/postpone", taskplan.PostponeTask)
 			tasks.POST("/batch-postpone", taskplan.BatchPostponeTasks)
+		}
+
+		// 定时任务（独立模块，与任务计划 / 待办任务无关）：cron 调度 + 动作执行 + 运行日志
+		cronJobs := api.Group("/cronJobs")
+		{
+			cronJobs.GET("/", cronjob.ListCronJobs)
+			cronJobs.POST("/", cronjob.CreateCronJob)
+			cronJobs.GET("/:id", cronjob.GetCronJob)
+			cronJobs.PATCH("/:id", cronjob.UpdateCronJob)
+			cronJobs.DELETE("/:id", cronjob.DeleteCronJob)
+			cronJobs.PATCH("/:id/toggle", cronjob.ToggleCronJob)
+			cronJobs.POST("/:id/run", cronjob.RunCronJob)
+			cronJobs.GET("/:id/runs", cronjob.ListCronJobRuns)
+			cronJobs.POST("/preview", cronjob.PreviewCron)
+		}
+
+		// 由原系统内置周期任务改造而来的内部动作接口，供定时任务模块通过 HTTP 触发
+		sysJobs := api.Group("/systemJobs")
+		{
+			sysJobs.POST("/sweep", func(c *gin.Context) {
+				taskplan.SweepScheduledTaskPlans()
+				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+			})
+			sysJobs.POST("/portForwardSelfHeal", func(c *gin.Context) {
+				portfwd.SelfHealForwards()
+				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+			})
+			sysJobs.POST("/stunRuleSync", func(c *gin.Context) {
+				stunsync.RunSync()
+				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+			})
+			sysJobs.POST("/stunPortForwardSync", func(c *gin.Context) {
+				stunpf.RunSync()
+				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+			})
 		}
 
 		notify := api.Group("/notify")

@@ -10,7 +10,6 @@ import (
 	"chaos-go/config"
 	"chaos-go/internal/mqttsync"
 	"chaos-go/internal/portfwd"
-	"chaos-go/scheduler"
 )
 
 // stunTopicPrefix 是 STUN 消息 channel 的前缀，与 stunsync 发布时一致。
@@ -59,8 +58,14 @@ func lastColon(s string) int {
 	return -1
 }
 
-func init() {
-	scheduler.Register("stun-port-forward-sync", interval(), run, enabled)
+// RunSync 供定时任务模块通过 HTTP API（/api/systemJobs/stunPortForwardSync）触发；
+// 未启用（需 MQTT 已启用）时直接跳过。
+func RunSync() {
+	if !enabled() {
+		slog.Info("stun 端口转发同步跳过", "reason", "未启用（需 MQTT 已启用）")
+		return
+	}
+	run()
 }
 
 // interval 返回同步间隔：读取配置，非法值时回退到 30 秒。

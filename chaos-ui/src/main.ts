@@ -9,6 +9,7 @@ import './style.css';
 import App from './App.vue';
 import router from './router';
 import {
+    AlarmClock,
     Clock,
     Coin,
     Collection,
@@ -41,7 +42,7 @@ initTheme();
 const app = createApp(App);
 
 // 全局注册用到的 Element Plus 图标（白名单），供路由 meta.icon 按名称动态渲染
-const usedIcons = {Clock, Coin, Collection, Connection, Delete, EditPen, Folder, HomeFilled, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Star, Sunny, Tickets}
+const usedIcons = {AlarmClock, Clock, Coin, Collection, Connection, Delete, EditPen, Folder, HomeFilled, Link, MagicStick, Monitor, Moon, Odometer, Plus, Setting, Sort, Star, Sunny, Tickets}
 for (const [key, component] of Object.entries(usedIcons)) {
     app.component(key, component);
 }

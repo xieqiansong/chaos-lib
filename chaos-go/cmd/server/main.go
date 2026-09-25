@@ -2,6 +2,7 @@ package main
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/cronjob"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	mqttsync "chaos-go/internal/mqttsync"
@@ -128,6 +129,8 @@ func main() {
 		&proxy.SdkSource{},
 		&mqttsync.MqttSyncMessage{},
 		&mqttsync.MqttSyncNode{},
+		&cronjob.CronJob{},
+		&cronjob.CronJobRun{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}
@@ -146,11 +149,16 @@ func main() {
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
 
-	// 端口转发自愈：周期性重连"期望运行但实际未运行"的规则（覆盖重启恢复失败、隧道意外消亡等）
-	scheduler.Register("端口转发自愈", 5*time.Minute, portfwd.SelfHealForwards)
+	// 端口转发自愈等原内置周期任务已改为 API（/api/systemJobs/*），
+	// 由定时任务模块按 cron 触发，见下方 cronjob 启动逻辑。
 
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
+
+	// 定时任务模块：首次运行时写入由原内置周期任务转换而来的默认任务，
+	// 随后启动基于 robfig/cron 的调度器，按 cron 表达式触发各类动作。
+	cronjob.SeedDefaults()
+	cronjob.Start()
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	r := routes.SetupRouter(resolveUIFS())
