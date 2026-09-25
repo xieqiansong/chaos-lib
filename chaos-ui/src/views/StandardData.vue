@@ -7,7 +7,8 @@ import {reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn} from '@/components/dataTable/types'
-import {standardDataApi, type StandardData} from '@/api/standardData'
+import DataFormDialog, {type FormField} from '@/components/DataFormDialog.vue'
+import {type StandardData, standardDataApi} from '@/api/standardData'
 
 const tableRef = ref<InstanceType<typeof DataTable>>()
 
@@ -27,11 +28,26 @@ const columns: DataTableColumn[] = [
   {field: '__actions', title: '操作', width: 160, type: 'actions', fixed: 'right'},
 ]
 
+// 表单字段配置（与 columns 对应，驱动通用 DataFormDialog）
+const fields: FormField[] = [
+  {field: 'Name', title: '名称', type: 'text', required: true, placeholder: '请输入名称'},
+  {field: 'Code', title: '编码', type: 'text', required: true, placeholder: '请输入编码'},
+  {field: 'Category', title: '分类', type: 'text', placeholder: '可选分类'},
+  {field: 'Description', title: '描述', type: 'textarea', rows: 2, placeholder: '可选描述'},
+  {field: 'Quantity', title: '数量', type: 'number', min: 0},
+  {field: 'Price', title: '金额', type: 'number', min: 0, precision: 2, step: 0.01},
+  {field: 'Enabled', title: '启用', type: 'switch'},
+  {field: 'Config', title: '配置(JSON)', type: 'json', rows: 3, placeholder: '如 {"k":"v"}'},
+  {field: 'EffectiveAt', title: '生效时间', type: 'datetime'},
+  {field: 'Sort', title: '排序', type: 'number', min: 0},
+]
+
 // ---- 表单（新建 / 编辑共用） ----
 const showDialog = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const editingId = ref<number | null>(null)
 const saving = ref(false)
+const showView = ref(false)
 
 function emptyForm(): Partial<StandardData> {
   return {
@@ -73,6 +89,22 @@ function openEdit(row: StandardData) {
     Sort: row.Sort,
   })
   showDialog.value = true
+}
+
+function openView(row: StandardData) {
+  Object.assign(form, {
+    Name: row.Name,
+    Code: row.Code,
+    Description: row.Description,
+    Category: row.Category,
+    Quantity: row.Quantity,
+    Price: row.Price,
+    Enabled: row.Enabled,
+    Config: row.Config,
+    EffectiveAt: row.EffectiveAt,
+    Sort: row.Sort,
+  })
+  showView.value = true
 }
 
 async function save() {
@@ -143,58 +175,28 @@ async function remove(row: StandardData) {
       </template>
 
       <template #actions="{ row }">
+        <el-button size="small" text @click="openView(row)">查看</el-button>
         <el-button type="primary" size="small" text @click="openEdit(row)">编辑</el-button>
         <el-button type="danger" size="small" text @click="remove(row)">删除</el-button>
       </template>
     </DataTable>
 
-    <el-dialog
+    <DataFormDialog
         v-model="showDialog"
         :title="dialogMode === 'create' ? '新建标准数据' : '编辑标准数据'"
-        width="37.5rem"
-    >
-      <el-form :model="form" label-width="6.25rem">
-        <el-form-item label="名称" required>
-          <el-input v-model="form.Name" placeholder="请输入名称"/>
-        </el-form-item>
-        <el-form-item label="编码" required>
-          <el-input v-model="form.Code" placeholder="请输入编码"/>
-        </el-form-item>
-        <el-form-item label="分类">
-          <el-input v-model="form.Category" placeholder="可选分类"/>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.Description" type="textarea" :rows="2" placeholder="可选描述"/>
-        </el-form-item>
-        <el-form-item label="数量">
-          <el-input-number v-model="form.Quantity" :min="0" controls-position="right"/>
-        </el-form-item>
-        <el-form-item label="金额">
-          <el-input-number v-model="form.Price" :min="0" :precision="2" :step="0.01" controls-position="right"/>
-        </el-form-item>
-        <el-form-item label="启用">
-          <el-switch v-model="form.Enabled"/>
-        </el-form-item>
-        <el-form-item label="配置(JSON)">
-          <el-input v-model="form.Config" type="textarea" :rows="3" placeholder='如 {"k":"v"}'/>
-        </el-form-item>
-        <el-form-item label="生效时间">
-          <el-date-picker
-              v-model="form.EffectiveAt"
-              type="datetime"
-              value-format="YYYY-MM-DDTHH:mm:ssZ"
-              placeholder="可选"
-              style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number v-model="form.Sort" :min="0" controls-position="right"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
-      </template>
-    </el-dialog>
+        :mode="dialogMode"
+        :fields="fields"
+        :form="form as any"
+        :saving="saving"
+        @save="save"
+    />
+
+    <DataFormDialog
+        v-model="showView"
+        title="查看标准数据"
+        mode="view"
+        :fields="fields"
+        :form="form as any"
+    />
   </div>
 </template>
