@@ -65,7 +65,7 @@
 
 ### 前端（chaos-ui）
 - `src/api/<resource>.ts`：定义 `interface <Resource>`（含基字段 ID / CreatedAt / UpdatedAt / IsDeleted）+ `export const <resource>Api = useRestApi<Resource>('<resource>')`。
-- `src/views/<Resource>.vue`：用通用 `DataTable`（`border` 默认开、`#toolbar` 插槽放「创建」按钮、搜索行在上操作行在下）+ 通用 `DataFormDialog`（表单字段由 `fields` 配置驱动，支持 text/textarea/json/number/switch/datetime）；路由在 `src/router/index.ts` 的 `appRoutes` 追加。
+- `src/views/<Resource>.vue`：用通用 `DataTable`，只需声明 `columns`（表格列）与 `fields`（表单字段，驱动内置弹窗）。`DataTable` 的 `api` 传**完整 `useRestApi` 对象**时，自动内置「查看/编辑/删除」操作列与新建/编辑/查看弹窗（`DataFormDialog`），无需任何增删改查样板；`#field` 具名插槽可自定义单元格（如启用开关）。路由在 `src/router/index.ts` 的 `appRoutes` 追加。
 - 增删改走 `useRestApi` 自动拼 `/api/<resource>`。
 
 ### 约定
