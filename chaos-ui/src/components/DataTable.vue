@@ -7,6 +7,12 @@
 //         非 CRUD 场景可仅用 { type: 'actions' } + #actions 插槽自行定义全部按钮。
 import {computed, onMounted, reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
+
+// 选择变化事件：透传 el-table 的 selection-change，便于业务层做批量操作。
+const emit = defineEmits<{
+  (e: 'selection-change', rows: any[]): void
+  (e: 'reset'): void
+}>()
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
 import {defaultFieldValue} from '@/composables/useFormDefaults'
@@ -45,6 +51,12 @@ const props = withDefaults(
       switchHandler?: (row: any, next: boolean) => Promise<void> | void
       /** 初始排序：首次取数即带 sort 参数（后端默认按 id 排，需要按业务字段排时由此指定） */
       defaultSort?: { field: string; order: 'ascending' | 'descending' }
+      /** 行 class 回调（透传 el-table 的 row-class-name），用于按行状态高亮，如逾期/已到点 */
+      rowClassName?: (row: any, index: number) => string
+      /** 勾选列可勾选判定（透传 el-table-column selection 的 :selectable） */
+      selectable?: (row: any, index: number) => boolean
+      /** 勾选列是否跨分页保留选中（透传 :reserve-selection） */
+      reserveSelection?: boolean
     }>(),
     {
       data: undefined,
@@ -103,6 +115,12 @@ const {
 })
 
 onMounted(() => getData())
+
+// 重置：先通知父级清空自定义筛选（如提前查询/计划树），再清空搜索栏内置项并刷新
+function onReset() {
+  emit('reset')
+  handleReset()
+}
 
 // 内置 CRUD 模式且未显式声明 actions 列时，自动追加操作列
 const finalColumns = computed<DataTableColumn[]>(() => {
@@ -232,8 +250,9 @@ defineExpose({refresh, getData})
       <slot name="toolbar"/>
       <el-button v-if="crudMode && hasAction(CRUD_ACTION.CREATE)" size="small" type="primary" @click="openCreate">+ 新建{{ title }}</el-button>
     </div>
-    <div v-if="searchableColumns.length" class="toolbar-search">
+    <div v-if="searchableColumns.length || $slots['search-extra']" class="toolbar-search">
       <el-form :inline="true" @submit.prevent>
+        <slot name="search-extra" />
         <el-form-item
           v-for="col in searchableColumns"
           :key="col.field"
@@ -265,7 +284,7 @@ defineExpose({refresh, getData})
         </el-form-item>
         <el-form-item>
           <el-button type="primary" size="small" @click="handleSearch">查询</el-button>
-          <el-button size="small" @click="handleReset">重置</el-button>
+          <el-button size="small" @click="onReset">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -280,10 +299,18 @@ defineExpose({refresh, getData})
     :border="border"
     class="datatable"
     :default-sort="defaultSort ? {prop: defaultSort.field, order: defaultSort.order} : undefined"
+    :row-class-name="rowClassName"
     size="small"
     @sort-change="handleSortChange"
+    @selection-change="(rows: any) => emit('selection-change', rows)"
   >
-    <el-table-column v-if="selection" type="selection" width="48"/>
+    <el-table-column
+      v-if="selection"
+      type="selection"
+      width="48"
+      :selectable="selectable"
+      :reserve-selection="reserveSelection"
+    />
 
     <el-table-column
       v-for="col in finalColumns"
@@ -386,6 +413,7 @@ defineExpose({refresh, getData})
   order: 2;
   flex: 1 1 100%;
   display: flex;
+  align-items: center;
   justify-content: flex-start;
 }
 

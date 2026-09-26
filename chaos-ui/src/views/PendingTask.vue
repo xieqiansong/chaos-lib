@@ -1,9 +1,16 @@
 <script setup lang="ts">
+// 待办任务（任务收件箱）：以通用 DataTable 驱动只读列表展示（对齐「标准数据」基线），
+// 但本视图不是 CRUD 资源，操作是 完成/取消/延期/复习/预览/跳转，
+// 且列表为 tasks JOIN task_plans 的连表查询（后端 GetPendingTasks 自定义 handler）。
+// 故仅复用 DataTable 的展示层（columns + #toolbar/#actions/#field 插槽），
+// 业务动作、计划树筛选、提前查询、评分/延期弹窗、轮询刷新、逾期高亮等定制能力全部保留在此页。
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {batchPostponeTasks, sendMessage} from '@/utils/api'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format as formatDate, parseISO} from 'date-fns'
 import {CircleClose} from '@element-plus/icons-vue'
+import DataTable from '@/components/DataTable.vue'
+import type {DataTableColumn, DataTableApiParams, DataTableApiResult} from '@/components/dataTable/types'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {openCenterPanel} from '@/utils/centerPanel'
 import RatingDialog from '@/components/RatingDialog.vue'
@@ -27,14 +34,11 @@ interface PendingTask {
   IsOverdue: boolean
 }
 
-const pendingTasks = ref<PendingTask[]>([])
+const dataTableRef = ref<any>(null)
+
+// 提前查询开关 + 计划树筛选（本页自定义，不走 DataTable 标准 search）
 const earlyMode = ref(true)
 const selectedTasks = ref<PendingTask[]>([])
-
-// 服务端分页：配合后端 tasks/pending 的 { items, total, page, size } 响应
-const page = ref(1)
-const size = ref(10)
-const total = ref(0)
 
 // 任务计划筛选：点击展开计划树（最多两层），选中后按该计划及其子孙计划过滤
 interface PlanTreeNode {
@@ -56,8 +60,8 @@ function toPlanTreeOptions(nodes: any[]): PlanTreeNode[] {
       label: child.Name,
     }))
     return children.length > 0
-        ? {value: node.ID, label: node.Name, children}
-        : {value: node.ID, label: node.Name}
+      ? {value: node.ID, label: node.Name, children}
+      : {value: node.ID, label: node.Name}
   })
 }
 
@@ -73,62 +77,76 @@ async function loadPlanTree() {
   }
 }
 
-function handlePlanFilterChange() {
-  // 切换筛选后数据集合变化，回到第 1 页避免落到空页
-  page.value = 1
-  loadPendingTasks()
-}
-
-// 点击计划树节点（含第一层根计划）：选中并关闭面板
 function onPlanNodeClick(node: PlanTreeNode) {
   filterPlanId.value = node.value
   filterPlanLabel.value = node.label
   planPopoverVisible.value = false
-  handlePlanFilterChange()
 }
 
-// 清空筛选：恢复全量待办
 function clearPlanFilter() {
   filterPlanId.value = null
   filterPlanLabel.value = ''
-  handlePlanFilterChange()
 }
 
-function handlePageChange(p: number) {
-  page.value = p
-  loadPendingTasks()
-}
-
-function handleSizeChange(s: number) {
-  size.value = s
-  page.value = 1
-  loadPendingTasks()
-}
-
-function handleEarlyModeChange() {
-  // 切换「提前查询」后数据集合变化，回到第 1 页避免落到空页
-  page.value = 1
-  loadPendingTasks()
-}
-
-function handleSelectionChange(rows: PendingTask[]) {
-  selectedTasks.value = rows
+// 搜索栏「重置」：清空自定义筛选（提前查询/计划树），恢复初始无过滤状态
+function onSearchReset() {
+  earlyMode.value = true
+  filterPlanId.value = null
+  filterPlanLabel.value = ''
 }
 
 function isPostponable(row: PendingTask): boolean {
   return row.PlanType === 'todo' || row.PlanType === 'interval'
 }
 
-const showRatingDialog = ref(false)
-const submittingRating = ref(false)
-const ratingTargetTask = ref<PendingTask | null>(null)
-const ratingValue = ref<number | null>(3)
+// DataTable 取数：把分页 + 本页自定义 early/planId + 排序拼成 query，
+// 对齐后端基线列表契约（page/size/sort/order → { items, total, page, size }）。
+async function fetchPending(params: DataTableApiParams): Promise<DataTableApiResult> {
+  const query: Record<string, any> = {
+    early: earlyMode.value ? 1 : 0,
+    page: params.page,
+    size: params.pageSize,
+  }
+  if (params.search?.PlanName) query.name = params.search.PlanName
+  if (filterPlanId.value) query.planId = filterPlanId.value
+  if (params.sort?.field) {
+    // 仅允许已知排序列；其余忽略（后端白名单二次校验）
+    const map: Record<string, string> = {StartedAt: 'started_at'}
+    const col = map[params.sort.field]
+    if (col) {
+      query.sort = col
+      query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'
+    }
+  }
+  const result = await sendMessage('tasks/pending', 'GET', query)
+  return {rows: (result?.items ?? []) as PendingTask[], total: result?.total ?? 0}
+}
 
-const showPostponeDialog = ref(false)
-const postponeTargetTask = ref<PendingTask | null>(null)
-const postponeDays = ref<number>(1)
-const postponePresets = [1, 3, 7]
+function onSelectionChange(rows: any[]) {
+  selectedTasks.value = rows as PendingTask[]
+}
 
+// 逾期行高亮：StartedAt 已到即标记（与原 cellStyle 行为一致，整行背景提示）
+function rowClassName(row: any): string {
+  const t = row as PendingTask
+  if (t.StartedAt && Date.now() > parseISO(t.StartedAt).getTime()) {
+    return 'pending-overdue-row'
+  }
+  return ''
+}
+
+// 列定义：仅声明展示列，操作列交由 #actions 插槽；不启用标准 CRUD。
+const columns: DataTableColumn[] = [
+  {field: 'PlanType', title: '类型', width: 90},
+  {field: 'PlanName', title: '任务名称', minWidth: 200, searchable: true, search: {placeholder: '请输入任务名称'}},
+  {field: 'ContentSize', title: '字数', width: 80},
+  {field: 'FsrsReps', title: '复习次数', width: 90},
+  {field: 'Status', title: '状态', width: 90},
+  {field: 'StartedAt', title: '开始时间', width: 120, sortable: true},
+  {field: '__actions', title: '操作', width: 240, type: 'actions', fixed: 'right'},
+]
+
+// ── 业务操作（保持原行为） ──────────────────────────────────────────────
 function openReview(task: PendingTask) {
   openCenterPanel('review', task.PlanID, task.PlanName)
 }
@@ -151,25 +169,6 @@ function openLink(link: string) {
   window.open(link, '_blank')
 }
 
-async function loadPendingTasks() {
-  try {
-    const planParam = filterPlanId.value ? `&planId=${filterPlanId.value}` : ''
-    const url = `tasks/pending?early=${earlyMode.value ? 1 : 0}&page=${page.value}&size=${size.value}${planParam}`
-    const result = await sendMessage(url, 'GET')
-    if (result && Array.isArray(result.items)) {
-      pendingTasks.value = result.items
-      total.value = result.total
-      // 当前页被取空且非首页（通常是完成/取消后数据变少），回退一页再拉取
-      if (pendingTasks.value.length === 0 && page.value > 1) {
-        page.value -= 1
-        return loadPendingTasks()
-      }
-    }
-  } catch (e) {
-    console.error(e)
-  }
-}
-
 async function completeTask(task: PendingTask) {
   if (task.PlanType === 'interval') {
     ratingTargetTask.value = task
@@ -185,7 +184,6 @@ async function completeTask(task: PendingTask) {
     })
     await sendMessage(`tasks/${task.ID}/complete`, 'PATCH', {})
     refreshPendingTasks()
-
     ElMessage.success('任务已完成')
   } catch (e: any) {
     if (e === 'cancel') return
@@ -202,7 +200,6 @@ async function cancelTask(task: PendingTask) {
     })
     await sendMessage(`tasks/${task.ID}/cancel`, 'PATCH', {})
     refreshPendingTasks()
-
     ElMessage.success('任务已取消')
   } catch (e: any) {
     if (e === 'cancel') return
@@ -214,15 +211,12 @@ async function submitRatingDialog(rating: number) {
   submittingRating.value = true
   try {
     if (ratingTargetTask.value) {
-      await sendMessage(`tasks/${ratingTargetTask.value.ID}/complete`, 'PATCH', {
-        rating,
-      })
+      await sendMessage(`tasks/${ratingTargetTask.value.ID}/complete`, 'PATCH', {rating})
       ElMessage.success('任务已完成')
     }
     showRatingDialog.value = false
     ratingTargetTask.value = null
     refreshPendingTasks()
-
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
@@ -231,18 +225,28 @@ async function submitRatingDialog(rating: number) {
   }
 }
 
-async function postponeTask(task: PendingTask) {
+function postponeTask(task: PendingTask) {
   postponeTargetTask.value = task
   postponeDays.value = 1
   showPostponeDialog.value = true
 }
 
-async function batchPostpone() {
+function batchPostpone() {
   if (selectedTasks.value.length === 0) return
   postponeTargetTask.value = null
   postponeDays.value = 1
   showPostponeDialog.value = true
 }
+
+const showRatingDialog = ref(false)
+const submittingRating = ref(false)
+const ratingTargetTask = ref<PendingTask | null>(null)
+const ratingValue = ref<number | null>(3)
+
+const showPostponeDialog = ref(false)
+const postponeTargetTask = ref<PendingTask | null>(null)
+const postponeDays = ref<number>(1)
+const postponePresets = [1, 3, 7]
 
 const postponeDialogTitle = computed(() => {
   if (postponeTargetTask.value) {
@@ -258,9 +262,7 @@ async function submitPostponeDialog() {
   }
   try {
     if (postponeTargetTask.value) {
-      await sendMessage(`tasks/${postponeTargetTask.value.ID}/postpone`, 'PATCH', {
-        days: postponeDays.value,
-      })
+      await sendMessage(`tasks/${postponeTargetTask.value.ID}/postpone`, 'PATCH', {days: postponeDays.value})
       ElMessage.success(`已延期 ${postponeDays.value} 天`)
     } else if (selectedTasks.value.length > 0) {
       const ids = selectedTasks.value.map(t => t.ID)
@@ -276,34 +278,24 @@ async function submitPostponeDialog() {
     postponeTargetTask.value = null
     selectedTasks.value = []
     refreshPendingTasks()
-
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
     console.error(e)
   }
 }
 
-function cellStyle({row}: { row: PendingTask }) {
-  if (row.StartedAt && Date.now() > parseISO(row.StartedAt).getTime()) {
-    return {backgroundColor: 'rgba(245, 108, 108, 0.12)'}
-  }
-  return {}
+function reload() {
+  dataTableRef.value?.refresh()
 }
-
 
 let pendingTimer: ReturnType<typeof setInterval>
 let stopVersionWatch: () => void
 
 onMounted(() => {
   loadPlanTree()
-  loadPendingTasks()
-  pendingTimer = setInterval(() => {
-    loadPendingTasks()
-  }, 30000)
+  pendingTimer = setInterval(() => reload(), 30000)
   // 订阅全局刷新信号：其它实例（如任务表格）操作后本实例实时同步
-  stopVersionWatch = watch(pendingTasksVersion, () => {
-    loadPendingTasks()
-  })
+  stopVersionWatch = watch(pendingTasksVersion, () => reload())
 })
 
 onUnmounted(() => {
@@ -311,134 +303,130 @@ onUnmounted(() => {
   stopVersionWatch?.()
 })
 
-defineExpose({loadPendingTasks})
+defineExpose({refresh: reload})
 </script>
 
 <template>
   <div class="pending-tasks-wrapper">
-    <div class="pending-toolbar">
-      <el-switch
-          v-model="earlyMode"
-          active-text="提前查询"
-          @change="handleEarlyModeChange"
-      />
-      <el-popover
-          v-model:visible="planPopoverVisible"
-          placement="bottom-start"
-          :width="260"
-          trigger="click"
-      >
-        <template #reference>
-          <el-input
-              :model-value="filterPlanLabel"
-              readonly
-              class="plan-filter"
-              placeholder="按任务计划筛选"
+    <DataTable
+      ref="dataTableRef"
+      :columns="columns"
+      :api="fetchPending"
+      :selection="true"
+      :selectable="isPostponable"
+      :reserve-selection="true"
+      :row-class-name="rowClassName"
+      row-key="ID"
+      title="待办任务"
+      @selection-change="onSelectionChange"
+      @reset="onSearchReset"
+    >
+      <!-- 搜索栏（第一行）：提前查询开关 + 任务计划筛选 + 任务名称（DataTable 自动生成输入框与 查询/重置） -->
+      <template #search-extra>
+        <el-form-item label="提前查询">
+          <el-switch v-model="earlyMode" />
+        </el-form-item>
+        <el-form-item label="任务计划">
+          <el-popover
+            v-model:visible="planPopoverVisible"
+            placement="bottom-start"
+            :width="260"
+            trigger="click"
           >
-            <!-- readonly 输入框不展示 el-input 自带的 clearable 图标，此处自绘清除按钮 -->
-            <template #suffix>
-              <el-icon
-                  v-if="filterPlanId"
-                  class="plan-filter-clear"
-                  title="清除筛选"
-                  @click.stop.prevent="clearPlanFilter"
+            <template #reference>
+              <el-input
+                :model-value="filterPlanLabel"
+                readonly
+                size="small"
+                class="plan-filter"
+                placeholder="按任务计划筛选"
               >
-                <CircleClose/>
-              </el-icon>
+                <template #suffix>
+                  <el-icon
+                    v-if="filterPlanId"
+                    class="plan-filter-clear"
+                    title="清除筛选"
+                    @click.stop.prevent="clearPlanFilter"
+                  >
+                    <CircleClose/>
+                  </el-icon>
+                </template>
+              </el-input>
             </template>
-          </el-input>
-        </template>
-        <el-tree
-            :data="planTree"
-            node-key="value"
-            :current-node-key="filterPlanId ?? undefined"
-            :expand-on-click-node="false"
-            highlight-current
-            @node-click="onPlanNodeClick"
-        />
-      </el-popover>
-      <div class="toolbar-actions">
-        <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
+            <el-tree
+              :data="planTree"
+              node-key="value"
+              :current-node-key="filterPlanId ?? undefined"
+              :expand-on-click-node="false"
+              highlight-current
+              @node-click="onPlanNodeClick"
+            />
+          </el-popover>
+        </el-form-item>
+      </template>
+
+      <!-- 工具栏（第二行，靠左）：批量延期 -->
+      <template #toolbar>
         <el-button
-            type="primary"
-            :disabled="selectedTasks.length === 0"
-            @click="batchPostpone"
+          type="primary"
+          size="small"
+          :disabled="selectedTasks.length === 0"
+          @click="batchPostpone"
         >批量延期
         </el-button>
-      </div>
-    </div>
+        <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
+      </template>
 
-    <el-empty
-        v-if="pendingTasks.length === 0"
-        :description="filterPlanId ? '该计划下暂无待办' : '暂无待办'"
-        class="pending-empty"
-    />
+      <!-- 类型：标签 -->
+      <template #PlanType="{ row }">
+        <el-tag size="small" :type="PLAN_TYPE_MAP[row.PlanType]?.type || 'info'">
+          {{ PLAN_TYPE_MAP[row.PlanType]?.text || row.PlanType }}
+        </el-tag>
+      </template>
 
-    <div v-else>
-      <el-table :data="pendingTasks" border stripe class="mb-sm" row-key="ID" @selection-change="handleSelectionChange" :cell-style="cellStyle">
-        <el-table-column type="selection" width="48" :selectable="isPostponable" reserve-selection/>
-        <el-table-column label="类型" width="90">
-          <template #default="{ row }">
-            <el-tag size="small" :type="PLAN_TYPE_MAP[row.PlanType]?.type || 'info'">
-              {{ PLAN_TYPE_MAP[row.PlanType]?.text || row.PlanType }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="PlanName" label="任务名称" min-width="200"/>
-        <el-table-column label="字数" width="80">
-          <template #default="{ row }">
-            <span v-if="row.ContentSize > 0">{{ row.ContentSize.toLocaleString() }}</span>
-            <span v-else class="text-secondary">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="复习次数" width="90">
-          <template #default="{ row }">
-            <span v-if="row.PlanType === 'interval'">{{ row.FsrsReps }}</span>
-            <span v-else class="text-secondary">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag v-if="row.IsOverdue" size="small" type="danger">已逾期</el-tag>
-            <el-tag v-else size="small" type="primary">待处理</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="开始时间" width="120">
-          <template #default="{ row }">
-            {{ formatTime(row.StartedAt) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="240" fixed="right">
-          <template #default="{ row }">
-            <div class="op-actions">
-              <el-button v-if="row.RawLink" size="small" type="info" text @click="openPreview(row)">预览</el-button>
-              <el-button v-if="row.RawLink && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
-              <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link!)">跳转</el-button>
-              <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
-              <el-button v-if="row.PlanType === 'todo' || row.PlanType === 'interval'" size="small" text @click="postponeTask(row)">延期</el-button>
-              <el-button size="small" type="success" text @click="completeTask(row)">完成</el-button>
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 字数 -->
+      <template #ContentSize="{ row }">
+        <span v-if="row.ContentSize > 0">{{ row.ContentSize.toLocaleString() }}</span>
+        <span v-else class="text-secondary">-</span>
+      </template>
 
-      <div class="pager">
-        <el-pagination :current-page="page" :page-size="size" :total="total"
-                       :page-sizes="[15, 30, 100, 1000]"
-                       layout="total, sizes, prev, pager, next, jumper"
-                       @current-change="handlePageChange"
-                       @size-change="handleSizeChange"
-        />
-      </div>
-    </div>
+      <!-- 复习次数 -->
+      <template #FsrsReps="{ row }">
+        <span v-if="row.PlanType === 'interval'">{{ row.FsrsReps }}</span>
+        <span v-else class="text-secondary">-</span>
+      </template>
+
+      <!-- 状态 -->
+      <template #Status="{ row }">
+        <el-tag v-if="row.IsOverdue" size="small" type="danger">已逾期</el-tag>
+        <el-tag v-else size="small" type="primary">待处理</el-tag>
+      </template>
+
+      <!-- 开始时间 -->
+      <template #StartedAt="{ row }">
+        {{ formatTime(row.StartedAt) }}
+      </template>
+
+      <!-- 行内操作 -->
+      <template #actions="{ row }">
+        <div class="op-actions">
+          <el-button v-if="row.RawLink" size="small" type="info" text @click="openPreview(row)">预览</el-button>
+          <el-button v-if="row.RawLink && row.FsrsReps > 0" size="small" type="warning" text @click="openReview(row)">复习</el-button>
+          <el-button v-if="row.Link" size="small" type="primary" text @click="openLink(row.Link)">跳转</el-button>
+          <el-button v-if="row.PlanType === 'cron'" size="small" type="danger" text @click="cancelTask(row)">取消</el-button>
+          <el-button v-if="row.PlanType === 'todo' || row.PlanType === 'interval'" size="small" text @click="postponeTask(row)">延期</el-button>
+          <el-button size="small" type="success" text @click="completeTask(row)">完成</el-button>
+        </div>
+      </template>
+    </DataTable>
 
     <RatingDialog
-        v-model="showRatingDialog"
-        v-model:rating="ratingValue"
-        title="完成间隔任务"
-        :target-name="ratingTargetTask?.PlanName || ''"
-        :loading="submittingRating"
-        @submit="submitRatingDialog"
+      v-model="showRatingDialog"
+      v-model:rating="ratingValue"
+      title="完成间隔任务"
+      :target-name="ratingTargetTask?.PlanName || ''"
+      :loading="submittingRating"
+      @submit="submitRatingDialog"
     />
 
     <el-dialog v-model="showPostponeDialog" :title="postponeDialogTitle" width="26.25rem">
@@ -446,19 +434,19 @@ defineExpose({loadPendingTasks})
         <p class="text-secondary mb-sm">选择延期天数，任务开始时间将向后顺延。</p>
         <div class="postpone-presets">
           <el-button
-              v-for="d in postponePresets"
-              :key="d"
-              :type="postponeDays === d ? 'primary' : 'default'"
-              @click="postponeDays = d"
+            v-for="d in postponePresets"
+            :key="d"
+            :type="postponeDays === d ? 'primary' : 'default'"
+            @click="postponeDays = d"
           >
             {{ d }} 天
           </el-button>
           <el-input-number
-              v-model="postponeDays"
-              :min="1"
-              :max="365"
-              placeholder="自定义"
-              style="width: 7.5rem"
+            v-model="postponeDays"
+            :min="1"
+            :max="365"
+            placeholder="自定义"
+            style="width: 7.5rem"
           />
         </div>
       </div>
@@ -475,12 +463,6 @@ defineExpose({loadPendingTasks})
   height: 100%;
 }
 
-.pending-toolbar {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--space-sm);
-}
-
 .plan-filter {
   width: 14rem;
   margin-left: var(--space-sm);
@@ -495,26 +477,14 @@ defineExpose({loadPendingTasks})
   color: var(--el-text-color-secondary);
 }
 
-.toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
 .selected-count {
   color: var(--el-text-color-secondary);
   font-size: 0.85rem;
+  margin-left: var(--space-sm);
 }
 
 .pending-empty {
   margin-top: var(--space-2xl);
-}
-
-.pager {
-  margin-top: var(--space-sm);
-  display: flex;
-  justify-content: flex-end;
 }
 
 .postpone-content {
@@ -526,5 +496,12 @@ defineExpose({loadPendingTasks})
   align-items: center;
   gap: var(--space-sm);
   flex-wrap: wrap;
+}
+</style>
+
+<style>
+/* 逾期行高亮（跨 scoped，因 el-table 行 class 生成在组件根外） */
+.pending-overdue-row {
+  background-color: rgba(245, 108, 108, 0.12);
 }
 </style>

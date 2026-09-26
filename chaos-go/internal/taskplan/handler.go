@@ -812,7 +812,33 @@ func GetPendingTasks(c *gin.Context) {
 		base = base.Where("tasks.plan_id IN ?", planIDs)
 	}
 
+	// 可选：按任务名称（即计划名）模糊筛选
+	if name := strings.TrimSpace(c.Query("name")); name != "" {
+		base = base.Where("task_plans.name LIKE ?", "%"+name+"%")
+	}
+
 	q := pagination.Parse(c)
+
+	// 排序：默认按「优先级↓、截止↑(空置后)、开始↑」；支持前端 sort/order 覆盖。
+	// 仅白名单列允许排序，规避 SQL 注入（方向仅拼接常量 ASC/DESC）。
+	orderClause := "task_plans.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC"
+	if sf := c.Query("sort"); sf != "" {
+		allowed := map[string]string{
+			"started_at": "tasks.started_at",
+			"deadline":   "tasks.deadline",
+			"plan_name":  "task_plans.name",
+		}
+		if col, ok := allowed[sf]; ok {
+			dir := "ASC"
+			if c.Query("order") == "desc" {
+				dir = "DESC"
+			}
+			if sf == "deadline" {
+				col += " NULLS LAST"
+			}
+			orderClause = col + " " + dir
+		}
+	}
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
@@ -831,7 +857,7 @@ func GetPendingTasks(c *gin.Context) {
 	}
 	if err := base.
 		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.raw_link AS plan_raw_link, task_plans.content_size, task_plans.fsrs_reps").
-		Order("task_plans.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC").
+		Order(orderClause).
 		Scopes(q.Scope).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
