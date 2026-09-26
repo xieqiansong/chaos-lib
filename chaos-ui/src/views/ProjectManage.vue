@@ -38,9 +38,10 @@ function onGroupClick(row: ProjectGroup) {
 }
 
 // 左侧项目组首次加载完成 → 默认选中第一个，并拉取右侧项目
+// （右表已用 :enabled 跳过初始空请求，useDataTable 也有 last-write-wins 保护，无需 setTimeout）
 function onGroupsLoaded(rows: any[]) {
   if (selectedGroupId.value == null && rows.length) {
-    setTimeout( () => onGroupClick(rows[0]), 1000)
+    onGroupClick(rows[0])
   }
 }
 
@@ -262,14 +263,12 @@ function toSnake(s: string): string {
 }
 
 onMounted(async () => {
-  // 拉取组列表（供移动选择 + 默认选中第一个组）
+  // 拉取组列表（供移动弹窗下拉选择）。
+  // 默认选中第一个组统一由 onGroupsLoaded 处理：此处 fetch 不带排序，
+  // res.rows[0] 与左表展示顺序可能不一致，重复选中会覆盖成错误的行。
   try {
     const res = await projectGroupApi.fetch({page: 1, pageSize: 200, search: {}})
     groupsForMove.value = res.rows
-    if (res.rows.length) {
-      selectedGroupId.value = res.rows[0].ID
-      projectsTable.value?.refresh()
-    }
   } catch (e) {
     console.error(e)
   }
@@ -299,6 +298,7 @@ onMounted(async () => {
         <DataTable
             ref="projectsTable"
             :api="projectsFetch"
+            :enabled="selectedGroupId != null"
             :columns="projectColumns"
             title="项目"
         >

@@ -59,6 +59,9 @@ const props = withDefaults(
       selectable?: (row: any, index: number) => boolean
       /** 勾选列是否跨分页保留选中（透传 :reserve-selection） */
       reserveSelection?: boolean
+      /** 是否启用自动取数：默认 true。为 false 时跳过挂载时的初始请求，
+       *  适用于「依赖外部条件（如先选中左侧项目组）才取数」的场景，避免无意义的初始空请求。 */
+      enabled?: boolean
     }>(),
     {
       data: undefined,
@@ -73,6 +76,7 @@ const props = withDefaults(
       fields: undefined,
       nameField: 'Name',
       enabledActions: () => [CRUD_ACTION.CREATE, CRUD_ACTION.VIEW, CRUD_ACTION.EDIT, CRUD_ACTION.DELETE],
+      enabled: true,
     },
 )
 
@@ -117,6 +121,7 @@ const {
 })
 
 onMounted(async () => {
+  if (!props.enabled) return
   await getData()
   emit('loaded', tableData.value)
 })

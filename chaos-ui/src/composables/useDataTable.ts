@@ -58,8 +58,13 @@ export function useDataTable(props: UseDataTableProps) {
     return list.slice(start, start + pageSize.value)
   })
 
+  // 请求序号：并发取数时仅采纳最新一次请求的结果（last-write-wins），
+  // 防止「先发后至」的响应覆盖更新的结果（如初始空请求冲掉真实数据）。
+  let reqId = 0
+
   async function getData() {
     if (!apiMode.value) return
+    const my = ++reqId
     loading.value = true
     try {
       const res = await props.api!({
@@ -68,6 +73,7 @@ export function useDataTable(props: UseDataTableProps) {
         search: {...searchState},
         sort: sortState.value ?? undefined,
       })
+      if (my !== reqId) return
       rows.value = res.rows ?? []
       total.value = res.total ?? 0
       // 当前页被取空且非首页（删除后数据变少），回退一页再拉取

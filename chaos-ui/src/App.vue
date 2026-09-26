@@ -241,7 +241,7 @@ onUnmounted(() => {
 }
 
 .app-sidebar {
-  width: 15rem; /* 240px @1920，随根字号缩放；与 style.css 中 min(100vw/120, 16px) 上限保持一致 */
+  width: 12rem; /* 192px @1920 */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
