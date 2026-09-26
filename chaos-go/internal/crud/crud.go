@@ -65,6 +65,11 @@ type Opts struct {
 	AfterCreate func(row any) error
 	AfterUpdate func(row any) error
 	AfterDelete func(row any) error
+
+	// ListHandler: 可选列表处理器覆盖。设置后，GET /<prefix> 走该自定义实现而非基线 list，
+	// 用于列表需要「派生数据 / 外部副作用（如扫描磁盘）」的场景（如项目管理：合并已认领 + 未认领目录）。
+	// 自定义实现须自行处理分页/搜索/软删过滤，并返回统一分页结构 { items, total, page, size }。
+	ListHandler func(c *gin.Context)
 }
 
 // Register 在路由组 rg 下为 prefix 注册一套标准 CRUD 路由。
@@ -73,7 +78,11 @@ type Opts struct {
 func Register(rg *gin.RouterGroup, prefix string, model any, opts Opts) {
 	h := &handler{model: model, opts: opts}
 	g := rg.Group("/" + prefix)
-	g.GET("", h.list)
+	if opts.ListHandler != nil {
+		g.GET("", opts.ListHandler)
+	} else {
+		g.GET("", h.list)
+	}
 	g.GET("/:id", h.get)
 	g.POST("", h.create)
 	g.PATCH("/:id", h.update)

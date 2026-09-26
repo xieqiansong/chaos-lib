@@ -1,66 +1,238 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue'
+// 项目管理：左右两部分。
+// 左：项目组（标准 CRUD，由 DataTable + projectGroupApi 驱动，无样板）。
+// 右：项目（DataTable 配置驱动展示 + 分页 + 搜索；列表由后端合并「已认领 / 磁盘未认领」，
+//      认领 / 移动 / 访问 / 复制路径 / 删除等动作经 #actions 插槽注入，保持基线纯净）。
+import {onMounted, ref} from 'vue'
 import {format} from 'date-fns'
-import {ElMessageBox, ElMessage} from 'element-plus'
+import {ElMessage, ElMessageBox} from 'element-plus'
+import DataTable from '@/components/DataTable.vue'
+import DataFormDialog from '@/components/DataFormDialog.vue'
+import type {DataTableApiParams, DataTableColumn, FormField} from '@/components/dataTable/types'
+import {projectGroupApi, type ProjectGroup} from '@/api/projectGroup'
+import {projectApi, type Project} from '@/api/project'
 import {sendMessage} from '@/utils/api'
 
-interface ProjectGroup {
-  ID: number
-  Name: string
-  OrderNum: number
-  AbsolutePath: string
-  Remark: string | null
-  CreatedAt: string
-  UpdatedAt: string
-}
-
-interface Project {
-  ID: number
-  GroupID: number
-  Name: string
-  AbsolutePath: string
-  RelativePath: string
-  GitURL: string | null
-  Remark: string | null
-  LastAccessedAt: string | null
-  CreatedAt: string
-  Claimed?: boolean
-}
-
-const groups = ref<ProjectGroup[]>([])
-const projects = ref<Project[]>([])
 const selectedGroupId = ref<number | null>(null)
-const loading = ref(false)
-const error = ref('')
+const projectsTable = ref<InstanceType<typeof DataTable> | null>(null)
+const groupsForMove = ref<ProjectGroup[]>([])
 
-// 项目组弹窗
-const showGroupModal = ref(false)
-const isGroupEdit = ref(false)
-const groupForm = ref({ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: ''})
+// ── 左：项目组（标准 CRUD）──
+const groupColumns: DataTableColumn[] = [
+  {field: 'Name', title: '名称', minWidth: 120, searchable: true},
+  {field: 'Remark', title: '备注', minWidth: 120},
+]
+const groupFields: FormField[] = [
+  {field: 'Name', title: '组名称', type: 'text', required: true, span: 24, placeholder: '项目组名称'},
+  {field: 'OrderNum', title: '排序', type: 'number', span: 24, min: 0},
+  {field: 'AbsolutePath', title: '根目录', type: 'text', required: true, span: 24, placeholder: '绝对路径，如 D:/code/mygroup'},
+  {field: 'Remark', title: '备注', type: 'textarea', rows: 2, span: 24, placeholder: '可选备注'},
+]
 
-// 项目弹窗
-const showProjectModal = ref(false)
-const isProjectEdit = ref(false)
-const projectForm = ref({
-  ID: 0, GroupID: 0, Name: '', AbsolutePath: '', RelativePath: '', GitURL: '', Remark: ''
-})
+// 点击左侧项目组 → 切换右侧过滤
+function onGroupClick(row: ProjectGroup) {
+  selectedGroupId.value = row.ID
+  projectsTable.value?.refresh()
+}
 
-// 移动弹窗
-const showMoveModal = ref(false)
-const moving = ref(false)
-const moveProjectId = ref(0)
-const moveForm = ref({TargetGroupID: 0, TargetRelativePath: ''})
+// ── 右：项目（自定义取数 + 动作插槽）──
+const projectColumns: DataTableColumn[] = [
+  {field: 'Name', title: '名称', minWidth: 140, searchable: true},
+  {field: 'RelativePath', title: '相对路径', minWidth: 140},
+  {field: 'GitURL', title: 'Git 地址', minWidth: 140},
+  {field: 'Remark', title: '备注', minWidth: 140},
+  {field: 'LastAccessedAt', title: '上次访问', width: 170, type: 'datetime'},
+  {field: 'Claimed', title: '状态', width: 90, formatter: (row: any) => (row.Claimed ? '已认领' : '未认领')},
+  {field: '__actions', title: '操作', width: 240, type: 'actions', fixed: 'right'},
+]
+// 编辑弹窗字段（仅允许改名称 / Git / 备注，路径经移动流程改写）
+const projectEditFields: FormField[] = [
+  {field: 'Name', title: '名称', type: 'text', required: true, span: 24, placeholder: '项目名称'},
+  {field: 'GitURL', title: 'Git 地址', type: 'text', span: 24, placeholder: '可选 Git 仓库地址'},
+  {field: 'Remark', title: '备注', type: 'textarea', rows: 2, span: 24, placeholder: '可选备注'},
+]
+// 新建弹窗字段（需指定所属组下的路径）
+const projectCreateFields: FormField[] = [
+  {field: 'Name', title: '名称', type: 'text', span: 12, placeholder: '留空取目录名'},
+  {field: 'AbsolutePath', title: '绝对路径', type: 'text', span: 12, placeholder: '与相对路径二选一'},
+  {field: 'RelativePath', title: '相对路径', type: 'text', span: 12, placeholder: '相对组根目录，如 proj'},
+  {field: 'GitURL', title: 'Git 地址', type: 'text', span: 12, placeholder: '可选'},
+  {field: 'Remark', title: '备注', type: 'textarea', rows: 2, span: 24, placeholder: '可选备注'},
+]
 
-// 详情弹窗
+// 自定义取数：仅返回所选组的项目（合并已认领 + 未认领）；未选组则返回空。
+async function projectsFetch(params: DataTableApiParams) {
+  if (selectedGroupId.value == null) return {rows: [], total: 0}
+  const query: Record<string, any> = {
+    page: params.page,
+    size: params.pageSize,
+    groupId: selectedGroupId.value,
+  }
+  for (const [k, v] of Object.entries(params.search ?? {})) {
+    if (v !== '' && v != null) query[toSnake(k)] = v
+  }
+  const res = await sendMessage('projects', 'GET', query)
+  const rows = (res?.items ?? res?.rows ?? []) as any[]
+  const total = res?.total ?? rows.length
+  return {rows, total}
+}
+
+// ── 弹窗状态 ──
+const showCreate = ref(false)
+const showEdit = ref(false)
 const showDetail = ref(false)
+const showMove = ref(false)
+const saving = ref(false)
+const form = ref<Record<string, any>>({})
+const editId = ref(0)
 const detailItem = ref<Project | null>(null)
+const moveForm = ref({TargetGroupID: 0, TargetRelativePath: ''})
+const moveId = ref(0)
 
-function openDetail(p: Project) {
-  detailItem.value = p
+function defaultForm(fields: FormField[]): Record<string, any> {
+  const f: Record<string, any> = {}
+  for (const field of fields) {
+    if (field.type === 'number') f[field.field] = field.defaultValue ?? 0
+    else if (field.type === 'switch') f[field.field] = field.defaultValue ?? false
+    else f[field.field] = field.defaultValue ?? ''
+  }
+  return f
+}
+
+function openCreateProject() {
+  if (selectedGroupId.value == null) {
+    ElMessage.warning('请先选择左侧项目组')
+    return
+  }
+  form.value = defaultForm(projectCreateFields)
+  showCreate.value = true
+}
+
+function openEditProject(row: Project) {
+  editId.value = row.ID
+  form.value = {Name: row.Name, GitURL: row.GitURL ?? '', Remark: row.Remark ?? ''}
+  showEdit.value = true
+}
+
+function openDetail(row: Project) {
+  detailItem.value = row
   showDetail.value = true
 }
 
-// formatTime 将后端返回的 ISO 时间字符串格式化为本地可读时间；空值返回占位符。
+function openMove(row: Project) {
+  moveId.value = row.ID
+  moveForm.value = {TargetGroupID: row.GroupID, TargetRelativePath: row.RelativePath}
+  showMove.value = true
+}
+
+async function saveCreate() {
+  saving.value = true
+  try {
+    await projectApi.create({GroupID: selectedGroupId.value!, ...form.value})
+    ElMessage.success('创建成功')
+    showCreate.value = false
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '创建失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveEdit() {
+  saving.value = true
+  try {
+    await projectApi.update(editId.value, {
+      Name: form.value.Name,
+      GitURL: form.value.GitURL || null,
+      Remark: form.value.Remark || null,
+    })
+    ElMessage.success('更新成功')
+    showEdit.value = false
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '更新失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function doMove() {
+  try {
+    await projectApi.move(moveId.value, moveForm.value.TargetGroupID, moveForm.value.TargetRelativePath || undefined)
+    ElMessage.success('移动成功')
+    showMove.value = false
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '移动失败')
+  }
+}
+
+async function claimProject(row: Project) {
+  try {
+    await projectApi.claim({
+      GroupID: row.GroupID,
+      Name: row.Name,
+      AbsolutePath: row.AbsolutePath,
+      RelativePath: row.RelativePath,
+    })
+    ElMessage.success('认领成功')
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '认领失败')
+  }
+}
+
+async function accessProject(row: Project) {
+  try {
+    await projectApi.access(row.ID)
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '访问失败')
+  }
+}
+
+async function deleteProject(row: Project) {
+  try {
+    await ElMessageBox.confirm(
+      `将永久删除项目「${row.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
+      '删除项目',
+      {confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'el-button--danger'},
+    )
+  } catch {
+    return
+  }
+  try {
+    await projectApi.remove(row.ID)
+    ElMessage.success('删除成功')
+    projectsTable.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
+}
+
+// 复制项目绝对路径到剪贴板（后端以服务运行，无桌面会话，无法直接打开资源管理器）
+async function copyPath(p: Project) {
+  if (!p.AbsolutePath) return
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(p.AbsolutePath)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = p.AbsolutePath
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ElMessage.success('已复制路径：' + p.AbsolutePath)
+  } catch (e: any) {
+    ElMessage.error('复制失败，请手动复制：' + p.AbsolutePath)
+  }
+}
+
 function formatTime(value: string | null | undefined): string {
   if (!value) return '—'
   const d = new Date(value)
@@ -68,288 +240,24 @@ function formatTime(value: string | null | undefined): string {
   return format(d, 'yyyy-MM-dd HH:mm:ss')
 }
 
-const selectedGroup = computed(() =>
-  groups.value.find(g => g.ID === selectedGroupId.value) || null
-)
+// 驼峰字段名 → snake_case，用于把前端列字段名翻译成后端查询参数
+function toSnake(s: string): string {
+  return s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+}
 
-// 项目列表请求令牌：每次重新拉取自增，用于丢弃过期的旧响应
-let projectReqToken = 0
-
-async function fetchGroups() {
-  loading.value = true
-  error.value = ''
+onMounted(async () => {
+  // 拉取组列表（供移动选择 + 默认选中第一个组）
   try {
-    groups.value = await sendMessage('projectGroups', 'GET')
-    if (selectedGroupId.value === null && groups.value.length > 0) {
-      selectedGroupId.value = groups.value[0].ID
-    }
-    if (selectedGroupId.value !== null) {
-      await fetchProjects()
-    } else {
-      projects.value = []
+    const res = await projectGroupApi.fetch({page: 1, pageSize: 200, search: {}})
+    groupsForMove.value = res.rows
+    if (res.rows.length) {
+      selectedGroupId.value = res.rows[0].ID
+      projectsTable.value?.refresh()
     }
   } catch (e) {
-    error.value = '获取项目组失败'
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchProjects() {
-  if (selectedGroupId.value === null) {
-    projects.value = []
-    return
-  }
-  // 请求令牌：仅应用最新一次请求的结果，避免快速切换分组时旧响应覆盖新数据
-  const token = ++projectReqToken
-  error.value = ''
-  try {
-    const data = await sendMessage('projects', 'GET', {groupId: selectedGroupId.value})
-    if (token !== projectReqToken) return
-    projects.value = data
-  } catch (e) {
-    if (token !== projectReqToken) return
-    error.value = '获取项目失败'
     console.error(e)
   }
-}
-
-function selectGroup(id: number) {
-  selectedGroupId.value = id
-  projects.value = [] // 立即清空，确保右侧列表在请求返回前就有变化
-  fetchProjects()
-}
-
-// ===== 项目组 =====
-function openCreateGroup() {
-  isGroupEdit.value = false
-  groupForm.value = {ID: 0, Name: '', OrderNum: 0, AbsolutePath: '', Remark: ''}
-  showGroupModal.value = true
-}
-
-function openEditGroup(g: ProjectGroup) {
-  isGroupEdit.value = true
-  groupForm.value = {ID: g.ID, Name: g.Name, OrderNum: g.OrderNum, AbsolutePath: g.AbsolutePath, Remark: g.Remark || ''}
-  showGroupModal.value = true
-}
-
-async function saveGroup() {
-  if (!groupForm.value.Name.trim()) {
-    error.value = '请填写组名称'
-    return
-  }
-  if (!groupForm.value.AbsolutePath.trim()) {
-    error.value = '请填写根目录绝对路径'
-    return
-  }
-  try {
-    if (isGroupEdit.value) {
-      await sendMessage(`projectGroups/${groupForm.value.ID}`, 'PATCH', {
-        Name: groupForm.value.Name,
-        OrderNum: groupForm.value.OrderNum,
-        AbsolutePath: groupForm.value.AbsolutePath,
-        Remark: groupForm.value.Remark || null,
-      })
-    } else {
-      await sendMessage('projectGroups', 'POST', {
-        Name: groupForm.value.Name,
-        OrderNum: groupForm.value.OrderNum,
-        AbsolutePath: groupForm.value.AbsolutePath,
-        Remark: groupForm.value.Remark || null,
-      })
-    }
-    showGroupModal.value = false
-    await fetchGroups()
-  } catch (e) {
-    error.value = '保存项目组失败'
-    console.error(e)
-  }
-}
-
-async function deleteGroup(g: ProjectGroup) {
-  if (!confirm(`确认删除项目组「${g.Name}」？其下项目需先移除，或用 cascade 级联删除。`)) return
-  try {
-    await sendMessage(`projectGroups/${g.ID}`, 'DELETE')
-    if (selectedGroupId.value === g.ID) selectedGroupId.value = null
-    await fetchGroups()
-  } catch (e) {
-    error.value = '删除失败（含项目时需先清空，或后端级联）'
-    console.error(e)
-  }
-}
-
-// ===== 项目 =====
-function openCreateProject() {
-  if (selectedGroupId.value === null) {
-    error.value = '请先选择一个项目组'
-    return
-  }
-  isProjectEdit.value = false
-  projectForm.value = {
-    ID: 0, GroupID: selectedGroupId.value, Name: '', AbsolutePath: '', RelativePath: '', GitURL: '', Remark: ''
-  }
-  showProjectModal.value = true
-}
-
-function openEditProject(p: Project) {
-  isProjectEdit.value = true
-  projectForm.value = {
-    ID: p.ID, GroupID: p.GroupID, Name: p.Name,
-    AbsolutePath: p.AbsolutePath, RelativePath: p.RelativePath,
-    GitURL: p.GitURL || '', Remark: p.Remark || ''
-  }
-  showProjectModal.value = true
-}
-
-async function saveProject() {
-  const f = projectForm.value
-  if (!f.Name.trim()) {
-    error.value = '请填写项目名称'
-    return
-  }
-  if (!f.AbsolutePath.trim() && !f.RelativePath.trim()) {
-    error.value = '请填写绝对路径或相对路径（二选一）'
-    return
-  }
-  try {
-    if (isProjectEdit.value) {
-      await sendMessage(`projects/${f.ID}`, 'PATCH', {
-        Name: f.Name,
-        GitURL: f.GitURL || null,
-        Remark: f.Remark || null
-      })
-    } else {
-      await sendMessage('projects', 'POST', {
-        GroupID: f.GroupID,
-        Name: f.Name,
-        AbsolutePath: f.AbsolutePath || undefined,
-        RelativePath: f.RelativePath || undefined,
-        GitURL: f.GitURL || null,
-        Remark: f.Remark || null
-      })
-    }
-    showProjectModal.value = false
-    await fetchProjects()
-  } catch (e) {
-    error.value = '保存项目失败'
-    console.error(e)
-  }
-}
-
-// ===== 移动 =====
-function openMove(p: Project) {
-  moveProjectId.value = p.ID
-  moveForm.value = {TargetGroupID: p.GroupID, TargetRelativePath: p.RelativePath}
-  showMoveModal.value = true
-}
-
-async function doMove() {
-  if (moveForm.value.TargetGroupID === 0) {
-    error.value = '请选择目标项目组'
-    return
-  }
-  moving.value = true
-  error.value = ''
-  try {
-    const res = await sendMessage(`projects/${moveProjectId.value}/move`, 'PATCH', {
-      TargetGroupID: moveForm.value.TargetGroupID,
-      TargetRelativePath: moveForm.value.TargetRelativePath || undefined
-    })
-    showMoveModal.value = false
-    await fetchProjects()
-  } catch (e) {
-    error.value = '移动项目失败'
-    console.error(e)
-  } finally {
-    moving.value = false
-  }
-}
-
-// ===== 认领（未入库的磁盘子目录）=====
-async function claimProject(item: Project) {
-  try {
-    await sendMessage('projects', 'POST', {
-      GroupID: item.GroupID,
-      Name: item.Name,
-      AbsolutePath: item.AbsolutePath,
-      RelativePath: item.RelativePath,
-      GitURL: null,
-      Remark: null
-    })
-    await fetchProjects()
-  } catch (e) {
-    error.value = '认领失败'
-    console.error(e)
-  }
-}
-
-// ===== 访问 / 打开 / 删除 =====
-async function accessProject(p: Project) {
-  try {
-    await sendMessage(`projects/${p.ID}/access`, 'PATCH')
-    await fetchProjects()
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-// 复制项目绝对路径到剪贴板（后端以 nssm 服务运行，无桌面会话，无法直接打开资源管理器）
-async function copyPath(p: Project) {
-  if (!p.AbsolutePath) return
-  error.value = ''
-  try {
-    await writeClipboard(p.AbsolutePath)
-    error.value = '' // 不污染错误提示区，复制成功用单独反馈
-    ElMessage.success('已复制路径：' + p.AbsolutePath)
-  } catch (e) {
-    error.value = '复制失败，请手动复制：' + p.AbsolutePath
-    console.error(e)
-  }
-}
-
-// writeClipboard 复制文本，优先 navigator.clipboard（需安全上下文），失败降级到 textarea 方案
-async function writeClipboard(text: string): Promise<void> {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.style.position = 'fixed'
-  ta.style.opacity = '0'
-  document.body.appendChild(ta)
-  ta.select()
-  const ok = document.execCommand('copy')
-  document.body.removeChild(ta)
-  if (!ok) throw new Error('execCommand copy failed')
-}
-
-async function deleteProject(p: Project) {
-  try {
-    await ElMessageBox.confirm(
-      `将永久删除项目「${p.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
-      '删除项目',
-      {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-        confirmButtonClass: 'el-button--danger',
-      },
-    )
-  } catch {
-    return
-  }
-  try {
-    await sendMessage(`projects/${p.ID}`, 'DELETE')
-    await fetchProjects()
-  } catch (e) {
-    error.value = '删除失败'
-    console.error(e)
-  }
-}
-
-onMounted(fetchGroups)
+})
 </script>
 
 <template>
@@ -359,160 +267,72 @@ onMounted(fetchGroups)
       <span class="text-secondary text-xs">项目组 / 项目文件夹（可移动、备注、记录访问）</span>
     </div>
 
-    <el-alert
-        v-if="error"
-        type="error"
-        :message="error"
-        show-icon
-        class="mb-sm"
-        @close="error = ''"
-    />
-
     <el-row :gutter="16">
       <!-- 左：项目组 -->
-      <el-col :span="6">
-        <div class="panel-header">
-          <span class="text-primary text-sm" style="font-weight:600">项目组</span>
-          <el-button size="small" type="primary" @click="openCreateGroup">+ 新建组</el-button>
-        </div>
-        <el-skeleton v-if="loading" :rows="4" animated/>
-        <div v-else-if="groups.length === 0" class="empty-wrap">
-          <el-empty description="暂无项目组"/>
-        </div>
-        <ul v-else class="group-list">
-          <li
-              v-for="g in groups"
-              :key="g.ID"
-              class="group-item"
-              :class="{active: g.ID === selectedGroupId}"
-              @click="selectGroup(g.ID)">
-            <div class="group-item-main">
-              <div class="text-primary text-sm truncate">{{ g.Name }}</div>
-              <div class="text-placeholder text-xs font-mono truncate">{{ g.AbsolutePath }}</div>
-            </div>
-            <div class="group-item-ops" @click.stop>
-              <el-button size="small" text @click="openEditGroup(g)">编辑</el-button>
-              <el-button size="small" text type="danger" @click="deleteGroup(g)">删除</el-button>
-            </div>
-          </li>
-        </ul>
+      <el-col :span="7">
+        <DataTable
+            :api="projectGroupApi"
+            :columns="groupColumns"
+            :fields="groupFields"
+            title="项目组"
+            :default-sort="{field: 'OrderNum', order: 'ascending'}"
+            @row-click="onGroupClick"
+        />
       </el-col>
 
       <!-- 右：项目 -->
-      <el-col :span="18">
-        <div class="panel-header">
-          <span class="text-primary text-sm" style="font-weight:600">
-            项目{{ selectedGroup ? ' · ' + selectedGroup.Name : '' }}
-          </span>
-          <el-button
-              size="small"
-              type="primary"
-              :disabled="selectedGroupId === null"
-              @click="openCreateProject">
-            + 新建项目
-          </el-button>
-        </div>
-
-        <el-skeleton v-if="loading" :rows="5" animated/>
-        <div v-else-if="selectedGroupId === null" class="empty-wrap">
-          <el-empty description="请选择左侧项目组"/>
-        </div>
-        <div v-else-if="projects.length === 0" class="empty-wrap">
-          <el-empty description="该组下暂无项目"/>
-        </div>
-        <el-table v-else :data="projects" class="project-table">
-          <el-table-column prop="Name" label="名称" min-width="160"/>
-          <el-table-column prop="Remark" label="备注" min-width="220" show-overflow-tooltip>
-            <template #default="{row}">
-              <span v-if="row.Remark" class="text-xs truncate">{{ row.Remark }}</span>
-              <span v-else class="text-placeholder">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="LastAccessedAt" label="上次访问" width="180">
-            <template #default="{row}">
-              <span v-if="row.LastAccessedAt" class="text-xs">{{ formatTime(row.LastAccessedAt) }}</span>
-              <span v-else class="text-placeholder">从未</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right">
-            <template #default="{row}">
-              <div class="op-actions">
-                <el-button v-if="row.Claimed" size="small" text type="primary" @click="openDetail(row)">详情</el-button>
-                <el-button v-if="row.Claimed" size="small" text @click="copyPath(row)">复制路径</el-button>
-                <el-button v-else size="small" type="success" text @click="claimProject(row)">认领</el-button>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table>
+      <el-col :span="17">
+        <DataTable
+            ref="projectsTable"
+            :api="projectsFetch"
+            :columns="projectColumns"
+            title="项目"
+        >
+          <template #toolbar>
+            <el-button size="small" type="primary" :disabled="selectedGroupId == null" @click="openCreateProject">
+              + 新建项目
+            </el-button>
+          </template>
+          <template #actions="{row}">
+            <div class="op-actions">
+              <template v-if="row.Claimed">
+                <el-button size="small" text @click="openDetail(row)">详情</el-button>
+                <el-button size="small" text type="primary" @click="openEditProject(row)">编辑</el-button>
+                <el-button size="small" text type="danger" @click="deleteProject(row)">删除</el-button>
+                <el-button size="small" text @click="openMove(row)">移动</el-button>
+                <el-button size="small" text @click="accessProject(row)">访问</el-button>
+                <el-button size="small" text @click="copyPath(row)">复制路径</el-button>
+              </template>
+              <el-button v-else size="small" type="success" text @click="claimProject(row)">认领</el-button>
+            </div>
+          </template>
+        </DataTable>
       </el-col>
     </el-row>
 
-    <!-- 项目组弹窗 -->
-    <el-dialog v-model="showGroupModal" :title="isGroupEdit ? '编辑项目组' : '新建项目组'" width="37.5rem">
-      <el-form :model="groupForm" label-width="6.25rem">
-        <el-form-item label="组名称">
-          <el-input v-model="groupForm.Name" placeholder="项目组名称"/>
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input v-model.number="groupForm.OrderNum" type="number" placeholder="数字越小越靠前"/>
-        </el-form-item>
-        <el-form-item label="根目录">
-          <el-input v-model="groupForm.AbsolutePath" placeholder="绝对路径，如 D:/code/mygroup"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="groupForm.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showGroupModal = false">取消</el-button>
-        <el-button type="primary" @click="saveGroup">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 新建项目 -->
+    <DataFormDialog
+        v-model="showCreate"
+        title="新建项目"
+        mode="create"
+        :fields="projectCreateFields"
+        :form="form"
+        :saving="saving"
+        @save="saveCreate"
+    />
 
-    <!-- 项目弹窗 -->
-    <el-dialog v-model="showProjectModal" :title="isProjectEdit ? '编辑项目' : '新建项目'" width="40rem">
-      <el-form :model="projectForm" label-width="6.25rem">
-        <el-form-item label="项目名称">
-          <el-input v-model="projectForm.Name" placeholder="留空则取目录名"/>
-        </el-form-item>
-        <el-form-item label="绝对路径">
-          <el-input v-model="projectForm.AbsolutePath" placeholder="与相对路径二选一，如 D:/code/mygroup/proj"/>
-        </el-form-item>
-        <el-form-item label="相对路径">
-          <el-input v-model="projectForm.RelativePath" placeholder="相对所属组根目录，如 proj 或 sub/proj"/>
-        </el-form-item>
-        <el-form-item label="Git 地址">
-          <el-input v-model="projectForm.GitURL" placeholder="可选 Git 仓库地址"/>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="projectForm.Remark" type="textarea" :rows="2" placeholder="可选备注"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showProjectModal = false">取消</el-button>
-        <el-button type="primary" @click="saveProject">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 编辑项目 -->
+    <DataFormDialog
+        v-model="showEdit"
+        title="编辑项目"
+        mode="edit"
+        :fields="projectEditFields"
+        :form="form"
+        :saving="saving"
+        @save="saveEdit"
+    />
 
-    <!-- 移动弹窗 -->
-    <el-dialog v-model="showMoveModal" title="移动项目" width="37.5rem">
-      <el-form :model="moveForm" label-width="6.25rem">
-        <el-form-item label="目标项目组">
-          <el-select v-model="moveForm.TargetGroupID" placeholder="选择目标项目组" style="width:100%">
-            <el-option v-for="g in groups" :key="g.ID" :label="g.Name" :value="g.ID"/>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="目标相对路径">
-          <el-input v-model="moveForm.TargetRelativePath" placeholder="相对目标组根目录的路径，如 proj 或 sub/proj"/>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showMoveModal = false">取消</el-button>
-        <el-button type="primary" :loading="moving" @click="doMove">移动</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 详情弹窗 -->
+    <!-- 详情 -->
     <el-dialog v-model="showDetail" title="项目详情" width="40rem">
       <div v-if="detailItem" class="detail-body">
         <div class="detail-row">
@@ -552,69 +372,37 @@ onMounted(fetchGroups)
       </div>
       <template #footer>
         <template v-if="detailItem?.Claimed">
-          <el-button size="small" @click="accessProject(detailItem!)">访问</el-button>
-          <el-button size="small" @click="copyPath(detailItem!)">复制路径</el-button>
-          <el-button size="small" type="primary" @click="openMove(detailItem!); showDetail = false">移动</el-button>
-          <el-button size="small" @click="openEditProject(detailItem!); showDetail = false">编辑</el-button>
-          <el-button size="small" type="danger" @click="deleteProject(detailItem!); showDetail = false">删除</el-button>
+          <el-button size="small" @click="accessProject(detailItem); showDetail = false">访问</el-button>
+          <el-button size="small" @click="copyPath(detailItem); showDetail = false">复制路径</el-button>
+          <el-button size="small" @click="openMove(detailItem); showDetail = false">移动</el-button>
+          <el-button size="small" @click="openEditProject(detailItem); showDetail = false">编辑</el-button>
+          <el-button size="small" type="danger" @click="deleteProject(detailItem); showDetail = false">删除</el-button>
         </template>
-        <el-button v-else type="success" @click="claimProject(detailItem!); showDetail = false">认领</el-button>
+        <el-button v-else type="success" size="small" @click="claimProject(detailItem); showDetail = false">认领</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 移动 -->
+    <el-dialog v-model="showMove" title="移动项目" width="37.5rem">
+      <el-form :model="moveForm" label-width="6.25rem">
+        <el-form-item label="目标项目组">
+          <el-select v-model="moveForm.TargetGroupID" placeholder="选择目标项目组" style="width: 100%">
+            <el-option v-for="g in groupsForMove" :key="g.ID" :label="g.Name" :value="g.ID"/>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="目标相对路径">
+          <el-input v-model="moveForm.TargetRelativePath" placeholder="相对目标组根目录的路径，如 proj 或 sub/proj"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showMove = false">取消</el-button>
+        <el-button type="primary" @click="doMove">移动</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: var(--space-sm);
-  margin-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.group-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.group-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-sm);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  margin-bottom: var(--space-xs);
-  cursor: pointer;
-}
-
-.group-item:hover {
-  background: var(--el-fill-color-light);
-}
-
-.group-item.active {
-  border-color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
-}
-
-.group-item-main {
-  min-width: 0;
-  flex: 1;
-}
-
-.group-item-ops {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0;
-}
-
-.project-table {
-  width: 100%;
-}
-
 .detail-body {
   max-height: 60vh;
   overflow-y: auto;

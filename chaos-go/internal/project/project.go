@@ -1,7 +1,13 @@
+// Package project 是「项目管理」：按 ProjectGroup / Project 组织本地项目，
+// 记录 Git URL 与访问时间，支持移动（同卷 rename / 跨卷 copy）、访问、删除。
+//
+// 本包遵循业务模块脚手架基线：模型嵌入 crud.BaseModel，标准 CRUD 交给通用 crud，
+// 磁盘副作用（建组时建根目录、删组级联删项目、删项目清目录、移动时搬目录）经
+// crud.Opts 的 Before/After 回调注入；项目列表需合并「磁盘未认领目录」，属基线之外的
+// 派生行为，由 ListHandler 自定义挂载。所有路由经 Register 自包含挂载，routes.go 只编排调用。
 package project
 
 import (
-	"chaos-go/config"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,64 +16,49 @@ import (
 	"strconv"
 	"time"
 
+	"chaos-go/config"
+	"chaos-go/internal/crud"
+	"chaos-go/internal/pagination"
+
 	"github.com/gin-gonic/gin"
 )
 
 // ── 模型 ──────────────────────────────────────────────────────────
 
+// ProjectGroup 项目组：拥有一个根目录（AbsolutePath），其下项目通过 RelativePath 相对该根目录定位。
 type ProjectGroup struct {
-	ID           int       `gorm:"primaryKey"`
-	Name         string    ``
-	OrderNum     int       `gorm:"default:0"`
-	AbsolutePath string    ``
-	Remark       *string   ``
-	CreatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
-	UpdatedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP"`
-	IsDeleted    bool      `gorm:"default:false"`
+	crud.BaseModel
+	Name         string  `json:"Name"`
+	OrderNum     int     `json:"OrderNum" gorm:"default:0"`
+	AbsolutePath string  `json:"AbsolutePath"`
+	Remark       *string `json:"Remark"`
 }
 
 func (ProjectGroup) TableName() string { return "project_groups" }
 
+// Project 项目：绝对路径 = 所属项目组绝对路径 + 相对路径。
 type Project struct {
-	ID             int        `gorm:"primaryKey"`
-	GroupID        int        ``
-	Name           string     ``
-	AbsolutePath   string     ``
-	RelativePath   string     ``
-	GitURL         *string    ``
-	Remark         *string    ``
-	LastAccessedAt *time.Time ``
-	CreatedAt      time.Time  `gorm:"default:CURRENT_TIMESTAMP"`
-	UpdatedAt      time.Time  `gorm:"default:CURRENT_TIMESTAMP"`
-	IsDeleted      bool       `gorm:"default:false"`
+	crud.BaseModel
+	GroupID        int        `json:"GroupID"`
+	Name           string     `json:"Name"`
+	AbsolutePath   string     `json:"AbsolutePath"`
+	RelativePath   string     `json:"RelativePath"`
+	GitURL         *string    `json:"GitURL"`
+	Remark         *string    `json:"Remark"`
+	LastAccessedAt *time.Time `json:"LastAccessedAt"`
 }
 
 func (Project) TableName() string { return "projects" }
 
+// ProjectListItem 项目列表项：指定 groupId 时合并磁盘未认领目录。
+//   - Claimed=true：已入库
+//   - Claimed=false：仅存于磁盘、尚未认领；其 ID 为负的哨兵值（避免前端 DataTable 行 key 冲突），其余为空
 type ProjectListItem struct {
 	Project
-	Claimed bool ``
+	Claimed bool `json:"Claimed"`
 }
 
 // ── 辅助函数 ──────────────────────────────────────────────────────
-
-func getProjectID(c *gin.Context) (int, bool) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目ID"})
-		return 0, false
-	}
-	return id, true
-}
-
-func getGroupID(c *gin.Context) (int, bool) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目组ID"})
-		return 0, false
-	}
-	return id, true
-}
 
 func resolveProjectPaths(group ProjectGroup, absolutePath, relativePath string) (string, string, error) {
 	var abs, rel string
@@ -88,82 +79,103 @@ func resolveProjectPaths(group ProjectGroup, absolutePath, relativePath string) 
 	return abs, rel, nil
 }
 
-// ── Project Handlers ───────────────────────────────────────────────
+// ── 写方向回调（注入磁盘副作用，保持基线纯 CRUD 不被污染）──────────────
 
-func CreateProject(c *gin.Context) {
-	var req struct {
-		GroupID      int     ``
-		Name         string  ``
-		AbsolutePath string  ``
-		RelativePath string  ``
-		GitURL       *string ``
-		Remark       *string ``
+// beforeCreateGroup 建组前校验名称/根目录并创建根目录。
+func beforeCreateGroup(row any) error {
+	g := row.(*ProjectGroup)
+	if g.Name == "" {
+		return fmt.Errorf("项目组名称不能为空")
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if g.AbsolutePath == "" {
+		return fmt.Errorf("根目录绝对路径不能为空")
 	}
-	if req.GroupID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "所属项目组ID不能为空"})
-		return
+	if err := os.MkdirAll(g.AbsolutePath, 0o755); err != nil {
+		return fmt.Errorf("根目录不存在且创建失败: %s", err.Error())
 	}
+	g.AbsolutePath = filepath.Clean(g.AbsolutePath)
+	return nil
+}
 
+// afterDeleteGroup 删组（软删）后级联软删其子项目。
+func afterDeleteGroup(row any) error {
+	g := row.(*ProjectGroup)
+	now := time.Now()
+	if err := config.GetDB().Model(&Project{}).
+		Where("group_id = ? AND is_deleted = ?", g.ID, false).
+		Updates(map[string]interface{}{"is_deleted": true, "updated_at": now}).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// afterUpdateGroup 组根目录变更后重算各子项目的绝对路径。
+func afterUpdateGroup(row any) error {
+	g := row.(*ProjectGroup)
+	var children []Project
+	if err := config.GetDB().Where("group_id = ? AND is_deleted = ?", g.ID, false).Find(&children).Error; err != nil {
+		return err
+	}
+	now := time.Now()
+	for _, c := range children {
+		newAbs := filepath.Join(g.AbsolutePath, c.RelativePath)
+		if newAbs != c.AbsolutePath {
+			if err := config.GetDB().Model(&c).
+				Updates(map[string]interface{}{"absolute_path": newAbs, "updated_at": now}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// beforeCreateProject 建项目前解析路径、校验目录存在、补全名称与访问时间。
+func beforeCreateProject(row any) error {
+	p := row.(*Project)
+	if p.GroupID == 0 {
+		return fmt.Errorf("所属项目组ID不能为空")
+	}
 	var group ProjectGroup
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", req.GroupID, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "所属项目组不存在"})
-		return
+	if err := config.GetDB().Where("id = ? AND is_deleted = ?", p.GroupID, false).First(&group).Error; err != nil {
+		return fmt.Errorf("所属项目组不存在")
 	}
-
-	abs, rel, err := resolveProjectPaths(group, req.AbsolutePath, req.RelativePath)
+	abs, rel, err := resolveProjectPaths(group, p.AbsolutePath, p.RelativePath)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		return err
 	}
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "项目目录不存在: " + abs})
-		return
+		return fmt.Errorf("项目目录不存在: %s", abs)
 	}
-
-	name := req.Name
-	if name == "" {
-		name = filepath.Base(abs)
+	p.AbsolutePath = abs
+	p.RelativePath = rel
+	if p.Name == "" {
+		p.Name = filepath.Base(abs)
 	}
-
-	var existing Project
-	if err := config.GetDB().Unscoped().Where("absolute_path = ? AND is_deleted = ?", abs, true).First(&existing).Error; err == nil {
-		updates := map[string]interface{}{
-			"is_deleted": false, "name": name, "group_id": group.ID,
-			"relative_path": rel, "git_url": req.GitURL, "remark": req.Remark,
-			"updated_at": time.Now(),
-		}
-		if uerr := config.GetDB().Model(&existing).Updates(updates).Error; uerr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "还原项目失败: " + uerr.Error()})
-			return
-		}
-		config.GetDB().First(&existing, existing.ID)
-		c.JSON(http.StatusOK, gin.H{"message": "项目已还原（reactivated）", "project": existing})
-		return
-	}
-
 	createdAt := DirCreatedAt(abs)
 	if createdAt.IsZero() {
 		createdAt = time.Now()
 	}
-	lastAccessed := createdAt
-
-	project := Project{
-		GroupID: group.ID, Name: name, AbsolutePath: abs, RelativePath: rel,
-		GitURL: req.GitURL, Remark: req.Remark,
-		CreatedAt: createdAt, LastAccessedAt: &lastAccessed,
-	}
-	if err := config.GetDB().Create(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建项目失败: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusCreated, project)
+	p.CreatedAt = createdAt
+	last := createdAt
+	p.LastAccessedAt = &last
+	return nil
 }
 
-func ListProjects(c *gin.Context) {
+// afterDeleteProject 删项目（软删）后清空物理目录；物理删除失败仅记录，DB 记录照常软删。
+func afterDeleteProject(row any) error {
+	p := row.(*Project)
+	if err := RemoveDirSafe(p.AbsolutePath); err != nil {
+		// 与历史行为一致：DB 记录已删除，仅物理目录残留，不阻断流程。
+		fmt.Printf("项目物理目录删除失败（已软删记录）：%s: %v\n", p.AbsolutePath, err)
+	}
+	return nil
+}
+
+// ── 列表（派生：合并已认领 + 磁盘未认领）────────────────────────────
+
+// listProjects 自定义列表：按 groupId 过滤，合并磁盘扫描出的未认领子目录。
+func listProjects(c *gin.Context) {
+	q := pagination.Parse(c)
 	db := config.GetDB().Model(&Project{}).Where("is_deleted = ?", false)
 	var groupID *int
 	if gid := c.Query("groupId"); gid != "" {
@@ -175,6 +187,9 @@ func ListProjects(c *gin.Context) {
 		groupID = &id
 		db = db.Where("group_id = ?", id)
 	}
+	if name := c.Query("name"); name != "" {
+		db = db.Where("name LIKE ?", "%"+name+"%")
+	}
 
 	var projects []Project
 	if err := db.Order("last_accessed_at DESC NULLS LAST, created_at DESC, id DESC").Find(&projects).Error; err != nil {
@@ -182,19 +197,32 @@ func ListProjects(c *gin.Context) {
 		return
 	}
 
+	var items []ProjectListItem
 	if groupID != nil {
 		var group ProjectGroup
 		if err := config.GetDB().Where("id = ? AND is_deleted = ?", *groupID, false).First(&group).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
 			return
 		}
-		items := buildProjectList(group, projects)
-		c.JSON(http.StatusOK, items)
-		return
+		items = buildProjectList(group, projects)
+	} else {
+		for _, p := range projects {
+			items = append(items, ProjectListItem{Project: p, Claimed: true})
+		}
 	}
-	c.JSON(http.StatusOK, projects)
+
+	start := q.Offset()
+	if start > len(items) {
+		start = len(items)
+	}
+	end := start + q.Size
+	if end > len(items) {
+		end = len(items)
+	}
+	c.JSON(http.StatusOK, pagination.New(items[start:end], int64(len(items)), q))
 }
 
+// buildProjectList 把已认领项目与磁盘未认领子目录合并；未认领项用负哨兵 ID 避免行 key 冲突。
 func buildProjectList(group ProjectGroup, dbProjects []Project) []ProjectListItem {
 	claimedSet := make(map[string]Project, len(dbProjects))
 	for _, p := range dbProjects {
@@ -228,13 +256,18 @@ func buildProjectList(group ProjectGroup, dbProjects []Project) []ProjectListIte
 		if relErr != nil {
 			rel = e.Name()
 		}
-		unclaimedList = append(unclaimedList, unclaimed{
-			item: ProjectListItem{
-				Project: Project{GroupID: group.ID, Name: e.Name(), AbsolutePath: abs, RelativePath: rel},
-				Claimed: false,
+		item := ProjectListItem{
+			Project: Project{
+				GroupID:      group.ID,
+				Name:         e.Name(),
+				AbsolutePath: abs,
+				RelativePath: rel,
 			},
-			name: e.Name(),
-		})
+			Claimed: false,
+		}
+		// 负哨兵 ID：避免与已认领项（正 ID）冲突导致前端 DataTable 行 key 重复
+		item.ID = -(len(unclaimedList) + 1)
+		unclaimedList = append(unclaimedList, unclaimed{item: item, name: e.Name()})
 	}
 
 	sort.Slice(unclaimedList, func(i, j int) bool {
@@ -246,67 +279,13 @@ func buildProjectList(group ProjectGroup, dbProjects []Project) []ProjectListIte
 	return items
 }
 
-func GetProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
-		return
-	}
-	var project Project
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
-		return
-	}
-	c.JSON(http.StatusOK, project)
-}
+// ── 扩展动作（基线之外，自定义路由）────────────────────────────────
 
-func UpdateProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
-		return
-	}
-	var req struct {
-		Name   *string ``
-		GitURL *string ``
-		Remark *string ``
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	var project Project
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
-		return
-	}
-
-	updated := map[string]interface{}{}
-	if req.Name != nil {
-		updated["name"] = *req.Name
-	}
-	if req.GitURL != nil {
-		updated["git_url"] = *req.GitURL
-	}
-	if req.Remark != nil {
-		updated["remark"] = *req.Remark
-	}
-	if len(updated) == 0 {
-		c.JSON(http.StatusOK, project)
-		return
-	}
-	updated["updated_at"] = time.Now()
-
-	if err := config.GetDB().Model(&project).Updates(updated).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
-		return
-	}
-	config.GetDB().First(&project, id)
-	c.JSON(http.StatusOK, project)
-}
-
+// MoveProject 移动项目文件夹（同卷 rename / 跨卷 copy）并同步路径字段。
 func MoveProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目ID"})
 		return
 	}
 	var req struct {
@@ -366,19 +345,18 @@ func MoveProject(c *gin.Context) {
 	}
 	tx.Commit()
 
-	// 源目录已随 MoveProjectFolder 移动走，无需额外清理
-
 	config.GetDB().First(&project, id)
-	resp := gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"message": "移动成功", "moved": moved, "project": project,
 		"oldAbsPath": oldAbs, "newAbsPath": newAbs,
-	}
-	c.JSON(http.StatusOK, resp)
+	})
 }
 
+// AccessProject 记录访问时间。
 func AccessProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目ID"})
 		return
 	}
 	var project Project
@@ -396,225 +374,30 @@ func AccessProject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "已记录访问", "lastAccessedAt": now})
 }
 
-func DeleteProject(c *gin.Context) {
-	id, ok := getProjectID(c)
-	if !ok {
-		return
-	}
-	var project Project
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
-		return
-	}
+// ── 路由注册（自包含）────────────────────────────────────────────
 
-	if err := RemoveDirSafe(project.AbsolutePath); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "已申请删除，但物理目录删除失败", "dirRemoveError": err.Error(),
-		})
-		return
-	}
-	if err := config.GetDB().Unscoped().Delete(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除记录失败: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "已删除"})
-}
+// Register 把项目管理两套资源的路由挂载到给定路由组。
+// 标准 CRUD 交给通用 crud；项目列表（合并未认领目录）与移动/访问为扩展能力，自定义挂载。
+func Register(rg *gin.RouterGroup) {
+	crud.Register(rg, "projectGroups", &ProjectGroup{}, crud.Opts{
+		Searchable:  []string{"name"},
+		Sortable:    []string{"order_num", "created_at", "id"},
+		BeforeCreate: beforeCreateGroup,
+		AfterUpdate:  afterUpdateGroup,
+		AfterDelete:  afterDeleteGroup,
+	})
 
-// ── ProjectGroup Handlers ──────────────────────────────────────────
+	crud.Register(rg, "projects", &Project{}, crud.Opts{
+		Searchable: []string{"name"},
+		Sortable:   []string{"last_accessed_at", "created_at", "id"},
+		// 路径类字段只能经带副作用的专属流程（建项目 / 移动）改写，禁止通用 PATCH 绕过。
+		Protected:    []string{"GroupID", "AbsolutePath", "RelativePath", "LastAccessedAt", "CreatedAt"},
+		BeforeCreate: beforeCreateProject,
+		AfterDelete:  afterDeleteProject,
+		ListHandler:  listProjects,
+	})
 
-func CreateProjectGroup(c *gin.Context) {
-	var req struct {
-		Name         string  ``
-		OrderNum     *int    ``
-		AbsolutePath string  ``
-		Remark       *string ``
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "项目组名称不能为空"})
-		return
-	}
-	if req.AbsolutePath == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "根目录绝对路径不能为空"})
-		return
-	}
-
-	orderNum := 0
-	if req.OrderNum != nil {
-		orderNum = *req.OrderNum
-	}
-
-	if err := os.MkdirAll(req.AbsolutePath, 0o755); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "根目录不存在且创建失败: " + err.Error()})
-		return
-	}
-
-	group := ProjectGroup{
-		Name: req.Name, OrderNum: orderNum,
-		AbsolutePath: filepath.Clean(req.AbsolutePath),
-		Remark:       req.Remark,
-	}
-	if err := config.GetDB().Create(&group).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建项目组失败: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusCreated, group)
-}
-
-func ListProjectGroups(c *gin.Context) {
-	var groups []ProjectGroup
-	if err := config.GetDB().Where("is_deleted = ?", false).
-		Order("order_num ASC, created_at DESC, id DESC").
-		Find(&groups).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, groups)
-}
-
-func GetProjectGroup(c *gin.Context) {
-	id, ok := getGroupID(c)
-	if !ok {
-		return
-	}
-	var group ProjectGroup
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
-		return
-	}
-	c.JSON(http.StatusOK, group)
-}
-
-func UpdateProjectGroup(c *gin.Context) {
-	id, ok := getGroupID(c)
-	if !ok {
-		return
-	}
-	var req struct {
-		Name         *string ``
-		OrderNum     *int    ``
-		AbsolutePath *string ``
-		Remark       *string ``
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	var group ProjectGroup
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
-		return
-	}
-
-	updated := map[string]interface{}{}
-	if req.Name != nil {
-		updated["name"] = *req.Name
-	}
-	if req.OrderNum != nil {
-		updated["order_num"] = *req.OrderNum
-	}
-	if req.Remark != nil {
-		updated["remark"] = *req.Remark
-	}
-
-	if req.AbsolutePath != nil && *req.AbsolutePath != group.AbsolutePath {
-		newRoot := filepath.Clean(*req.AbsolutePath)
-		updated["absolute_path"] = newRoot
-
-		tx := config.GetDB().Begin()
-		if err := tx.Model(&group).Updates(updated).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
-			return
-		}
-
-		var projects []Project
-		if err := tx.Where("group_id = ? AND is_deleted = ?", id, false).Find(&projects).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询子项目失败: " + err.Error()})
-			return
-		}
-		for _, p := range projects {
-			newAbs := filepath.Join(newRoot, p.RelativePath)
-			if err := tx.Model(&p).Updates(map[string]interface{}{
-				"absolute_path": newAbs, "updated_at": time.Now(),
-			}).Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "重算子项目路径失败: " + err.Error()})
-				return
-			}
-		}
-		tx.Commit()
-
-		config.GetDB().First(&group, id)
-		c.JSON(http.StatusOK, group)
-		return
-	}
-
-	if len(updated) == 0 {
-		c.JSON(http.StatusOK, group)
-		return
-	}
-	updated["updated_at"] = time.Now()
-	if err := config.GetDB().Model(&group).Updates(updated).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
-		return
-	}
-	config.GetDB().First(&group, id)
-	c.JSON(http.StatusOK, group)
-}
-
-func DeleteProjectGroup(c *gin.Context) {
-	id, ok := getGroupID(c)
-	if !ok {
-		return
-	}
-	cascade := c.Query("cascade") == "true"
-
-	var group ProjectGroup
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
-		return
-	}
-
-	var childCount int64
-	if err := config.GetDB().Model(&Project{}).Where("group_id = ? AND is_deleted = ?", id, false).Count(&childCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询子项目失败: " + err.Error()})
-		return
-	}
-
-	if !cascade && childCount > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "该项目组下还有项目，无法删除", "childCount": childCount,
-			"suggestion": "请先移除组内项目，或使用 ?cascade=true 级联删除",
-		})
-		return
-	}
-
-	tx := config.GetDB().Begin()
-	if cascade && childCount > 0 {
-		if err := tx.Model(&Project{}).Where("group_id = ? AND is_deleted = ?", id, false).
-			Updates(map[string]interface{}{"is_deleted": true, "updated_at": time.Now()}).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "级联删除项目失败: " + err.Error()})
-			return
-		}
-	}
-	if err := tx.Model(&group).Updates(map[string]interface{}{"is_deleted": true, "updated_at": time.Now()}).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
-		return
-	}
-	tx.Commit()
-
-	resp := gin.H{"message": "删除成功", "cascade": cascade}
-	if cascade {
-		resp["deletedProjectCount"] = childCount
-	}
-	c.JSON(http.StatusOK, resp)
+	projects := rg.Group("/projects")
+	projects.PATCH("/:id/move", MoveProject)
+	projects.PATCH("/:id/access", AccessProject)
 }

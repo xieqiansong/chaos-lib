@@ -12,6 +12,7 @@ import {ElMessage, ElMessageBox} from 'element-plus'
 const emit = defineEmits<{
   (e: 'selection-change', rows: any[]): void
   (e: 'reset'): void
+  (e: 'row-click', row: any, column: any, event: any): void
 }>()
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
@@ -304,6 +305,7 @@ defineExpose({refresh, getData})
     size="small"
     @sort-change="handleSortChange"
     @selection-change="(rows: any) => emit('selection-change', rows)"
+    @row-click="(row: any, column: any, event: any) => emit('row-click', row, column, event)"
   >
     <el-table-column
       v-if="selection"

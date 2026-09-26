@@ -145,25 +145,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			notify.POST("/", notifysvc.ShowNotify)
 		}
 
-		projectGroups := api.Group("/projectGroups")
-		{
-			projectGroups.POST("/", project.CreateProjectGroup)
-			projectGroups.GET("/", project.ListProjectGroups)
-			projectGroups.GET("/:id", project.GetProjectGroup)
-			projectGroups.PATCH("/:id", project.UpdateProjectGroup)
-			projectGroups.DELETE("/:id", project.DeleteProjectGroup)
-		}
-
-		projects := api.Group("/projects")
-		{
-			projects.POST("/", project.CreateProject)
-			projects.GET("/", project.ListProjects)
-			projects.GET("/:id", project.GetProject)
-			projects.PATCH("/:id", project.UpdateProject)
-			projects.PATCH("/:id/move", project.MoveProject)
-			projects.PATCH("/:id/access", project.AccessProject)
-			projects.DELETE("/:id", project.DeleteProject)
-		}
+		// 项目管理：资源接口自包含，本行仅做编排调用（路由实现在 internal/project）
+		project.Register(api)
 
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
 		api.GET("/weather", proxy.GetWeather)
