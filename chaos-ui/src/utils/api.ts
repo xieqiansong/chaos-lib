@@ -234,7 +234,7 @@ export function deletePortForward(id: number): Promise<any> {
 }
 
 export function updatePortForwardStatus(id: number, status: boolean): Promise<any> {
-    return sendMessage(`portForwards/${id}/status`, 'PATCH', {status})
+	return sendMessage(`portForwards/${id}/status`, 'PATCH', {status})
 }
 
 // ---- MQTT 多节点同步 ----
@@ -272,63 +272,6 @@ export function deleteMqttMessagesByChannel(channel: string): Promise<{ channel:
 
 export function getMqttStatus(): Promise<MqttStatus> {
     return sendMessage('mqttSync/status', 'GET')
-}
-
-// ---- 数据库监控 ----
-
-export interface DbOverview {
-    dbType: string
-    version: string
-    totalBytes: number
-    tableCount: number
-    totalRows: number
-    sizeSupported: boolean
-}
-
-export interface TableStat {
-    name: string
-    rows: number
-    rowsEstimated: boolean
-    tableBytes: number
-    indexBytes: number
-    totalBytes: number
-    indexCount: number
-    sizeSupported: boolean
-    seqScan?: number | null
-    idxScan?: number | null
-    lastVacuum?: string | null
-    lastAnalyze?: string | null
-}
-
-export interface ColumnInfo {
-    name: string
-    type: string
-    nullable: boolean
-    isPk: boolean
-    default?: string | null
-}
-
-export interface IndexInfo {
-    name: string
-    unique: boolean
-    columns: string
-}
-
-export interface TableDetail extends TableStat {
-    columns: ColumnInfo[]
-    indexes: IndexInfo[]
-}
-
-export function getDbOverview(): Promise<DbOverview> {
-    return sendMessage('dbMonitor/overview', 'GET')
-}
-
-export function getTables(): Promise<{ items: TableStat[]; total: number }> {
-    return sendMessage('dbMonitor/tables', 'GET')
-}
-
-export function getTableDetail(name: string): Promise<TableDetail> {
-    return sendMessage(`dbMonitor/tables/${encodeURIComponent(name)}`, 'GET')
 }
 
 // ---- 待办任务 ----

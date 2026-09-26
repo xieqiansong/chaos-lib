@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"chaos-go/config"
+	"chaos-go/internal/pagination"
 
 	"github.com/gin-gonic/gin"
 )
@@ -102,15 +103,47 @@ func GetOverview(c *gin.Context) {
 	c.JSON(http.StatusOK, ov)
 }
 
-// ListTables 返回全部用户表统计（行数为精确 COUNT(*)，支持 ?sort / ?order）。
+// ListTables 返回用户表统计的分页列表（行数为精确 COUNT(*)，
+// 支持 ?page / ?size / ?sort / ?order / ?name）。分页与排序约定与标准 CRUD
+// 基线（pagination 包）一致：排序键为 snake_case，响应为 { items, total }。
 func ListTables(c *gin.Context) {
-	tables, err := collectTables()
+	all, err := collectTables()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	sortTables(tables, c.Query("sort"), c.Query("order"))
-	c.JSON(http.StatusOK, gin.H{"items": tables, "total": len(tables)})
+
+	// 按表名过滤（在分页与排序前生效，并计入 total）。
+	name := strings.TrimSpace(c.Query("name"))
+	filtered := all
+	if name != "" {
+		lower := strings.ToLower(name)
+		filtered = make([]TableStat, 0, len(all))
+		for _, t := range all {
+			if strings.Contains(strings.ToLower(t.Name), lower) {
+				filtered = append(filtered, t)
+			}
+		}
+	}
+
+	sortTables(filtered, c.Query("sort"), c.Query("order"))
+
+	// 分页（复用统一约定：page 默认 1，size 默认 20，上限 200）。
+	q := pagination.Parse(c)
+	total := len(filtered)
+	start := q.Offset()
+	if start > total {
+		start = total
+	}
+	end := start + q.Size
+	if end > total {
+		end = total
+	}
+	items := filtered[start:end]
+	if items == nil {
+		items = []TableStat{}
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
 }
 
 // GetTableDetail 返回单表详情（统计 + 列 + 索引）。
@@ -130,6 +163,17 @@ func GetTableDetail(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, detail)
+}
+
+// Register 把数据库监控（只读自省）的路由挂载到给定路由组（通常来自 routes.go 的 api 组），
+// 使本资源的接口自包含、按业务分离：搜索本业务只需看 internal/dbmonitor，搜索本路由只需看这里。
+func Register(rg *gin.RouterGroup) {
+	g := rg.Group("/dbMonitor")
+	{
+		g.GET("/overview", GetOverview)
+		g.GET("/tables", ListTables)
+		g.GET("/tables/:name", GetTableDetail)
+	}
 }
 
 // ── 分派 ──
@@ -181,12 +225,14 @@ func sortTables(tables []TableStat, sortKey, order string) {
 		switch sortKey {
 		case "rows":
 			ai, bi = a.Rows, b.Rows
-		case "tableBytes":
+		case "table_bytes":
 			ai, bi = a.TableBytes, b.TableBytes
-		case "indexBytes":
+		case "index_bytes":
 			ai, bi = a.IndexBytes, b.IndexBytes
-		case "totalBytes":
+		case "total_bytes":
 			ai, bi = a.TotalBytes, b.TotalBytes
+		case "index_count":
+			ai, bi = int64(a.IndexCount), int64(b.IndexCount)
 		default: // name
 			if a.Name != b.Name {
 				if desc {

@@ -200,13 +200,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.PATCH("/portForwards/:id/status", portfwd.UpdatePortForwardingStatus)
 	}
 
-	// 数据库监控（只读自省：表名 / 大小 / 行数 / 索引等统计）
-	dbMon := api.Group("/dbMonitor")
-	{
-		dbMon.GET("/overview", dbmonitor.GetOverview)
-		dbMon.GET("/tables", dbmonitor.ListTables)
-		dbMon.GET("/tables/:name", dbmonitor.GetTableDetail)
-	}
+	// 数据库监控（只读自省：表名 / 大小 / 行数 / 索引等统计）；路由由本业务包自包含挂载
+	dbmonitor.Register(api)
 
 	r.GET("/", func(c *gin.Context) {
 		f, err := webFS.Open("index.html")
