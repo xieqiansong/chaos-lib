@@ -51,3 +51,12 @@ export interface DataTableApiResult {
   rows: any[]
   total: number
 }
+
+/** 内置 CRUD 动作标识（英文，避免魔法字符串），用于 enabledActions 逐项显隐 */
+export const CRUD_ACTION = {
+  CREATE: 'create',
+  VIEW: 'view',
+  EDIT: 'edit',
+  DELETE: 'delete',
+} as const
+export type CrudAction = (typeof CRUD_ACTION)[keyof typeof CRUD_ACTION]

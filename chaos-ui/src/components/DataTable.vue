@@ -10,7 +10,8 @@ import {ElMessage, ElMessageBox} from 'element-plus'
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
 import {type RestApi} from '@/composables/useRestApi'
-import type {DataTableApiParams, DataTableApiResult, DataTableColumn} from '@/components/dataTable/types'
+import type {DataTableApiParams, DataTableApiResult, DataTableColumn, CrudAction} from '@/components/dataTable/types'
+import {CRUD_ACTION} from '@/components/dataTable/types'
 import DataFormDialog, {type FormField} from '@/components/DataFormDialog.vue'
 
 const props = withDefaults(
@@ -31,6 +32,12 @@ const props = withDefaults(
       fields?: FormField[]
       /** 删除确认时用于展示的记录名称字段，默认 Name */
       nameField?: string
+      /**
+       * 启用（显示）的内置 CRUD 动作，默认全开：[CREATE, VIEW, EDIT, DELETE]。
+       * 业务只需子集时传入，如 [VIEW, EDIT, DELETE]（平铺表单隐藏「新建」）。
+       * 取值见 dataTable/types 的 CRUD_ACTION。
+       */
+      enabledActions?: CrudAction[]
       stripe?: boolean
       border?: boolean
       /** type=switch 列切换时的回调：返回 Promise，成功后自动刷新并提示；未提供则开关禁用 */
@@ -50,6 +57,7 @@ const props = withDefaults(
       title: '',
       fields: undefined,
       nameField: 'Name',
+      enabledActions: () => [CRUD_ACTION.CREATE, CRUD_ACTION.VIEW, CRUD_ACTION.EDIT, CRUD_ACTION.DELETE],
     },
 )
 
@@ -60,6 +68,11 @@ const fetchFn = computed(() =>
     typeof props.api === 'function' ? props.api : props.api ? props.api.fetch : undefined,
 )
 const crudMode = computed(() => isCrud.value && !!props.fields)
+
+// 内置 CRUD 动作是否启用（被 template 逐项显隐使用），取值见 CRUD_ACTION 枚举
+function hasAction(action: CrudAction): boolean {
+  return props.enabledActions.includes(action)
+}
 
 const {
   page,
@@ -217,9 +230,9 @@ defineExpose({refresh, getData})
 
 <template>
   <section class="section-toolbar datatable-toolbar">
-    <div v-if="$slots.toolbar || crudMode" class="toolbar-left">
+    <div v-if="$slots.toolbar || (crudMode && hasAction(CRUD_ACTION.CREATE))" class="toolbar-left">
       <slot name="toolbar"/>
-      <el-button v-if="crudMode" size="small" type="primary" @click="openCreate">+ 新建{{ title }}</el-button>
+      <el-button v-if="crudMode && hasAction(CRUD_ACTION.CREATE)" size="small" type="primary" @click="openCreate">+ 新建{{ title }}</el-button>
     </div>
     <div v-if="searchableColumns.length" class="toolbar-search">
       <el-form :inline="true" @submit.prevent>
@@ -255,9 +268,9 @@ defineExpose({refresh, getData})
                插槽只负责「扩展动作」，标准动作仍由组件统一提供，避免业务页重复实现。 -->
           <div class="op-actions">
             <template v-if="crudMode">
-              <el-button size="small" text @click="openView(scope.row)">查看</el-button>
-              <el-button type="primary" size="small" text @click="openEdit(scope.row)">编辑</el-button>
-              <el-button type="danger" size="small" text @click="remove(scope.row)">删除</el-button>
+              <el-button v-if="hasAction(CRUD_ACTION.VIEW)" size="small" text @click="openView(scope.row)">查看</el-button>
+              <el-button v-if="hasAction(CRUD_ACTION.EDIT)" type="primary" size="small" text @click="openEdit(scope.row)">编辑</el-button>
+              <el-button v-if="hasAction(CRUD_ACTION.DELETE)" type="danger" size="small" text @click="remove(scope.row)">删除</el-button>
             </template>
             <slot name="actions" :row="scope.row"/>
           </div>
@@ -297,7 +310,7 @@ defineExpose({refresh, getData})
   />
 
   <DataFormDialog
-      v-if="crudMode"
+      v-if="crudMode && hasAction(CRUD_ACTION.VIEW)"
       v-model="showView"
       :title="`查看${title}`"
       mode="view"
@@ -317,6 +330,19 @@ defineExpose({refresh, getData})
 .datatable-toolbar .toolbar-search {
   order: 1;
   flex: 1 1 100%;
+}
+
+/* 搜索项自带 18px 下边距，会与工具栏 row-gap 叠加成过宽的间隙；
+   改为 flex 布局 + row-gap，行间距统一由 row-gap 控制。 */
+.datatable-toolbar .toolbar-search :deep(.el-form) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: var(--space-sm);
+}
+
+.datatable-toolbar .toolbar-search :deep(.el-form-item) {
+  margin-bottom: 0;
 }
 
 .datatable-toolbar .toolbar-left {

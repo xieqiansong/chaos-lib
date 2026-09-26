@@ -49,7 +49,7 @@
 
 #### Scenario: Publish stores locally and broadcasts
 
-- **WHEN** 通过 `POST /api/mqttSync/messages` 发送一条消息且 broker 在线
+- **WHEN** 通过 `POST /api/mqttSync`（新建消息，经 AfterCreate 广播）发送一条消息且 broker 在线
 - **THEN** 该消息写入本地数据库，并被发布到集群主题，其它节点能够收到
 
 #### Scenario: Publish while broker offline
@@ -83,17 +83,17 @@
 
 ### Requirement: Displaying messages on the UI
 
-前端 SHALL 在独立页面展示本机消息列表（含本机发出与来自其它节点的消息），并 SHALL 展示当前连接状态（启用 / 已连接）、本机节点标识、broker 与公共前缀。对于每个 topic（channel），界面 SHALL 仅展示最新的一条消息；更早的同 topic 消息 MUST 仍保留在数据库中，MUST NOT 在列表中重复出现。前端 SHOULD 以合理频率刷新以呈现其它节点的新消息。
+前端 SHALL 在独立页面以分页表格展示本机消息列表（含本机发出与来自其它节点的消息），并 SHALL 展示当前连接状态（启用 / 已连接）、本机节点标识、broker 与公共前缀。列表 MUST 由通用 DataTable 驱动（资源接口自包含于 `internal/mqttsync`，遵循标准数据基线），支持按 topic（channel）/ 节点（node_id）/ 内容（payload）搜索与按时间排序；所有消息 MUST 在数据库中保留，删除为软删除。前端 SHOULD 以合理频率刷新状态以呈现集群变化。
 
-#### Scenario: Message list shows latest per topic
+#### Scenario: Message list is paginated and searchable
 
 - **WHEN** 用户在界面查看消息列表
-- **THEN** 界面按 topic 分组，每个 topic 仅展示最新一条消息（时间倒序），包含本机与对端消息，旧消息不在列表重复出现
+- **THEN** 界面以分页表格展示全部消息，可按主题 / 节点 / 内容搜索，并按时间排序，包含本机与对端消息
 
 #### Scenario: Older messages remain in database
 
-- **WHEN** 同一 topic 收到第二条及以后的消息
-- **THEN** 先前的消息仍保留在数据库，仅界面列表更新为该 topic 的最新一条
+- **WHEN** 同一 topic 收到多条消息
+- **THEN** 全部消息均保留在数据库，可在列表中分页查看，删除仅标记软删
 
 #### Scenario: Connection status is visible
 
@@ -102,8 +102,8 @@
 
 #### Scenario: Sending from the UI
 
-- **WHEN** 用户在界面输入文本并点击发送
-- **THEN** 该消息经 API 发送，并在列表中即时出现本机消息
+- **WHEN** 用户在平铺广播表单填写主题与内容后点击「广播」
+- **THEN** 该消息经 API 落库并经 AfterCreate 广播到集群，列表中即时出现本机消息；表单右侧的「删除该主题消息」按该主题批量软删
 
 ### Requirement: Connection status query
 

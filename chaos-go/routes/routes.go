@@ -76,14 +76,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			envVars.GET("/snapshots/:snapshotId", envvar.GetEnvSnapshotDetail)
 		}
 
-		// MQTT 多节点消息同步（公共 broker）
-		mqttSync := api.Group("/mqttSync")
-		{
-			mqttSync.GET("/messages", mqttsync.ListMessages)
-			mqttSync.POST("/messages", mqttsync.SendMessage)
-			mqttSync.DELETE("/messages", mqttsync.DeleteMessages)
-			mqttSync.GET("/status", mqttsync.Status)
-		}
+		// MQTT 多节点消息同步：资源接口自包含，本行仅做编排调用（路由实现在 internal/mqttsync）
+		mqttsync.Register(api)
 
 		taskPlans := api.Group("/taskPlans")
 		{

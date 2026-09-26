@@ -1,142 +1,103 @@
 <script setup lang="ts">
+// MQTT 同步界面：状态面板 + 配置驱动 DataTable（内置查看/编辑/删除）。
+// 新建改为平铺广播表单（#toolbar 插槽 + hide-create），广播并记录到本地消息表；
+// 状态查询、主题级删除为扩展能力，由本页自行调用 mqttSyncApi 处理。
 import {onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {Refresh} from '@element-plus/icons-vue'
-import {format, parseISO} from 'date-fns'
-import {deleteMqttMessagesByChannel, getMqttMessages, getMqttStatus, type MqttMessage, type MqttStatus, sendMqttMessage,} from '@/utils/api'
+import DataTable from '@/components/DataTable.vue'
+import type {DataTableColumn} from '@/components/dataTable/types'
+import {CRUD_ACTION} from '@/components/dataTable/types'
+import type {FormField} from '@/components/DataFormDialog.vue'
+import {mqttSyncApi, type MqttStatus} from '@/api/mqttSync'
 
 const status = ref<MqttStatus | null>(null)
-const messages = ref<MqttMessage[]>([])
+// 平铺广播表单：主题同时作为「广播」与「删除该主题消息」的目标
+const channel = ref('broadcast')
 const payload = ref('')
-const channel = ref('')
-const refreshing = ref(false)
 const sending = ref(false)
-const detailVisible = ref(false)
-const detailTitle = ref('')
-const detailPayload = ref('')
+const tableRef = ref<InstanceType<typeof DataTable> | null>(null)
 let timer: number | undefined
 
-function showDetail(row: MqttMessage) {
-  detailTitle.value = row.node_id
-  detailPayload.value = row.payload
-  detailVisible.value = true
-}
+const columns: DataTableColumn[] = [
+  {field: 'Channel', title: '主题', minWidth: 160, searchable: true},
+  {field: 'NodeID', title: '节点', width: 220, searchable: true},
+  {
+    field: 'IsSelf',
+    title: '来源',
+    width: 90,
+    formatter: (row: any) => (row.IsSelf ? '本机' : '对端'),
+  },
+  {field: 'Payload', title: '内容', minWidth: 280, showOverflowTooltip: true},
+  {field: 'CreatedAt', title: '时间', width: 180, type: 'datetime'},
+]
 
-// 尽量把 payload 美化为可读 JSON，失败则原样展示
-function prettyPayload(v: string): string {
-  try {
-    return JSON.stringify(JSON.parse(v), null, 2)
-  } catch {
-    return v
-  }
-}
-
-// copyPayload 复制文本到剪贴板，优先 navigator.clipboard（需安全上下文），失败降级到 textarea 方案
-async function copyPayload(text: string) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand('copy')
-      document.body.removeChild(ta)
-      if (!ok) throw new Error('execCommand copy failed')
-    }
-    ElMessage.success('已复制')
-  } catch {
-    ElMessage.error('复制失败')
-  }
-}
+// 表单字段配置：驱动 DataTable 内置「查看 / 编辑」弹窗（新建走上方平铺表单）。
+// 缺省主题为 broadcast，内容必填。
+const fields: FormField[] = [
+  {field: 'Channel', title: '主题', type: 'text', span: 12, required: true, placeholder: '如 broadcast'},
+  {field: 'Payload', title: '内容', type: 'textarea', rows: 4, span: 24, required: true, placeholder: '消息内容，将广播到集群'},
+]
 
 async function refreshStatus() {
   try {
-    status.value = await getMqttStatus()
+    status.value = await mqttSyncApi.status()
   } catch {
     status.value = null
   }
 }
 
-async function refreshMessages() {
-  try {
-    const list = await getMqttMessages()
-    // 按 topic（channel）升序展示，便于同类消息归拢查看
-    messages.value = [...list].sort((a, b) => a.channel.localeCompare(b.channel, 'zh-CN'))
-  } catch {
-    /* 轮询出错忽略，下次重试 */
-  }
-}
-
-async function refresh() {
-  refreshing.value = true
-  try {
-    await Promise.all([refreshStatus(), refreshMessages()])
-  } finally {
-    refreshing.value = false
-  }
-}
-
-async function send() {
-  if (!payload.value.trim()) {
-    ElMessage.warning('请输入消息内容')
-    return
-  }
-  sending.value = true
-  try {
-    await sendMqttMessage(payload.value, channel.value.trim() || undefined)
-    payload.value = ''
-    ElMessage.success('已发送')
-    await refreshMessages()
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    ElMessage.error('发送失败：' + msg)
-  } finally {
-    sending.value = false
-  }
-}
-
 onMounted(() => {
-  refresh()
-  timer = window.setInterval(refresh, 3000)
+  refreshStatus()
+  timer = window.setInterval(refreshStatus, 5000)
 })
 
 onUnmounted(() => {
   if (timer) window.clearInterval(timer)
 })
 
-async function removeByChannel(ch: string) {
+// 广播：新建消息（AfterCreate 钩子广播到集群并记录到本地消息表）。
+// 对应后端标准 CRUD 的 create，即 POST /api/mqttSync。
+async function broadcast() {
+  const body = payload.value.trim()
+  if (!body) {
+    ElMessage.warning('请输入内容')
+    return
+  }
+  sending.value = true
   try {
-    await deleteMqttMessagesByChannel(ch)
-    ElMessage.success(`已删除 topic「${ch}」的全部消息`)
-    await refreshMessages()
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    ElMessage.error('删除失败：' + msg)
+    await mqttSyncApi.create({Channel: channel.value.trim() || 'broadcast', Payload: body})
+    ElMessage.success('已广播并记录到本地消息表')
+    payload.value = ''
+    tableRef.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '广播失败')
+  } finally {
+    sending.value = false
   }
 }
 
-function confirmRemove(row: MqttMessage) {
-  // 二次确认：按 topic 软删除数据库中的全部消息
-  ElMessageBox.confirm(
-      `确认删除 topic「${row.channel}」下的全部消息？（仅标记删除，仍保留在库中）`,
+// 按主题批量删除：目标主题取平铺表单的主题输入。
+async function removeChannel() {
+  const name = channel.value.trim()
+  if (!name) {
+    ElMessage.warning('请输入要删除的主题')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认删除主题「${name}」下的全部消息？（仅标记删除，仍保留在库中）`,
       '删除确认',
       {type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'},
-  )
-      .then(() => removeByChannel(row.channel))
-      .catch(() => {
-      })
-}
-
-function fmtTime(v: string): string {
-  if (!v) return '-'
-  try {
-    return format(parseISO(v), 'yyyy-MM-dd HH:mm:ss')
+    )
   } catch {
-    return v
+    return
+  }
+  try {
+    await mqttSyncApi.deleteChannel(name)
+    ElMessage.success(`已删除主题「${name}」的消息`)
+    tableRef.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
   }
 }
 </script>
@@ -177,9 +138,6 @@ function fmtTime(v: string): string {
           <code>{{ status?.prefix || '-' }}</code>
         </div>
       </div>
-      <div class="section-actions">
-        <el-button size="small" :icon="Refresh" :loading="refreshing" @click="refresh">刷新</el-button>
-      </div>
     </div>
 
     <el-alert
@@ -188,7 +146,7 @@ function fmtTime(v: string): string {
         type="warning"
         show-icon
         :closable="false"
-        title="MQTT 未连接：消息仅本地落库，无法广播给其它节点"
+        title="MQTT 未连接：广播消息仅本地落库，无法送达其它节点"
     />
     <el-alert
         v-if="status?.enabled && !status?.encrypt"
@@ -207,53 +165,43 @@ function fmtTime(v: string): string {
         title="MQTT 同步未启用：请在 .env 设置 MQTT_ENABLED=true 并重启"
     />
 
-    <div class="send-row">
-      <el-input v-model="channel" placeholder="topic（缺省 broadcast）" class="channel-input"/>
-      <el-input
-          v-model="payload"
-          placeholder="输入消息内容，回车发送"
-          class="payload-input"
-          @keyup.enter="send"
-      />
-      <el-button type="primary" :loading="sending" @click="send">发送</el-button>
-    </div>
-
-    <el-card shadow="never" class="table-card">
-      <template #header>
-        <div class="table-header">
-          <span class="text-primary text-sm">消息（{{ messages.length }}）</span>
-          <span class="text-secondary text-xs">每个 topic 仅展示最新一条，旧消息已存库</span>
+    <DataTable
+        ref="tableRef"
+        :columns="columns"
+        :api="mqttSyncApi"
+        :fields="fields"
+        title="消息"
+        row-key="ID"
+        :enabled-actions="[CRUD_ACTION.VIEW, CRUD_ACTION.EDIT, CRUD_ACTION.DELETE]"
+        :default-sort="{field: 'created_at', order: 'descending'}"
+    >
+      <!-- 平铺广播表单：新建即广播并记录到本地消息表；主题同时作为「删除该主题消息」的目标 -->
+      <template #toolbar>
+        <div class="broadcast-form">
+          <el-input
+              v-model="channel"
+              placeholder="主题（默认 broadcast）"
+              size="small"
+              clearable
+              class="broadcast-channel"
+          />
+          <el-input
+              v-model="payload"
+              placeholder="内容，广播到集群并记录到本地消息表"
+              size="small"
+              clearable
+              class="broadcast-payload"
+              @keyup.enter="broadcast"
+          />
+          <el-button type="primary" size="small" :loading="sending" @click="broadcast">广播</el-button>
+          <el-button type="danger" size="small" plain @click="removeChannel">删除该主题消息</el-button>
         </div>
       </template>
-      <el-skeleton v-if="refreshing && messages.length === 0" :rows="6" animated/>
-      <el-empty v-else-if="messages.length === 0" description="暂无消息"/>
-      <el-table v-else :data="messages" stripe empty-text="暂无消息" style="width: 100%">
-        <el-table-column prop="channel" label="topic" width="300"/>
-        <el-table-column label="内容" min-width="240" prop="payload" show-overflow-tooltip/>
-        <el-table-column label="操作" width="210" fixed="right">
-          <template #default="{ row }">
-            <div class="op-actions">
-              <el-button size="small" text @click="copyPayload(row.payload)">复制</el-button>
-              <el-button size="small" type="primary" text @click="showDetail(row)">详情</el-button>
-              <el-button size="small" type="danger" text @click="confirmRemove(row)">删除</el-button>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="更新时间" width="180">
-          <template #default="{ row }">
-            {{ fmtTime(row.created_at) }}
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
 
-    <el-dialog v-model="detailVisible" :title="`消息详情：${detailTitle}`" width="75%">
-      <pre class="detail-pre">{{ prettyPayload(detailPayload) }}</pre>
-      <template #footer>
-        <el-button @click="copyPayload(detailPayload)">复制内容</el-button>
-        <el-button type="primary" @click="detailVisible = false">关闭</el-button>
+      <template #Payload="{ row }">
+        <span class="payload-cell">{{ row.Payload }}</span>
       </template>
-    </el-dialog>
+    </DataTable>
   </div>
 </template>
 
@@ -281,34 +229,6 @@ function fmtTime(v: string): string {
   flex-shrink: 0;
 }
 
-.send-row {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-}
-
-.channel-input {
-  max-width: 220px;
-}
-
-.payload-input {
-  flex: 1;
-}
-
-.table-card {
-  --el-card-padding: 12px;
-}
-
-.table-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.mb-sm {
-  margin-bottom: var(--space-sm);
-}
-
 code {
   background: var(--el-fill-color-light);
   padding: 2px 6px;
@@ -317,15 +237,32 @@ code {
   font-size: var(--el-font-size-small);
 }
 
-.detail-pre {
-  margin: 0;
-  max-height: 60vh;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: var(--el-font-size-small);
-  line-height: 1.5;
+.mb-sm {
+  margin-bottom: var(--space-sm);
 }
 
+.broadcast-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.broadcast-channel {
+  width: 200px;
+  flex: 0 0 auto;
+}
+
+.broadcast-payload {
+  flex: 1 1 auto;
+  min-width: 200px;
+}
+
+.payload-cell {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
 </style>

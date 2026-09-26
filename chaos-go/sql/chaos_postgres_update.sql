@@ -194,3 +194,14 @@ CREATE INDEX idx_bookmarks_url ON public.bookmarks USING btree (url) WHERE (url 
 -- 文件连接接入标准 CRUD 基线（模型嵌入 crud.BaseModel）：补创建/更新时间
 ALTER TABLE public.file_links ADD COLUMN IF NOT EXISTS created_at timestamp with time zone;
 ALTER TABLE public.file_links ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone;
+
+-- ============================================================
+-- 2026-09-26: MQTT 同步接入标准 CRUD 基线（mqtt-cluster-sync 变更）
+-- mqtt_sync_messages 模型嵌入 crud.BaseModel：新增 updated_at 列（id 仍为 integer，无需变更）。
+-- 路由改为 mqttsync.Register 自包含挂载：标准 CRUD 走 /api/mqttSync，
+-- 扩展接口为 GET /api/mqttSync/status 与 DELETE /api/mqttSync/channel?name=。
+-- 对应模型：internal/mqttsync.MqttSyncMessage、internal/mqttsync.MqttSyncNode（不变）
+-- ============================================================
+
+ALTER TABLE public.mqtt_sync_messages ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone;
+COMMENT ON COLUMN public.mqtt_sync_messages.updated_at IS '更新时间（嵌入 crud.BaseModel 基线字段）';

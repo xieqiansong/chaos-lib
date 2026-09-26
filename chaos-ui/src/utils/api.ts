@@ -237,43 +237,6 @@ export function updatePortForwardStatus(id: number, status: boolean): Promise<an
 	return sendMessage(`portForwards/${id}/status`, 'PATCH', {status})
 }
 
-// ---- MQTT 多节点同步 ----
-
-export interface MqttMessage {
-    msg_id: string
-    node_id: string
-    channel: string
-    payload: string
-    created_at: string
-    /** 是否为本机发出的消息 */
-    is_self: boolean
-}
-
-export interface MqttStatus {
-    enabled: boolean
-    connected: boolean
-    broker: string
-    prefix: string
-    node_id: string
-    encrypt: boolean
-}
-
-export function getMqttMessages(): Promise<MqttMessage[]> {
-    return sendMessage('mqttSync/messages', 'GET')
-}
-
-export function sendMqttMessage(payload: string, channel?: string): Promise<MqttMessage> {
-    return sendMessage('mqttSync/messages', 'POST', {payload, channel})
-}
-
-export function deleteMqttMessagesByChannel(channel: string): Promise<{ channel: string; deleted: number }> {
-    return sendMessage(`mqttSync/messages?channel=${encodeURIComponent(channel)}`, 'DELETE')
-}
-
-export function getMqttStatus(): Promise<MqttStatus> {
-    return sendMessage('mqttSync/status', 'GET')
-}
-
 // ---- 待办任务 ----
 
 export function postponeTask(id: number, days: number): Promise<any> {
