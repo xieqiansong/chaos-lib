@@ -50,9 +50,32 @@
 - 用户提需求后，主动提醒是否需要补充测试用例（后端配套 `_test.go`），由用户决定是否添加，不自动强写
 - 涉及前端（chaos-ui）的改动不引入测试框架；change 的 tasks.md 必须附「前端手动验证清单」，由用户人工验收
 
+## 模块脚手架基线（通用，所有业务模块适用）
+
+当用户说「按标准数据 / 标准参考表 / 照此复制 / 参考 X 开发」，或涉及
+「新增 / 重写业务模块」时，必须套用本基线，**不论该模块是 CRUD 还是只读**：
+
+- 前端接口门户：`src/api/<resource>.ts` 独占该资源全部类型与 api 函数
+  （只从 `@/utils/api` 借 `sendMessage`）。**禁止**把多业务接口聚合在 `utils/api.ts`。
+- 前端页面：`src/views/<Resource>.vue` 用通用 `DataTable`，仅声明 `columns`
+  与（CRUD 时）`fields`，无增删改查样板。
+- 后端路由：业务包内实现 `Register(rg *gin.RouterGroup)`，`routes.go` 只写
+  一行 `<pkg>.Register(api)`。**禁止**在 `routes.go` 内联业务路由。
+- 后端模型：`internal/<module>/<资源>.go` 定义；CRUD 资源嵌入 `crud.BaseModel`
+  并走 `crud.Register`。
+
+**开工前自查清单（逐条核对）**：
+- [ ] 接口门户为独立文件（非 `utils/api.ts` 聚合）
+- [ ] 页面仅配置驱动、无 CRUD 样板
+- [ ] 路由走业务包 `Register(api)`（非 `routes.go` 内联）
+- [ ] 模型在业务包内
+
+> 存量代码（`utils/api.ts` / `routes.go` 中已聚合的旧模块）为历史遗留，不强制立刻整改；
+> 但任何被重写 / 扩展的模块必须迁移到本基线（如 dbMonitor 已迁移至 `src/api/dbMonitor.ts` + `dbmonitor.Register(api)`）。
+
 ## 标准参考表（配置驱动 CRUD 基准）
 
-`standardData` / 表 `standard_datas` 是所有「简单表」的基准范式：后端零 handler、前端配置驱动。
+`standardData` / 表 `standard_datas` 是上节「模块脚手架基线（通用）」的 CRUD 实例范式：后端零 handler、前端配置驱动。
 新增同类表时**照此复制**，不要为每个表手写 handler。参考实现：`internal/standarddata/standarddata.go` + `src/views/StandardData.vue` + `src/api/standardData.ts`。
 
 ### 后端（chaos-go）
