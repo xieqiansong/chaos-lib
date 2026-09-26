@@ -3,7 +3,7 @@
 // 左：项目组（标准 CRUD，由 DataTable + projectGroupApi 驱动，无样板）。
 // 右：项目（DataTable 配置驱动展示 + 分页 + 搜索；列表由后端合并「已认领 / 磁盘未认领」，
 //      认领 / 移动 / 访问 / 复制路径 / 删除等动作经 #actions 插槽注入，保持基线纯净）。
-import {onMounted, ref} from 'vue'
+import {onMounted, ref, watch} from 'vue'
 import {format} from 'date-fns'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
@@ -43,6 +43,14 @@ function onGroupsLoaded(rows: any[]) {
     setTimeout( () => onGroupClick(rows[0]), 500)
   }
 }
+
+// 选中项目组行高亮（浅绿背景）
+function groupRowClass({row}: any) {
+  return row.ID === selectedGroupId.value ? 'group-row-active' : ''
+}
+
+// 选中项变化时重渲染左侧表格，使行高亮（row-class-name）随之生效
+watch(selectedGroupId, () => groupsTable.value?.refresh())
 
 // ── 右：项目（自定义取数 + 动作插槽）──
 const projectColumns: DataTableColumn[] = [
@@ -280,6 +288,7 @@ onMounted(async () => {
             :fields="groupFields"
             title="项目组"
             :default-sort="{field: 'OrderNum', order: 'ascending'}"
+            :row-class-name="groupRowClass"
             @row-click="onGroupClick"
             @loaded="onGroupsLoaded"
         />
@@ -426,5 +435,14 @@ onMounted(async () => {
   flex-shrink: 0;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-small);
+}
+
+/* 选中的项目组行：浅绿背景（作用于 td，避免被斑马纹的 td 背景盖住） */
+:deep(.el-table .el-table__body tr.group-row-active > td.el-table__cell) {
+  background-color: #e8f8ec !important;
+}
+
+:deep(.el-table .el-table__body tr.group-row-active:hover > td.el-table__cell) {
+  background-color: #d6f2dd !important;
 }
 </style>
