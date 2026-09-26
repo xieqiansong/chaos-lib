@@ -30,9 +30,9 @@ const statusMap: Record<string, { text: string; type: string }> = {
 
 const columns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 150, searchable: true},
-  {field: 'CronExpr', title: 'Cron 表达式', width: 150, searchable: true, search: {placeholder: '如 */5 * * * *'}},
+  {field: 'CronExpr', title: 'Cron', width: 150, searchable: true, search: {placeholder: '如 */5 * * * *'}},
   {
-    field: 'ActionType', title: '动作', width: 90, searchable: true,
+    field: 'ActionType', title: '动作', width: 80, searchable: true,
     search: {type: 'select', options: [{label: 'HTTP', value: 'http'}, {label: '命令', value: 'shell'}]},
   },
   {field: 'ActionConfig', title: '动作配置', minWidth: 200},
@@ -56,7 +56,7 @@ const fields: FormField[] = [
     ],
   },
   {
-    field: 'CronExpr', title: 'Cron 表达式', type: 'text', required: true,
+    field: 'CronExpr', title: 'Cron', type: 'text', required: true,
     placeholder: '5 字段(分 时 日 月 周)如 */5 * * * *；6 字段含秒如 */30 * * * * *',
   },
   {

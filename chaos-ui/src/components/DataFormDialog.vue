@@ -38,7 +38,7 @@ function fieldVisible(f: FormField): boolean {
 </script>
 
 <template>
-  <el-dialog v-model="visible" :title="title" width="70rem">
+  <el-dialog v-model="visible" :title="title" width="50rem">
     <el-form :model="form" label-width="6.25rem">
       <el-row :gutter="16">
         <el-col v-for="f in fields" v-show="fieldVisible(f)" :key="f.field" :span="f.span ?? 24">

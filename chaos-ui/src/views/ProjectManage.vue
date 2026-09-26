@@ -40,7 +40,7 @@ function onGroupClick(row: ProjectGroup) {
 // 左侧项目组首次加载完成 → 默认选中第一个，并拉取右侧项目
 function onGroupsLoaded(rows: any[]) {
   if (selectedGroupId.value == null && rows.length) {
-    setTimeout( () => onGroupClick(rows[0]), 500)
+    setTimeout( () => onGroupClick(rows[0]), 1000)
   }
 }
 
