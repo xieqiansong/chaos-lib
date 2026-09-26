@@ -112,7 +112,7 @@ onMounted(() => {
 }
 
 .api-balance {
-  margin-bottom: var(--space-2xl);
+  margin-bottom: var(--space-lg);
   font-size: var(--el-font-size-base);
 }
 
