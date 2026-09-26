@@ -294,10 +294,10 @@ onUnmounted(() => {
   --el-menu-active-color: var(--term-green);
   --el-menu-hover-bg-color: var(--term-active-bg);
   --el-menu-hover-text-color: var(--term-green);
-  --el-menu-item-height: 32px;
-  --el-menu-sub-item-height: 29.6px;
-  --el-menu-base-level-padding: var(--space-lg);
-  --el-menu-level-padding: var(--space-lg);
+  --el-menu-item-height: 26px;
+  --el-menu-sub-item-height: 24px;
+  --el-menu-base-level-padding: var(--space-sm);
+  --el-menu-level-padding: var(--space-sm);
 }
 
 .sidebar-menu :deep(.el-menu-item),

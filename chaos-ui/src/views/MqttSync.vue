@@ -17,16 +17,12 @@ const tableRef = ref<InstanceType<typeof DataTable> | null>(null)
 let timer: number | undefined
 
 const columns: DataTableColumn[] = [
-  {field: 'Channel', title: '主题', minWidth: 160, searchable: true},
-  {field: 'NodeID', title: '节点', width: 220, searchable: true},
-  {
-    field: 'IsSelf',
-    title: '来源',
-    width: 90,
-    formatter: (row: any) => (row.IsSelf ? '本机' : '对端'),
-  },
+  {field: 'Channel', title: '主题', minWidth: 140, searchable: true},
+  {field: 'NodeID', title: '节点', width: 170, searchable: true},
+  {field: 'IsSelf', title: '来源', width: 170, formatter: (row: any) => (row.IsSelf ? '本机' : '对端'),},
   {field: 'Payload', title: '内容', minWidth: 280, showOverflowTooltip: true},
-  {field: 'CreatedAt', title: '时间', width: 180, type: 'datetime'},
+  {field: 'CreatedAt', title: '时间', width: 170, type: 'datetime'},
+  {field: '__actions', title: '操作', width: 140, type: 'actions', fixed: 'right'},
 ]
 
 // 表单字段配置：驱动 DataTable 内置「查看 / 编辑」弹窗（新建走上方平铺表单）。

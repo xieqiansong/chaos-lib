@@ -83,7 +83,7 @@ onMounted(() => {
     </el-row>
 
 
-    <el-row :gutter="8" class="mb-sm">
+    <el-row :gutter="16" class="mb-lg">
       <el-col :span="12">
         <div class="chart-section">
           <DailyStatsChart/>
@@ -95,7 +95,7 @@ onMounted(() => {
         </div>
       </el-col>
     </el-row>
-    <el-row :gutter="8" class="mb-sm">
+    <el-row :gutter="16" class="mb-lg">
       <el-col :span="12">
         <div class="chart-section">
           <div v-if="contributionLoading" class="contrib-placeholder">加载中...</div>
