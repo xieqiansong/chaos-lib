@@ -50,7 +50,7 @@ const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
 const paletteVisible = ref(false)
 
 // 横屏全屏查看（仅 Android 等支持 orientation.lock 的设备显示入口）
-const { locked, supported, toggle: toggleLandscape } = useLandscape()
+const {locked, supported, toggle: toggleLandscape} = useLandscape()
 
 function togglePalette() {
   paletteVisible.value = !paletteVisible.value
@@ -180,28 +180,30 @@ onUnmounted(() => {
           <div class="search-wrapper">
             <Search @search-change="handleSearchChange"/>
           </div>
-          <PendingTaskBadge/>
-          <button
-              class="cmdpalette-hint theme-toggle"
-              :title="theme === 'paper' ? '切换到 GitHub 暗色' : '切换到 GitHub 浅色'"
-              @click="toggleTheme"
-          >
-            <el-icon :size="14">
-              <Moon v-if="theme === 'paper'"/>
-              <Sunny v-else/>
-            </el-icon>
-          </button>
-          <button
-              v-if="supported"
-              class="cmdpalette-hint theme-toggle"
-              :title="locked ? '退出横屏全屏' : '横屏全屏查看'"
-              @click="toggleLandscape"
-          >
-            <span class="term-prompt">{{ locked ? '⤡' : '⤢' }}</span> 横屏
-          </button>
-          <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
-            <span class="term-prompt">$</span> ⌘K
-          </button>
+          <div class="header-actions">
+            <PendingTaskBadge/>
+            <button
+                class="cmdpalette-hint theme-toggle"
+                :title="theme === 'paper' ? '切换到 GitHub 暗色' : '切换到 GitHub 浅色'"
+                @click="toggleTheme"
+            >
+              <el-icon :size="16">
+                <Moon v-if="theme === 'paper'"/>
+                <Sunny v-else/>
+              </el-icon>
+            </button>
+            <button
+                v-if="supported"
+                class="cmdpalette-hint theme-toggle"
+                :title="locked ? '退出横屏全屏' : '横屏全屏查看'"
+                @click="toggleLandscape"
+            >
+              <span class="term-prompt">{{ locked ? '⤡' : '⤢' }}</span>
+            </button>
+            <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
+              <span class="term-prompt">$</span>
+            </button>
+          </div>
         </header>
         <main class="app-content">
           <router-view v-slot="{Component}">
@@ -396,23 +398,33 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* 文字按钮（横屏 / ⌘K）：字号与内边距用大写 PX 绕过 px->rem 转换——
+/* 顶栏右侧按钮组：统一收进容器，用固定 gap 控制按钮间距，
+   避免 .app-header 的 space-between 把剩余宽度均摊到按钮之间产生大空隙 */
+.header-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6PX;
+  margin-left: var(--space-lg);
+}
+
+/* 顶栏按钮（主题 / 横屏 / ⌘K）：字号与内边距用大写 PX 绕过 px->rem 转换——
    手机竖屏时根字号按 100vw/120 缩到 ~3px，rem 字号会小到不可读；
-   固定 PX 后与待办/主题切换按钮（14px 固定图标）视觉同高。
+   固定 PX 后与待办按钮（16px 固定图标）视觉同高。
    桌面端根字号恰为 16px，这些 PX 值与原 rem 值相等，外观零变化。 */
 .cmdpalette-hint {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4PX;
-  background: transparent;
+  gap: 5PX;
+  background: var(--term-inner);
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
-  font-size: 11.2PX;
-  padding: 2PX 8PX;
+  font-size: 13PX;
+  padding: 5PX 12PX;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 4PX;
 }
 
 .cmdpalette-hint:hover {

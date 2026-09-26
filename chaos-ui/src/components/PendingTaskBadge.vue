@@ -51,7 +51,7 @@ onUnmounted(() => {
       :title="count > 0 ? `待办任务（${count}）` : '待办任务'"
       @click="openPendingTasks"
   >
-    <el-icon :size="14">
+    <el-icon :size="16">
       <Clock/>
     </el-icon>
     <span v-if="count > 0" class="pending-badge">{{ count > MAX_DISPLAY ? `${MAX_DISPLAY}+` : count }}</span>
@@ -59,21 +59,22 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* 顶栏「待办任务」按钮：与 ⌘K / 主题 / 横屏按钮同尺寸同风格（PX 固定，不随根字号缩放），
+   按钮间距由 App.vue 的 .header-actions gap 统一控制，不再单独留 margin */
 .pending-badge-btn {
   position: relative;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: var(--space-05);
-  background: transparent;
+  background: var(--term-inner);
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
-  font-size: var(--font-xs);
-  padding: 2px 8px;
+  font-size: 13PX;
+  padding: 5PX 12PX;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 4PX;
 }
 
 .pending-badge-btn:hover {
