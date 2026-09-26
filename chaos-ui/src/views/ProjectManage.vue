@@ -21,6 +21,7 @@ const groupsForMove = ref<ProjectGroup[]>([])
 const groupColumns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 120, searchable: true},
   {field: 'Remark', title: '备注', minWidth: 120},
+  {field: '__actions', title: '操作', width: 140, type: 'actions', fixed: 'right'},
 ]
 const groupFields: FormField[] = [
   {field: 'Name', title: '组名称', type: 'text', required: true, span: 24, placeholder: '项目组名称'},
@@ -38,12 +39,11 @@ function onGroupClick(row: ProjectGroup) {
 // ── 右：项目（自定义取数 + 动作插槽）──
 const projectColumns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 140, searchable: true},
-  {field: 'RelativePath', title: '相对路径', minWidth: 140},
-  {field: 'GitURL', title: 'Git 地址', minWidth: 140},
+  {field: 'AbsolutePath', title: '绝对路径', minWidth: 140},
   {field: 'Remark', title: '备注', minWidth: 140},
-  {field: 'LastAccessedAt', title: '上次访问', width: 170, type: 'datetime'},
+  {field: 'LastAccessedAt', title: '上次访问', width: 160, type: 'datetime'},
   {field: 'Claimed', title: '状态', width: 90, formatter: (row: any) => (row.Claimed ? '已认领' : '未认领')},
-  {field: '__actions', title: '操作', width: 240, type: 'actions', fixed: 'right'},
+  {field: '__actions', title: '操作', width: 180, type: 'actions', fixed: 'right'},
 ]
 // 编辑弹窗字段（仅允许改名称 / Git / 备注，路径经移动流程改写）
 const projectEditFields: FormField[] = [
@@ -262,11 +262,6 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="section-toolbar">
-      <span class="text-primary text-base section-title">本地项目管理</span>
-      <span class="text-secondary text-xs">项目组 / 项目文件夹（可移动、备注、记录访问）</span>
-    </div>
-
     <el-row :gutter="16">
       <!-- 左：项目组 -->
       <el-col :span="7">
