@@ -7,8 +7,7 @@
 //   2. 启用开关有副作用（建/删联接点）且带校验，走自定义 /:id/status 接口，
 //      由 switch-handler 回调注入（与标准数据的 status 同一套范式）。
 import DataTable from '@/components/DataTable.vue'
-import type {DataTableColumn} from '@/components/dataTable/types'
-import type {FormField} from '@/components/DataFormDialog.vue'
+import type {DataTableColumn, FormField} from '@/components/dataTable/types'
 import {fileLinkApi, type FileLink} from '@/api/fileLink'
 
 // 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）

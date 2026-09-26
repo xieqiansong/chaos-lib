@@ -5,9 +5,7 @@
 import {onMounted, onUnmounted, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
-import type {DataTableColumn} from '@/components/dataTable/types'
-import {CRUD_ACTION} from '@/components/dataTable/types'
-import type {FormField} from '@/components/DataFormDialog.vue'
+import {CRUD_ACTION, type DataTableColumn, type FormField} from '@/components/dataTable/types'
 import {mqttSyncApi, type MqttStatus} from '@/api/mqttSync'
 
 const status = ref<MqttStatus | null>(null)

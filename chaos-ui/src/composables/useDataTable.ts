@@ -30,7 +30,6 @@ export function useDataTable(props: UseDataTableProps) {
 
   const apiMode = computed(() => !!props.api)
   const searchableColumns = computed(() => props.columns.filter((c) => c.searchable))
-  const renderColumns = computed(() => props.columns)
 
   // 初始化搜索字段默认值
   searchableColumns.value.forEach((c) => {
@@ -125,7 +124,6 @@ export function useDataTable(props: UseDataTableProps) {
     loading,
     searchState,
     searchableColumns,
-    renderColumns,
     tableData,
     getData,
     handleSearch,

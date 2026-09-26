@@ -9,10 +9,11 @@ import {computed, onMounted, reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
+import {defaultFieldValue} from '@/composables/useFormDefaults'
 import {type RestApi} from '@/composables/useRestApi'
-import type {DataTableApiParams, DataTableApiResult, DataTableColumn, CrudAction} from '@/components/dataTable/types'
+import type {DataTableApiParams, DataTableApiResult, DataTableColumn, CrudAction, FormField} from '@/components/dataTable/types'
 import {CRUD_ACTION} from '@/components/dataTable/types'
-import DataFormDialog, {type FormField} from '@/components/DataFormDialog.vue'
+import DataFormDialog from '@/components/DataFormDialog.vue'
 
 const props = withDefaults(
     defineProps<{
@@ -124,10 +125,7 @@ const form = reactive<Record<string, any>>({})
 function emptyForm(): Record<string, any> {
   const f: Record<string, any> = {}
   for (const field of props.fields ?? []) {
-    if (field.defaultValue !== undefined) f[field.field] = field.defaultValue
-    else if (field.type === 'switch') f[field.field] = true
-    else if (field.type === 'number') f[field.field] = 0
-    else f[field.field] = field.type === 'datetime' ? null : ''
+    f[field.field] = defaultFieldValue(field)
   }
   return f
 }
@@ -236,31 +234,68 @@ defineExpose({refresh, getData})
     </div>
     <div v-if="searchableColumns.length" class="toolbar-search">
       <el-form :inline="true" @submit.prevent>
-        <el-form-item v-for="col in searchableColumns" :key="col.field" :label="col.search?.label ?? col.title">
-          <el-select v-if="col.search?.type === 'select'" v-model="searchState[col.field]" :placeholder="col.search?.placeholder ?? '请选择'" clearable
-                     style="width: 160px">
-            <el-option v-for="o in (col.search?.options ?? [])" :key="o.value" :label="o.label" :value="o.value"/>
+        <el-form-item
+          v-for="col in searchableColumns"
+          :key="col.field"
+          :label="col.search?.label ?? col.title"
+        >
+          <el-select
+            v-if="col.search?.type === 'select'"
+            v-model="searchState[col.field]"
+            :placeholder="col.search?.placeholder ?? '请选择'"
+            clearable
+            style="width: 160px"
+          >
+            <el-option
+              v-for="o in (col.search?.options ?? [])"
+              :key="o.value"
+              :label="o.label"
+              :value="o.value"
+            />
           </el-select>
-          <el-input v-else v-model="searchState[col.field]" :placeholder="col.search?.placeholder ?? '请输入'" clearable style="width: 200px"
-                    @keyup.enter="handleSearch" size="small"/>
+          <el-input
+            v-else
+            v-model="searchState[col.field]"
+            :placeholder="col.search?.placeholder ?? '请输入'"
+            clearable
+            style="width: 200px"
+            size="small"
+            @keyup.enter="handleSearch"
+          />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch" size="small">查询</el-button>
-          <el-button text @click="handleReset" size="small">重置</el-button>
+          <el-button type="primary" size="small" @click="handleSearch">查询</el-button>
+          <el-button size="small" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
     </div>
   </section>
 
-  <el-table v-loading="loading" :data="tableData" :row-key="rowKey" :tree-props="treeProps" :stripe="stripe" :border="border" class="datatable"
-            :default-sort="defaultSort ? {prop: defaultSort.field, order: defaultSort.order} : undefined"
-            @sort-change="handleSortChange" size="small">
+  <el-table
+    v-loading="loading"
+    :data="tableData"
+    :row-key="rowKey"
+    :tree-props="treeProps"
+    :stripe="stripe"
+    :border="border"
+    class="datatable"
+    :default-sort="defaultSort ? {prop: defaultSort.field, order: defaultSort.order} : undefined"
+    size="small"
+    @sort-change="handleSortChange"
+  >
     <el-table-column v-if="selection" type="selection" width="48"/>
 
-    <el-table-column v-for="col in finalColumns"
-                     :key="col.field" :prop="col.field" :label="col.title" :width="col.width"
-                     :min-width="col.minWidth" :align="col.align" :fixed="col.fixed === true ? 'left' : col.fixed"
-                     :sortable="col.sortable ? (api ? 'custom' : true) : false">
+    <el-table-column
+      v-for="col in finalColumns"
+      :key="col.field"
+      :prop="col.field"
+      :label="col.title"
+      :width="col.width"
+      :min-width="col.minWidth"
+      :align="col.align"
+      :fixed="col.fixed === true ? 'left' : col.fixed"
+      :sortable="col.sortable ? (api ? 'custom' : true) : false"
+    >
       <template #default="scope">
         <slot v-if="$slots[col.field]" :name="col.field" :row="scope.row" :value="scope.row[col.field]"/>
         <template v-else-if="col.type === 'actions'">
@@ -290,32 +325,34 @@ defineExpose({refresh, getData})
 
   <div v-if="total > 0" class="pager">
     <el-pagination
-        :current-page="page" :page-size="pageSize" :total="total"
-        :page-sizes="pageSizeOptions"
-        layout="total, sizes, prev, pager, next, jumper"
-        @current-change="handlePageChange"
-        @size-change="handleSizeChange"
+      :current-page="page"
+      :page-size="pageSize"
+      :total="total"
+      :page-sizes="pageSizeOptions"
+      layout="total, sizes, prev, pager, next, jumper"
+      @current-change="handlePageChange"
+      @size-change="handleSizeChange"
     />
   </div>
 
   <DataFormDialog
-      v-if="crudMode"
-      v-model="showDialog"
-      :title="dialogMode === 'create' ? `新建${title}` : `编辑${title}`"
-      :mode="dialogMode"
-      :fields="fields ?? []"
-      :form="form"
-      :saving="saving"
-      @save="save"
+    v-if="crudMode"
+    v-model="showDialog"
+    :title="dialogMode === 'create' ? `新建${title}` : `编辑${title}`"
+    :mode="dialogMode"
+    :fields="fields ?? []"
+    :form="form"
+    :saving="saving"
+    @save="save"
   />
 
   <DataFormDialog
-      v-if="crudMode && hasAction(CRUD_ACTION.VIEW)"
-      v-model="showView"
-      :title="`查看${title}`"
-      mode="view"
-      :fields="fields ?? []"
-      :form="form"
+    v-if="crudMode && hasAction(CRUD_ACTION.VIEW)"
+    v-model="showView"
+    :title="`查看${title}`"
+    mode="view"
+    :fields="fields ?? []"
+    :form="form"
   />
 </template>
 

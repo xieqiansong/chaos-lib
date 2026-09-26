@@ -1,31 +1,10 @@
-<script lang="ts">
+<script setup lang="ts">
 // 通用「新建 / 编辑 / 查看」表单弹窗：字段由 fields 配置驱动，
 // 与 DataTable 配套，使简单表的增改/查看界面也能配置化、零样板。
 // mode 为 'view' 时所有控件禁用，底部仅保留「关闭」。
 // 字段命名与 DataTableColumn 对齐：field（字段名）/ title（标签）。
-export interface FormField {
-  field: string
-  title: string
-  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select'
-  required?: boolean
-  placeholder?: string
-  rows?: number
-  min?: number
-  precision?: number
-  step?: number
-  /** type=select 时的选项 */
-  options?: { label: string; value: any }[]
-  /** 新建时的初始值；未指定则按类型取空值（switch→true、number→0、其余→''） */
-  defaultValue?: any
-  // 时间列默认 RFC3339 带时区（与后端 time.Time 解析约定一致），可覆盖
-  valueFormat?: string
-  // 布局：基于 24 栅格，默认占满整行（24），可指定如 12 实现两列并排
-  span?: number
-}
-</script>
-
-<script setup lang="ts">
 import {computed} from 'vue'
+import type {FormField} from '@/components/dataTable/types'
 
 const props = defineProps<{
   modelValue: boolean

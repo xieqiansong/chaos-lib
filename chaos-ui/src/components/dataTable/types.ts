@@ -10,7 +10,6 @@ export interface DataTableSearchConfig {
   placeholder?: string
   /** type=select 时的选项 */
   options?: { label: string; value: any }[]
-  width?: number | string
 }
 
 export interface DataTableColumn {
@@ -60,3 +59,25 @@ export const CRUD_ACTION = {
   DELETE: 'delete',
 } as const
 export type CrudAction = (typeof CRUD_ACTION)[keyof typeof CRUD_ACTION]
+
+// DataFormDialog 的字段配置，与 DataTableColumn 对齐：field（字段名）/ title（标签）。
+// 由 DataTable 透传给 DataFormDialog，驱动「新建 / 编辑 / 查看」表单。
+export interface FormField {
+  field: string
+  title: string
+  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select'
+  required?: boolean
+  placeholder?: string
+  rows?: number
+  min?: number
+  precision?: number
+  step?: number
+  /** type=select 时的选项 */
+  options?: { label: string; value: any }[]
+  /** 新建时的初始值；未指定则按类型取空值（switch→true、number→0、其余→''） */
+  defaultValue?: any
+  // 时间列默认 RFC3339 带时区（与后端 time.Time 解析约定一致），可覆盖
+  valueFormat?: string
+  // 布局：基于 24 栅格，默认占满整行（24），可指定如 12 实现两列并排
+  span?: number
+}

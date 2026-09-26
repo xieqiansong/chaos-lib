@@ -2,8 +2,7 @@
 // 标准参考表界面：通用 DataTable（内置查看/编辑/删除 + 弹窗）驱动完整 CRUD。
 // 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
 import DataTable from '@/components/DataTable.vue'
-import type {DataTableColumn} from '@/components/dataTable/types'
-import type {FormField} from '@/components/DataFormDialog.vue'
+import type {DataTableColumn, FormField} from '@/components/dataTable/types'
 import {standardDataApi, type StandardData} from '@/api/standardData'
 
 const columns: DataTableColumn[] = [

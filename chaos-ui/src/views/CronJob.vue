@@ -11,8 +11,7 @@ import {ref, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {format as formatDate, parseISO} from 'date-fns'
 import DataTable from '@/components/DataTable.vue'
-import type {DataTableColumn} from '@/components/dataTable/types'
-import type {FormField} from '@/components/DataFormDialog.vue'
+import type {DataTableColumn, FormField} from '@/components/dataTable/types'
 import {cronJobApi, type CronJob, type CronJobRun} from '@/api/cronJob'
 
 // 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）
