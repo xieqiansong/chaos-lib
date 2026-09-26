@@ -15,12 +15,13 @@ import {sendMessage} from '@/utils/api'
 
 const selectedGroupId = ref<number | null>(null)
 const projectsTable = ref<InstanceType<typeof DataTable> | null>(null)
+const groupsTable = ref<InstanceType<typeof DataTable> | null>(null)
 const groupsForMove = ref<ProjectGroup[]>([])
 
 // ── 左：项目组（标准 CRUD）──
 const groupColumns: DataTableColumn[] = [
-  {field: 'Name', title: '名称', minWidth: 120, searchable: true},
-  {field: 'Remark', title: '备注', minWidth: 120},
+  {field: 'Name', title: '名称', minWidth: 100, searchable: true},
+  {field: 'Remark', title: '备注', minWidth: 140},
   {field: '__actions', title: '操作', width: 140, type: 'actions', fixed: 'right'},
 ]
 const groupFields: FormField[] = [
@@ -36,13 +37,20 @@ function onGroupClick(row: ProjectGroup) {
   projectsTable.value?.refresh()
 }
 
+// 左侧项目组首次加载完成 → 默认选中第一个，并拉取右侧项目
+function onGroupsLoaded(rows: any[]) {
+  if (selectedGroupId.value == null && rows.length) {
+    setTimeout( () => onGroupClick(rows[0]), 500)
+  }
+}
+
 // ── 右：项目（自定义取数 + 动作插槽）──
 const projectColumns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 140, searchable: true},
   {field: 'AbsolutePath', title: '绝对路径', minWidth: 140},
   {field: 'Remark', title: '备注', minWidth: 140},
   {field: 'LastAccessedAt', title: '上次访问', width: 160, type: 'datetime'},
-  {field: 'Claimed', title: '状态', width: 90, formatter: (row: any) => (row.Claimed ? '已认领' : '未认领')},
+  {field: 'Claimed', title: '状态', width: 80, formatter: (row: any) => (row.Claimed ? '已认领' : '未认领')},
   {field: '__actions', title: '操作', width: 180, type: 'actions', fixed: 'right'},
 ]
 // 编辑弹窗字段（仅允许改名称 / Git / 备注，路径经移动流程改写）
@@ -267,11 +275,13 @@ onMounted(async () => {
       <el-col :span="7">
         <DataTable
             :api="projectGroupApi"
+            ref="groupsTable"
             :columns="groupColumns"
             :fields="groupFields"
             title="项目组"
             :default-sort="{field: 'OrderNum', order: 'ascending'}"
             @row-click="onGroupClick"
+            @loaded="onGroupsLoaded"
         />
       </el-col>
 

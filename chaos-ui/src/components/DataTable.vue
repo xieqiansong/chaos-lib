@@ -13,6 +13,7 @@ const emit = defineEmits<{
   (e: 'selection-change', rows: any[]): void
   (e: 'reset'): void
   (e: 'row-click', row: any, column: any, event: any): void
+  (e: 'loaded', rows: any[]): void
 }>()
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
@@ -115,7 +116,10 @@ const {
   defaultSort: props.defaultSort,
 })
 
-onMounted(() => getData())
+onMounted(async () => {
+  await getData()
+  emit('loaded', tableData.value)
+})
 
 // 重置：先通知父级清空自定义筛选（如提前查询/计划树），再清空搜索栏内置项并刷新
 function onReset() {
