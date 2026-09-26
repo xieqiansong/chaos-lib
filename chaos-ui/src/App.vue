@@ -11,6 +11,7 @@ import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
 import {Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
+import {useLandscape} from './composables/useLandscape'
 import {buildMenu, flattenMenu} from './router'
 
 // 中心面板（预览原文 / 复习）打开时才加载，避免 markdown-it/dompurify 常驻主包
@@ -47,6 +48,9 @@ const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
 })))
 
 const paletteVisible = ref(false)
+
+// 横屏全屏查看（仅 Android 等支持 orientation.lock 的设备显示入口）
+const { locked, supported, toggle: toggleLandscape } = useLandscape()
 
 function togglePalette() {
   paletteVisible.value = !paletteVisible.value
@@ -186,6 +190,14 @@ onUnmounted(() => {
               <Moon v-if="theme === 'paper'"/>
               <Sunny v-else/>
             </el-icon>
+          </button>
+          <button
+              v-if="supported"
+              class="cmdpalette-hint theme-toggle"
+              :title="locked ? '退出横屏全屏' : '横屏全屏查看'"
+              @click="toggleLandscape"
+          >
+            <span class="term-prompt">{{ locked ? '⤡' : '⤢' }}</span> 横屏
           </button>
           <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
             <span class="term-prompt">$</span> ⌘K
