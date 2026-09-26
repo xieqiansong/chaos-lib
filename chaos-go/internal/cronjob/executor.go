@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
-	"time"
 )
 
 func jsonUnmarshal(s string, v interface{}) error {
@@ -34,7 +33,7 @@ func runShell(job *CronJob) (output, errMsg string, success bool) {
 	if strings.TrimSpace(act.Command) == "" {
 		return "", "命令为空", false
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(job.TimeoutSec)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeoutOf(job))
 	defer cancel()
 
 	args := append([]string{"/c", act.Command}, act.Args...)

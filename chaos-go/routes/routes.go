@@ -121,19 +121,9 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 			tasks.POST("/batch-postpone", taskplan.BatchPostponeTasks)
 		}
 
-		// 定时任务（独立模块，与任务计划 / 待办任务无关）：cron 调度 + 动作执行 + 运行日志
-		cronJobs := api.Group("/cronJobs")
-		{
-			cronJobs.GET("/", cronjob.ListCronJobs)
-			cronJobs.POST("/", cronjob.CreateCronJob)
-			cronJobs.GET("/:id", cronjob.GetCronJob)
-			cronJobs.PATCH("/:id", cronjob.UpdateCronJob)
-			cronJobs.DELETE("/:id", cronjob.DeleteCronJob)
-			cronJobs.PATCH("/:id/toggle", cronjob.ToggleCronJob)
-			cronJobs.POST("/:id/run", cronjob.RunCronJob)
-			cronJobs.GET("/:id/runs", cronjob.ListCronJobRuns)
-			cronJobs.POST("/preview", cronjob.PreviewCron)
-		}
+		// 定时任务（独立模块，与任务计划 / 待办任务无关）：资源接口自包含，
+		// 本行仅做编排调用（路由实现在 internal/cronjob）
+		cronjob.Register(api)
 
 		// 由原系统内置周期任务改造而来的内部动作接口，供定时任务模块通过 HTTP 触发
 		sysJobs := api.Group("/systemJobs")

@@ -1,69 +1,144 @@
 <script setup lang="ts">
-import {onMounted, ref, watch} from 'vue'
-import {sendMessage} from '@/utils/api'
-import {ElMessage, ElMessageBox} from 'element-plus'
+// 定时任务界面：参考标准数据，由通用 DataTable（内置查看/编辑/删除 + 弹窗）驱动完整 CRUD。
+// 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
+//
+// 本资源相对标准基线有四个「自定义」点（均属扩展能力，不污染基线）：
+//   1. 启停有副作用（挂载 / 摘除 cron 调度），走自定义 /:id/status 接口，由 switch-handler 注入。
+//   2. 「运行 / 历史」是标准 CRUD 之外的动作，经 #actions 插槽追加到操作列。
+//   3. 下次执行时间（NextRun）由后端按 cron 表达式实时计算，不落库 —— 前端只负责渲染。
+//   4. 工具栏的 cron 表达式校验沿用自定义 /preview 接口，避免填错表达式却要到点才发现。
+import {ref, watch} from 'vue'
+import {ElMessage} from 'element-plus'
 import {format as formatDate, parseISO} from 'date-fns'
+import DataTable from '@/components/DataTable.vue'
+import type {DataTableColumn} from '@/components/dataTable/types'
+import type {FormField} from '@/components/DataFormDialog.vue'
+import {cronJobApi, type CronJob, type CronJobRun} from '@/api/cronJob'
 
-interface CronJob {
-  ID: number
-  Name: string
-  CronExpr: string
-  ActionType: string
-  ActionConfig: string
-  Enabled: boolean
-  TimeoutSec: number
-  LastRunAt: string | null
-  LastStatus: string
-  NextRun: string | null
-}
+// 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）
+defineProps<{ searchText?: string }>()
 
-interface CronJobRun {
-  ID: number
-  JobID: number
-  StartedAt: string
-  FinishedAt: string | null
-  Success: boolean
-  Output: string
-  Error: string
-}
-
-const jobs = ref<CronJob[]>([])
-const loading = ref(false)
-
-const showDialog = ref(false)
-const editingId = ref<number | null>(null)
-const saving = ref(false)
-
-const formData = ref({
-  Name: '',
-  CronExpr: '',
-  ActionType: 'http',
-  Method: 'POST',
-  URL: '',
-  Headers: '',
-  Body: '',
-  Command: '',
-  WorkDir: '',
-  TimeoutSec: 30,
-  Enabled: true,
-})
-
-// cron 表达式实时预览
-const previewValid = ref(true)
-const previewError = ref('')
-const previewRuns = ref<string[]>([])
-let previewTimer: any = null
-
-const actionTypeMap: Record<string, {text: string; type: string}> = {
+const actionTypeMap: Record<string, { text: string; type: string }> = {
   http: {text: 'HTTP', type: 'primary'},
   shell: {text: '命令', type: 'warning'},
 }
 
-const statusMap: Record<string, {text: string; type: string}> = {
+const statusMap: Record<string, { text: string; type: string }> = {
   ok: {text: '成功', type: 'success'},
   failed: {text: '失败', type: 'danger'},
   '': {text: '—', type: 'info'},
 }
+
+const columns: DataTableColumn[] = [
+  {field: 'Name', title: '名称', minWidth: 150, searchable: true},
+  {field: 'CronExpr', title: 'Cron 表达式', width: 150, searchable: true, search: {placeholder: '如 */5 * * * *'}},
+  {
+    field: 'ActionType', title: '动作', width: 90, searchable: true,
+    search: {type: 'select', options: [{label: 'HTTP', value: 'http'}, {label: '命令', value: 'shell'}]},
+  },
+  {field: 'ActionConfig', title: '动作配置', minWidth: 200},
+  {field: 'Enabled', title: '启用', width: 80, type: 'switch'},
+  {field: 'TimeoutSec', title: '超时(秒)', width: 90, align: 'right'},
+  {field: 'LastStatus', title: '上次结果', width: 100},
+  {field: 'LastRunAt', title: '上次执行', width: 170, type: 'datetime'},
+  {field: 'NextRun', title: '下次执行', width: 170, type: 'datetime'},
+  // 显式声明操作列以放宽宽度：内置「查看/编辑/删除」+ #actions 插槽的「运行/历史」
+  {field: '__actions', title: '操作', width: 230, type: 'actions', fixed: 'right'},
+]
+
+// 表单字段配置（与 columns 对应，驱动 DataTable 内置的 DataFormDialog）
+const fields: FormField[] = [
+  {field: 'Name', title: '任务名称', type: 'text', span: 12, required: true, placeholder: '请输入任务名称'},
+  {
+    field: 'ActionType', title: '动作类型', type: 'select', span: 12, defaultValue: 'http',
+    options: [
+      {label: 'HTTP 请求 / Webhook', value: 'http'},
+      {label: '执行命令 / 脚本（预留）', value: 'shell'},
+    ],
+  },
+  {
+    field: 'CronExpr', title: 'Cron 表达式', type: 'text', required: true,
+    placeholder: '5 字段(分 时 日 月 周)如 */5 * * * *；6 字段含秒如 */30 * * * * *',
+  },
+  {
+    field: 'ActionConfig', title: '动作配置(JSON)', type: 'json', rows: 4,
+    placeholder: 'http: {"method":"POST","url":"/api/systemJobs/sweep"}；shell: {"command":"echo hi"}',
+  },
+  {field: 'TimeoutSec', title: '超时(秒)', type: 'number', span: 8, min: 1, defaultValue: 30},
+  {field: 'Enabled', title: '启用', type: 'switch', span: 8, defaultValue: true},
+]
+
+const tableRef = ref<InstanceType<typeof DataTable> | null>(null)
+
+// 启停：交给 cronJobApi 的自定义 setStatus（DataTable 负责刷新与提示）
+function onEnabledChange(row: CronJob, next: boolean) {
+  return cronJobApi.setStatus(row.ID, next)
+}
+
+// 立即执行一次（标准 CRUD 之外的动作）
+async function runJob(row: CronJob) {
+  try {
+    const run = await cronJobApi.run(row.ID)
+    if (run?.Success) ElMessage.success('执行成功')
+    else ElMessage.warning('执行失败，可查看运行历史')
+    tableRef.value?.refresh()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '触发失败')
+  }
+}
+
+// 运行历史（标准 CRUD 之外的只读弹窗）
+const showHistory = ref(false)
+const historyJobName = ref('')
+const runs = ref<CronJobRun[]>([])
+const runsLoading = ref(false)
+
+async function openHistory(row: CronJob) {
+  historyJobName.value = row.Name
+  showHistory.value = true
+  runsLoading.value = true
+  try {
+    const res = await cronJobApi.runs(row.ID, {page: 1, size: 50})
+    runs.value = res?.items ?? []
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载历史失败')
+    runs.value = []
+  } finally {
+    runsLoading.value = false
+  }
+}
+
+// cron 表达式校验（工具栏）：输入后防抖调用 /preview
+const previewExpr = ref('')
+const previewValid = ref<boolean | null>(null)
+const previewError = ref('')
+const previewRuns = ref<string[]>([])
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+
+async function runPreview() {
+  const expr = previewExpr.value.trim()
+  if (!expr) {
+    previewValid.value = null
+    previewError.value = ''
+    previewRuns.value = []
+    return
+  }
+  try {
+    const res = await cronJobApi.preview(expr, 5)
+    previewValid.value = !!res?.valid
+    previewError.value = res?.valid ? '' : (res?.error || '表达式无效')
+    previewRuns.value = (res?.nextRuns ?? []).map((s: string) => fmtTime(s))
+  } catch (e: any) {
+    previewValid.value = false
+    previewError.value = e?.message || '校验失败'
+    previewRuns.value = []
+  }
+}
+
+watch(previewExpr, () => {
+  if (previewTimer) clearTimeout(previewTimer)
+  previewTimer = setTimeout(runPreview, 300)
+})
 
 function fmtTime(s: string | null): string {
   if (!s) return '—'
@@ -80,382 +155,59 @@ function duration(start: string, end: string | null): string {
   return (ms / 1000).toFixed(1) + 's'
 }
 
-async function fetchJobs() {
-  loading.value = true
+// 动作配置（JSON 文本）在表格里的摘要：http 显示「方法 URL」，命令显示命令本身
+function actionSummary(row: CronJob): string {
   try {
-    const res = await sendMessage('cronJobs', 'GET')
-    jobs.value = Array.isArray(res) ? res : []
-  } catch (e: any) {
-    ElMessage.error(e?.message || '加载失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-function resetForm() {
-  formData.value = {
-    Name: '',
-    CronExpr: '',
-    ActionType: 'http',
-    Method: 'POST',
-    URL: '',
-    Headers: '',
-    Body: '',
-    Command: '',
-    WorkDir: '',
-    TimeoutSec: 30,
-    Enabled: true,
-  }
-  previewValid.value = true
-  previewError.value = ''
-  previewRuns.value = []
-}
-
-function openCreate() {
-  editingId.value = null
-  resetForm()
-  showDialog.value = true
-}
-
-async function openEdit(row: CronJob) {
-  editingId.value = row.ID
-  resetForm()
-  try {
-    const job: any = await sendMessage(`cronJobs/${row.ID}`, 'GET')
-    formData.value.Name = job.Name || ''
-    formData.value.CronExpr = job.CronExpr || ''
-    formData.value.ActionType = job.ActionType || 'http'
-    formData.value.TimeoutSec = job.TimeoutSec ?? 30
-    formData.value.Enabled = job.Enabled !== false
-    try {
-      const cfg = JSON.parse(job.ActionConfig || '{}')
-      if (formData.value.ActionType === 'http') {
-        formData.value.Method = cfg.method || 'POST'
-        formData.value.URL = cfg.url || ''
-        formData.value.Headers = cfg.headers ? JSON.stringify(cfg.headers, null, 2) : ''
-        formData.value.Body = cfg.body || ''
-      } else if (formData.value.ActionType === 'shell') {
-        formData.value.Command = cfg.command || ''
-        formData.value.WorkDir = cfg.workDir || ''
-      }
-    } catch {
-      /* 配置解析失败忽略 */
-    }
-    showDialog.value = true
-    runPreview()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '读取失败')
-  }
-}
-
-function parseHeaders(text: string): Record<string, string> {
-  const t = (text || '').trim()
-  if (!t) return {}
-  try {
-    const obj = JSON.parse(t)
-    if (obj && typeof obj === 'object') return obj as Record<string, string>
+    const cfg = JSON.parse(row.ActionConfig || '{}')
+    if (row.ActionType === 'http') return `${cfg.method || 'GET'} ${cfg.url || ''}`.trim()
+    return cfg.command || row.ActionConfig
   } catch {
-    /* 退回按行解析 */
-  }
-  const obj: Record<string, string> = {}
-  for (const line of t.split('\n')) {
-    const idx = line.indexOf(':')
-    if (idx > 0) obj[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
-  }
-  return obj
-}
-
-function buildActionConfig(): string {
-  if (formData.value.ActionType === 'shell') {
-    return JSON.stringify({
-      command: formData.value.Command,
-      args: [],
-      workDir: formData.value.WorkDir,
-    })
-  }
-  const cfg: Record<string, unknown> = {
-    method: formData.value.Method || 'POST',
-    url: formData.value.URL,
-  }
-  const headers = parseHeaders(formData.value.Headers)
-  if (Object.keys(headers).length > 0) cfg.headers = headers
-  if (formData.value.Body && formData.value.Body.trim() !== '') cfg.body = formData.value.Body
-  return JSON.stringify(cfg)
-}
-
-async function runPreview() {
-  const expr = formData.value.CronExpr.trim()
-  if (!expr) {
-    previewValid.value = true
-    previewError.value = ''
-    previewRuns.value = []
-    return
-  }
-  try {
-    const res: any = await sendMessage('cronJobs/preview', 'POST', {cronExpr: expr, count: 5})
-    previewValid.value = !!res.valid
-    previewError.value = res.valid ? '' : (res.error || '表达式无效')
-    previewRuns.value = (res.nextRuns || []).map((s: string) => fmtTime(s))
-  } catch (e: any) {
-    previewValid.value = false
-    previewError.value = e?.message || '校验失败'
-    previewRuns.value = []
+    return row.ActionConfig
   }
 }
-
-watch(() => formData.value.CronExpr, () => {
-  if (previewTimer) clearTimeout(previewTimer)
-  previewTimer = setTimeout(runPreview, 300)
-})
-
-async function submit() {
-  if (!formData.value.Name.trim()) {
-    ElMessage.error('请输入任务名称')
-    return
-  }
-  if (!formData.value.CronExpr.trim()) {
-    ElMessage.error('请输入 cron 表达式')
-    return
-  }
-  if (!previewValid.value) {
-    ElMessage.error('cron 表达式无效：' + previewError.value)
-    return
-  }
-  if (formData.value.ActionType === 'http' && !formData.value.URL.trim()) {
-    ElMessage.error('HTTP 动作必须填写 URL')
-    return
-  }
-  if (formData.value.ActionType === 'shell' && !formData.value.Command.trim()) {
-    ElMessage.error('命令动作必须填写命令')
-    return
-  }
-
-  saving.value = true
-  const payload = {
-    name: formData.value.Name.trim(),
-    cronExpr: formData.value.CronExpr.trim(),
-    actionType: formData.value.ActionType,
-    actionConfig: buildActionConfig(),
-    timeoutSec: Number(formData.value.TimeoutSec) || 30,
-    enabled: formData.value.Enabled,
-  }
-  try {
-    if (editingId.value) {
-      await sendMessage(`cronJobs/${editingId.value}`, 'PATCH', payload)
-      ElMessage.success('已保存')
-    } else {
-      await sendMessage('cronJobs', 'POST', payload)
-      ElMessage.success('已创建')
-    }
-    showDialog.value = false
-    await fetchJobs()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-  } finally {
-    saving.value = false
-  }
-}
-
-async function toggleJob(row: CronJob) {
-  try {
-    await sendMessage(`cronJobs/${row.ID}/toggle`, 'PATCH', {})
-    await fetchJobs()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-    await fetchJobs()
-  }
-}
-
-async function deleteJob(row: CronJob) {
-  try {
-    await ElMessageBox.confirm(`确认删除定时任务「${row.Name}」？删除后不再调度。`, '警告', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'error',
-    })
-  } catch {
-    return
-  }
-  try {
-    await sendMessage(`cronJobs/${row.ID}`, 'DELETE')
-    ElMessage.success('已删除')
-    await fetchJobs()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
-}
-
-async function runJob(row: CronJob) {
-  try {
-    const run: any = await sendMessage(`cronJobs/${row.ID}/run`, 'POST', {})
-    const ok = run && run.Success
-    if (ok) ElMessage.success('执行成功')
-    else ElMessage.warning('执行失败，请查看运行历史')
-    await fetchJobs()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '触发失败')
-  }
-}
-
-const showHistory = ref(false)
-const historyJobId = ref<number | null>(null)
-const historyJobName = ref('')
-const runs = ref<CronJobRun[]>([])
-const runsLoading = ref(false)
-
-async function openHistory(row: CronJob) {
-  historyJobId.value = row.ID
-  historyJobName.value = row.Name
-  showHistory.value = true
-  runsLoading.value = true
-  try {
-    const res: any = await sendMessage(`cronJobs/${row.ID}/runs`, 'GET', {page: 1, size: 50})
-    runs.value = res?.items ?? []
-  } catch (e: any) {
-    ElMessage.error(e?.message || '加载历史失败')
-    runs.value = []
-  } finally {
-    runsLoading.value = false
-  }
-}
-
-onMounted(fetchJobs)
 </script>
 
 <template>
-  <div>
-    <div class="section-toolbar flex items-center justify-between">
-      <span class="text-primary text-base section-title">定时任务</span>
-      <div class="section-actions">
-        <el-button size="small" type="primary" @click="openCreate">+ 新建定时任务</el-button>
-      </div>
-    </div>
+  <div class="cronjob-view">
+    <DataTable
+        ref="tableRef"
+        :columns="columns"
+        :api="cronJobApi"
+        :fields="fields"
+        title="定时任务"
+        row-key="ID"
+        :switch-handler="onEnabledChange"
+    >
 
-    <el-table :data="jobs" v-loading="loading" border stripe class="task-table">
-      <el-table-column label="名称" width="160" prop="Name"/>
-      <el-table-column label="Cron 表达式" width="160" prop="CronExpr"/>
-      <el-table-column label="动作" min-width="140">
-        <template #default="{ row }">
-          <el-tag size="small" :type="actionTypeMap[row.ActionType]?.type || 'info'">
-            {{ actionTypeMap[row.ActionType]?.text || row.ActionType }}
-          </el-tag>
-          <span v-if="row.ActionType === 'http'" class="ml-sm text-secondary text-xs break-all">{{ row.ActionConfig }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="启用" width="80">
-        <template #default="{ row }">
-          <el-switch :model-value="row.Enabled" @change="toggleJob(row)"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="运行状态" width="240">
-        <template #default="{ row }">
-          <div>
-            <span>{{ fmtTime(row.LastRunAt) }}</span>
-            <el-tag size="small" class="ml-sm" :type="statusMap[row.LastStatus]?.type || 'info'">
-              {{ statusMap[row.LastStatus]?.text || '—' }}
-            </el-tag>
-          </div>
-          <div class="mt-xs">
-            <span v-if="row.Enabled" class="text-secondary">{{ fmtTime(row.NextRun) }}</span>
-            <span v-else class="text-secondary">已停用</span>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
-        <template #default="{ row }">
-          <div class="op-actions">
-            <el-button size="small" type="primary" text @click="runJob(row)">运行</el-button>
-            <el-button size="small" text @click="openHistory(row)">历史</el-button>
-            <el-button size="small" text @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" text @click="deleteJob(row)">删除</el-button>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-dialog v-model="showDialog" :title="editingId ? '编辑定时任务' : '新建定时任务'" width="48rem">
-      <el-form label-position="top">
-        <div class="form-row">
-          <el-form-item label="任务名称">
-            <el-input v-model="formData.Name" placeholder="请输入任务名称"/>
-          </el-form-item>
-          <el-form-item label="动作类型">
-            <el-select v-model="formData.ActionType">
-              <el-option label="HTTP 请求 / Webhook" value="http"/>
-              <el-option label="执行命令 / 脚本（预留）" value="shell"/>
-            </el-select>
-          </el-form-item>
-        </div>
-        <el-form-item label="Cron 表达式">
-          <el-input v-model="formData.CronExpr" placeholder="5字段(分 时 日 月 周)如 */5 * * * *；6字段含秒(秒 分 时 日 月 周)如 */30 * * * * * (每30秒)"/>
-          <div class="cron-preview mt-xs">
-            <span v-if="!formData.CronExpr.trim()" class="text-secondary text-xs">输入表达式后实时校验并预览下次执行时间</span>
-            <template v-else>
-              <span v-if="previewValid" class="text-success text-xs">✓ 表达式有效</span>
-              <span v-else class="text-danger text-xs">✗ {{ previewError }}</span>
-              <div v-if="previewValid && previewRuns.length" class="text-xs text-secondary mt-xs">
-                未来 5 次：{{ previewRuns.join(' · ') }}
-              </div>
-            </template>
-          </div>
-        </el-form-item>
-
-        <el-alert v-if="formData.ActionType === 'shell'" type="warning" :closable="false" show-icon
-                  class="mb-sm" title="命令执行功能默认关闭，仅当后端 FEATURE_CRON_SHELL=true 时才会真正执行；否则运行会记录「未启用」。"/>
-
-        <template v-if="formData.ActionType === 'http'">
-          <div class="form-row">
-            <el-form-item label="方法">
-              <el-select v-model="formData.Method" style="width: 100%">
-                <el-option label="GET" value="GET"/>
-                <el-option label="POST" value="POST"/>
-                <el-option label="PUT" value="PUT"/>
-                <el-option label="DELETE" value="DELETE"/>
-                <el-option label="PATCH" value="PATCH"/>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="超时(秒)">
-              <el-input-number v-model="formData.TimeoutSec" :min="1" :max="600" controls-position="right" style="width: 100%"/>
-            </el-form-item>
-            <el-form-item label="启用" class="form-item-narrow">
-              <el-switch v-model="formData.Enabled"/>
-            </el-form-item>
-          </div>
-          <el-form-item label="URL（以 / 开头表示调用本机同名接口）">
-            <el-input v-model="formData.URL" placeholder="https://example.com/hook 或 /api/systemJobs/sweep"/>
-          </el-form-item>
-          <div class="form-row">
-            <el-form-item label="请求头（JSON 或每行 Key: Value）">
-              <el-input v-model="formData.Headers" type="textarea" :rows="2" placeholder='{"Authorization":"Bearer x"}'/>
-            </el-form-item>
-            <el-form-item label="请求体">
-              <el-input v-model="formData.Body" type="textarea" :rows="2" placeholder="可选"/>
-            </el-form-item>
-          </div>
-        </template>
-
-        <template v-else>
-          <div class="form-row">
-            <el-form-item label="命令">
-              <el-input v-model="formData.Command" placeholder="如: echo hello 或 C:\\scripts\\backup.bat"/>
-            </el-form-item>
-            <el-form-item label="工作目录（可选）">
-              <el-input v-model="formData.WorkDir" placeholder="可选"/>
-            </el-form-item>
-            <el-form-item label="启用" class="form-item-narrow">
-              <el-switch v-model="formData.Enabled"/>
-            </el-form-item>
-          </div>
-        </template>
-      </el-form>
-      <template #footer>
-        <el-button @click="showDialog = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+      <template #ActionType="{ row }">
+        <el-tag size="small" :type="(actionTypeMap[row.ActionType]?.type as any) || 'info'">
+          {{ actionTypeMap[row.ActionType]?.text || row.ActionType }}
+        </el-tag>
       </template>
-    </el-dialog>
 
-    <el-dialog v-model="showHistory" :title="`运行历史 — ${historyJobName}`" width="40rem">
-      <el-table :data="runs" v-loading="runsLoading" border stripe max-height="50vh">
+      <template #ActionConfig="{ row }">
+        <span class="text-secondary text-xs break-all">{{ actionSummary(row) }}</span>
+      </template>
+
+      <template #LastStatus="{ row }">
+        <el-tag size="small" :type="(statusMap[row.LastStatus ?? '']?.type as any) || 'info'">
+          {{ statusMap[row.LastStatus ?? '']?.text || row.LastStatus }}
+        </el-tag>
+      </template>
+
+      <template #NextRun="{ row }">
+        <span v-if="!row.Enabled" class="text-secondary">已停用</span>
+        <span v-else>{{ fmtTime(row.NextRun) }}</span>
+      </template>
+
+      <template #actions="{ row }">
+        <el-button size="small" type="primary" text @click="runJob(row)">运行</el-button>
+        <el-button size="small" text @click="openHistory(row)">历史</el-button>
+      </template>
+    </DataTable>
+
+    <el-dialog v-model="showHistory" :title="`运行历史 — ${historyJobName}`" width="46rem">
+      <el-table :data="runs" v-loading="runsLoading" border stripe size="small" max-height="50vh">
         <el-table-column label="开始时间" width="170">
           <template #default="{ row }">{{ fmtTime(row.StartedAt) }}</template>
         </el-table-column>
@@ -478,26 +230,15 @@ onMounted(fetchJobs)
 </template>
 
 <style scoped>
-.task-table {
-  width: 100%;
-}
-
-.form-row {
+.cron-check {
   display: flex;
-  gap: var(--space-md);
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
-.form-row .el-form-item {
-  flex: 1;
-  margin-bottom: 18px;
-}
-
-.form-row .form-item-narrow {
-  flex: 0 0 90px;
-}
-
-.cron-preview {
-  line-height: 1.6;
+.cron-check .el-input {
+  width: 16rem;
 }
 
 .run-output {
@@ -510,11 +251,5 @@ onMounted(fetchJobs)
   background: var(--el-fill-color-light, #f5f7fa);
   padding: 6px 8px;
   border-radius: 4px;
-}
-
-.op-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
 }
 </style>

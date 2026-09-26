@@ -23,6 +23,9 @@ var (
 	entryIDs     = map[int]cron.EntryID{}
 )
 
+// defaultTimeoutSec 是未显式配置超时时的兜底值（秒）。
+const defaultTimeoutSec = 30
+
 // Start 加载所有启用的定时任务并启动调度器。
 func Start() {
 	cronMu.Lock()
@@ -175,7 +178,7 @@ func runHTTP(job *CronJob) (output, errMsg string, success bool) {
 	for k, v := range act.Headers {
 		req.Header.Set(k, v)
 	}
-	client := &http.Client{Timeout: time.Duration(job.TimeoutSec) * time.Second}
+	client := &http.Client{Timeout: timeoutOf(job)}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "请求失败: " + err.Error(), false
@@ -193,6 +196,14 @@ func runHTTP(job *CronJob) (output, errMsg string, success bool) {
 
 func selfBaseURL() string {
 	return fmt.Sprintf("http://127.0.0.1:%d", config.GetConfig().Server.Port)
+}
+
+// timeoutOf 兜底超时：未配置（0）或非法值时按 30 秒计，避免 http.Client 零超时等于不超时。
+func timeoutOf(job *CronJob) time.Duration {
+	if job.TimeoutSec <= 0 {
+		return defaultTimeoutSec * time.Second
+	}
+	return time.Duration(job.TimeoutSec) * time.Second
 }
 
 func truncate(s string, max int) string {

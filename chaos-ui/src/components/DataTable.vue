@@ -3,7 +3,8 @@
 // 由 columns 派生表格列；searchable 列自动生成搜索栏；支持服务端(api)/本地(data)两种分页模式。
 // 自定义单元格优先用具名插槽 #field，其次 formatter，否则纯文本。
 // 操作列：传入完整 RestApi（含 create/update/remove）+ fields 时，自动渲染「查看/编辑/删除」并内置弹窗；
-//         也可自行用 columns 的 { type: 'actions' } + 具名插槽 #actions 自定义（保持向后兼容）。
+//         业务扩展动作经 #actions 插槽追加在同格（如定时任务的「运行 / 历史」），
+//         非 CRUD 场景可仅用 { type: 'actions' } + #actions 插槽自行定义全部按钮。
 import {computed, onMounted, reactive, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format, parseISO} from 'date-fns'
@@ -110,7 +111,8 @@ const form = reactive<Record<string, any>>({})
 function emptyForm(): Record<string, any> {
   const f: Record<string, any> = {}
   for (const field of props.fields ?? []) {
-    if (field.type === 'switch') f[field.field] = true
+    if (field.defaultValue !== undefined) f[field.field] = field.defaultValue
+    else if (field.type === 'switch') f[field.field] = true
     else if (field.type === 'number') f[field.field] = 0
     else f[field.field] = field.type === 'datetime' ? null : ''
   }
@@ -249,12 +251,14 @@ defineExpose({refresh, getData})
       <template #default="scope">
         <slot v-if="$slots[col.field]" :name="col.field" :row="scope.row" :value="scope.row[col.field]"/>
         <template v-else-if="col.type === 'actions'">
-          <div class="op-actions" v-if="crudMode && !$slots.actions">
-            <el-button size="small" text @click="openView(scope.row)">查看</el-button>
-            <el-button type="primary" size="small" text @click="openEdit(scope.row)">编辑</el-button>
-            <el-button type="danger" size="small" text @click="remove(scope.row)">删除</el-button>
-          </div>
-          <div class="op-actions" v-else-if="$slots.actions">
+          <!-- 内置增删改按钮 + 业务自定义按钮（#actions 插槽）共存：
+               插槽只负责「扩展动作」，标准动作仍由组件统一提供，避免业务页重复实现。 -->
+          <div class="op-actions">
+            <template v-if="crudMode">
+              <el-button size="small" text @click="openView(scope.row)">查看</el-button>
+              <el-button type="primary" size="small" text @click="openEdit(scope.row)">编辑</el-button>
+              <el-button type="danger" size="small" text @click="remove(scope.row)">删除</el-button>
+            </template>
             <slot name="actions" :row="scope.row"/>
           </div>
         </template>

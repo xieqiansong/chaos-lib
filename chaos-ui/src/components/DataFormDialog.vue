@@ -6,13 +6,17 @@
 export interface FormField {
   field: string
   title: string
-  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime'
+  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select'
   required?: boolean
   placeholder?: string
   rows?: number
   min?: number
   precision?: number
   step?: number
+  /** type=select 时的选项 */
+  options?: { label: string; value: any }[]
+  /** 新建时的初始值；未指定则按类型取空值（switch→true、number→0、其余→''） */
+  defaultValue?: any
   // 时间列默认 RFC3339 带时区（与后端 time.Time 解析约定一致），可覆盖
   valueFormat?: string
   // 布局：基于 24 栅格，默认占满整行（24），可指定如 12 实现两列并排
@@ -68,6 +72,15 @@ const readonly = computed(() => props.mode === 'view')
                 :disabled="readonly"
                 :placeholder="f.placeholder"
             />
+            <el-select
+                v-else-if="f.type === 'select'"
+                v-model="form[f.field]"
+                :disabled="readonly"
+                :placeholder="f.placeholder ?? '请选择'"
+                style="width: 100%"
+            >
+              <el-option v-for="o in (f.options ?? [])" :key="o.value" :label="o.label" :value="o.value"/>
+            </el-select>
             <el-input-number
                 v-else-if="f.type === 'number'"
                 v-model="form[f.field]"
