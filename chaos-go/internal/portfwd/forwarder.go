@@ -92,7 +92,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	}
 
 	pf.mu.RLock()
-	_, exists := pf.forwards[rule.Id]
+	_, exists := pf.forwards[rule.ID]
 	pf.mu.RUnlock()
 	if exists {
 		return fmt.Errorf("该端口转发已启动")
@@ -124,7 +124,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 
 	taskCtx, taskCancel := context.WithCancel(pf.ctx)
 	task := &ForwardTask{
-		ruleId: rule.Id, direction: rule.Direction, port: rule.Port,
+		ruleId: rule.ID, direction: rule.Direction, port: rule.Port,
 		bindAddr: rule.BindAddress, listenAddr: rule.listenAddr(), targetAddr: rule.targetAddr(),
 		sshConn: sshConn, owner: pf,
 		ctx: taskCtx, cancel: taskCancel,
@@ -156,7 +156,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	}
 
 	pf.mu.Lock()
-	if _, dup := pf.forwards[rule.Id]; dup {
+	if _, dup := pf.forwards[rule.ID]; dup {
 		pf.mu.Unlock()
 		taskCancel()
 		task.closeListener()
@@ -165,7 +165,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		}
 		return fmt.Errorf("该端口转发已启动")
 	}
-	pf.forwards[rule.Id] = task
+	pf.forwards[rule.ID] = task
 	pf.mu.Unlock()
 
 	if rule.Direction == DirectionRemote {
@@ -183,7 +183,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		sshAddr = sshConn.sshAddr()
 	}
 	slog.Info("端口转发已启动",
-		"ruleId", rule.Id, "direction", rule.Direction, "listen", task.listenAddr,
+		"ruleId", rule.ID, "direction", rule.Direction, "listen", task.listenAddr,
 		"sshAddr", sshAddr, "target", task.targetAddr)
 	return nil
 }
@@ -285,7 +285,7 @@ func RecoverForwardsOnBoot() {
 		return
 	}
 	var rules []PortForwarding
-	if err := db.Where("status = ?", true).Order("id ASC").Find(&rules).Error; err != nil {
+	if err := db.Where("status = ? AND is_deleted = ?", true, false).Order("id ASC").Find(&rules).Error; err != nil {
 		slog.Warn("读取待恢复端口转发失败", "err", err)
 		return
 	}
@@ -301,16 +301,16 @@ func RecoverForwardsOnBoot() {
 			var loaded SshConnection
 			if err := db.First(&loaded, "id = ?", rule.SshConnectionId).Error; err != nil {
 				slog.Warn("端口转发恢复跳过：SSH 连接不存在",
-					"ruleId", rule.Id, "name", rule.Name, "err", err)
+					"ruleId", rule.ID, "name", rule.Name, "err", err)
 				continue
 			}
 			conn = &loaded
 		}
 		if err := GlobalPortForwarder.AddForward(rule, conn); err != nil {
 			slog.Warn("端口转发恢复失败（后续自愈任务会重试）",
-				"ruleId", rule.Id, "name", rule.Name, "err", err)
+				"ruleId", rule.ID, "name", rule.Name, "err", err)
 		} else {
-			slog.Info("端口转发已恢复", "ruleId", rule.Id, "name", rule.Name)
+			slog.Info("端口转发已恢复", "ruleId", rule.ID, "name", rule.Name)
 		}
 	}
 }
@@ -324,13 +324,13 @@ func SelfHealForwards() {
 		return
 	}
 	var rules []PortForwarding
-	if err := db.Where("status = ?", true).Order("id ASC").Find(&rules).Error; err != nil {
+	if err := db.Where("status = ? AND is_deleted = ?", true, false).Order("id ASC").Find(&rules).Error; err != nil {
 		slog.Warn("端口转发自愈扫描失败", "err", err)
 		return
 	}
 	for i := range rules {
 		rule := &rules[i]
-		if running, _ := GlobalPortForwarder.Status(rule.Id); running {
+		if running, _ := GlobalPortForwarder.Status(rule.ID); running {
 			continue
 		}
 		_ = rule.normalize()
@@ -344,9 +344,9 @@ func SelfHealForwards() {
 		}
 		if err := GlobalPortForwarder.AddForward(rule, conn); err != nil {
 			slog.Debug("端口转发自愈重连失败",
-				"ruleId", rule.Id, "name", rule.Name, "err", err)
+				"ruleId", rule.ID, "name", rule.Name, "err", err)
 		} else {
-			slog.Info("端口转发自愈重连成功", "ruleId", rule.Id, "name", rule.Name)
+			slog.Info("端口转发自愈重连成功", "ruleId", rule.ID, "name", rule.Name)
 		}
 	}
 }

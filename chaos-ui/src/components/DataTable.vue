@@ -263,6 +263,7 @@ defineExpose({refresh, getData})
             v-model="searchState[col.field]"
             :placeholder="col.search?.placeholder ?? '请选择'"
             clearable
+            size="small"
             style="width: 160px"
           >
             <el-option

@@ -67,6 +67,12 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '文件连接', icon: 'Link'},
   },
   {
+    path: '/sshConn',
+    name: 'sshConn',
+    component: () => import('@/views/SshConn.vue'),
+    meta: {title: 'SSH连接', icon: 'Key'},
+  },
+  {
     path: '/portForward',
     name: 'portForward',
     component: () => import('@/views/PortForward.vue'),

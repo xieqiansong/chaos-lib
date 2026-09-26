@@ -55,6 +55,10 @@ type Opts struct {
 	// 未配置则原样返回模型。单条接口（get/create/update）内部包成 1 元素切片复用同一回调。
 	ToResponse func(rows any) any
 
+	// BeforeCreate: 写方向回调，在 ShouldBindJSON 之后、tx.Create 之前执行。
+	// 入参为 *Model，可就地规范化字段（如补全默认值、自动生成名称）；返回 error 则直接 400 并拒绝创建。
+	BeforeCreate func(row any) error
+
 	// AfterCreate / AfterUpdate / AfterDelete: 写方向回调，在事务内、提交前执行。
 	// 入参为 *Model；返回 error 则整笔回滚（钩子不成功就不提交）。
 	// 注意：文件系统等外部副作用本身无法随事务回滚，钩子放在提交前只是保证「失败即不落库」。
@@ -197,6 +201,10 @@ func (h *handler) get(c *gin.Context) {
 func (h *handler) create(c *gin.Context) {
 	ptr := h.newModel()
 	if err := c.ShouldBindJSON(ptr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.runHook(h.opts.BeforeCreate, ptr); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

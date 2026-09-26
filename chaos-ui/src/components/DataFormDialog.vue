@@ -26,13 +26,22 @@ const visible = computed({
 })
 
 const readonly = computed(() => props.mode === 'view')
+
+// 条件显隐：form[showIf.field] 满足 equals / notEquals 时才渲染该字段
+function fieldVisible(f: FormField): boolean {
+  if (!f.showIf) return true
+  const cur = props.form[f.showIf.field]
+  if (f.showIf.equals !== undefined) return cur === f.showIf.equals
+  if (f.showIf.notEquals !== undefined) return cur !== f.showIf.notEquals
+  return true
+}
 </script>
 
 <template>
   <el-dialog v-model="visible" :title="title" width="70rem">
     <el-form :model="form" label-width="6.25rem">
       <el-row :gutter="16">
-        <el-col v-for="f in fields" :key="f.field" :span="f.span ?? 24">
+        <el-col v-for="f in fields" v-show="fieldVisible(f)" :key="f.field" :span="f.span ?? 24">
           <el-form-item
               :label="f.title"
               :required="f.required"
@@ -40,6 +49,14 @@ const readonly = computed(() => props.mode === 'view')
             <el-input
                 v-if="f.type === 'text'"
                 v-model="form[f.field]"
+                :disabled="readonly"
+                :placeholder="f.placeholder"
+            />
+            <el-input
+                v-else-if="f.type === 'password'"
+                v-model="form[f.field]"
+                type="password"
+                show-password
                 :disabled="readonly"
                 :placeholder="f.placeholder"
             />

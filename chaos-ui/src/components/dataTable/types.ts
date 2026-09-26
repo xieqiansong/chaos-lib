@@ -65,7 +65,7 @@ export type CrudAction = (typeof CRUD_ACTION)[keyof typeof CRUD_ACTION]
 export interface FormField {
   field: string
   title: string
-  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select'
+  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select' | 'password'
   required?: boolean
   placeholder?: string
   rows?: number
@@ -80,4 +80,6 @@ export interface FormField {
   valueFormat?: string
   // 布局：基于 24 栅格，默认占满整行（24），可指定如 12 实现两列并排
   span?: number
+  /** 条件显隐：仅当 form[showIf.field] equals/notEquals 指定值时才渲染该字段（如按认证方式切换凭据字段） */
+  showIf?: { field: string; equals?: any; notEquals?: any }
 }

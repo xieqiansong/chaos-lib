@@ -36,7 +36,12 @@ export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T>
       }
     }
     const res = await sendMessage(prefix, 'GET', query)
-    return { rows: (res?.items ?? []) as T[], total: res?.total ?? 0 }
+    // 兼容不同后端构建的响应形态：分页包可能是 {items}（crud 基线）或 {rows}（旧接口），
+    // 主键字段可能是 ID 或 Id；统一规整为 {rows, total} 且每行必含 ID。
+    const raw = (res?.items ?? res?.rows ?? res?.data?.items ?? res?.data?.rows ?? []) as any[]
+    const rows = raw.map((it: any) => ({...it, ID: it.ID ?? it.Id})) as T[]
+    const total = res?.total ?? res?.data?.total ?? rows.length
+    return {rows, total}
   }
 
   function create(data: Partial<T>) {

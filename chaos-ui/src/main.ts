@@ -19,6 +19,7 @@ import {
     Folder,
     Grid,
     HomeFilled,
+    Key,
     Link,
     MagicStick,
     Monitor,
@@ -64,7 +65,8 @@ const usedIcons = {
     Star,
     Sunny,
     Tickets,
-    Grid
+    Grid,
+    Key
 }
 for (const [key, component] of Object.entries(usedIcons)) {
     app.component(key, component);

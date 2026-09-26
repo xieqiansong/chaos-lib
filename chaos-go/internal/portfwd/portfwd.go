@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"chaos-go/internal/crud"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,27 +36,11 @@ func isLocalSideListen(direction string) bool {
 }
 
 // PortForwarding 端口转发规则。
+// 嵌入 crud.BaseModel 以获得统一主键 / 时间戳 / 软删除。
 // Direction 决定「监听」发生在哪一侧：local 在本机监听，remote 在 SSH 服务器侧监听。
+// Status 为「期望运行」标记（供重启恢复 / 自愈使用）；实际运行状态以内存为准（见 toResponse）。
 type PortForwarding struct {
-	Id              int `gorm:"primaryKey"`
-	Name            string
-	Direction       string
-	Port            int
-	BindAddress     string
-	TargetHost      string
-	TargetPort      int
-	SshConnectionId int
-	Status          bool
-	Remark          string
-}
-
-func (PortForwarding) TableName() string {
-	return "port_forwarding"
-}
-
-// PortForwardingResponse 对外 DTO；Status 以内存中实际运行状态为准。
-type PortForwardingResponse struct {
-	Id              int
+	crud.BaseModel
 	Name            string
 	Direction       string
 	Port            int
@@ -65,6 +51,40 @@ type PortForwardingResponse struct {
 	Status          bool
 	LastError       string
 	Remark          string
+}
+
+func (PortForwarding) TableName() string {
+	return "port_forwarding"
+}
+
+// PortForwardingResponse 对外 DTO；Status 以内存中实际运行状态为准。
+type PortForwardingResponse struct {
+	ID              int    `json:"ID"`
+	Name            string `json:"Name"`
+	Direction       string
+	Port            int
+	BindAddress     string
+	TargetHost      string
+	TargetPort      int
+	SshConnectionId int
+	Status          bool
+	LastError       string
+	Remark          string
+}
+
+// displayBindAddress 监听地址展示值：空值时按方向取默认（仅用于展示，运行期 normalize 另行兜底）。
+func (pf *PortForwarding) displayBindAddress() string {
+	if strings.TrimSpace(pf.BindAddress) != "" {
+		return pf.BindAddress
+	}
+	switch pf.Direction {
+	case DirectionRemote:
+		return DefaultRemoteBindAddress
+	case DirectionDirect:
+		return DefaultDirectBindAddress
+	default:
+		return DefaultLocalBindAddress
+	}
 }
 
 // normalize 补齐方向与监听地址：方向空值视为 local（兼容本次变更前的存量数据）。
@@ -112,16 +132,35 @@ func (pf *PortForwarding) directionLabel() string {
 }
 
 func (pf *PortForwarding) toResponse() PortForwardingResponse {
-	running, lastErr := GlobalPortForwarder.Status(pf.Id)
+	running, lastErr := GlobalPortForwarder.Status(pf.ID)
 	return PortForwardingResponse{
-		Id: pf.Id, Name: pf.Name, Direction: pf.Direction, Port: pf.Port,
-		BindAddress: pf.BindAddress, TargetHost: pf.TargetHost, TargetPort: pf.TargetPort,
-		SshConnectionId: pf.SshConnectionId, Status: running,
-		LastError: lastErr, Remark: pf.Remark,
+		ID:              pf.ID,
+		Name:            pf.Name,
+		Direction:       pf.Direction,
+		Port:            pf.Port,
+		BindAddress:     pf.displayBindAddress(),
+		TargetHost:      pf.TargetHost,
+		TargetPort:      pf.TargetPort,
+		SshConnectionId: pf.SshConnectionId,
+		Status:          running,
+		LastError:       lastErr,
+		Remark:          pf.Remark,
 	}
 }
 
-// validate 校验规则字段；需关联已存在的 SSH 连接。
+// portForwardingsToResponse 整批把 []*PortForwarding 转成响应 DTO（供 crud.ToResponse 调用）。
+func portForwardingsToResponse(rows any) any {
+	rules := rows.([]*PortForwarding)
+	out := make([]PortForwardingResponse, 0, len(rules))
+	for _, r := range rules {
+		// 存量行可能没有 direction，读路径同样按 local 兜底
+		_ = r.normalize()
+		out = append(out, r.toResponse())
+	}
+	return out
+}
+
+// validate 校验规则字段；需关联已存在的 SSH 连接（direct 除外）。空名称自动生成。
 func (pf *PortForwarding) validate() error {
 	if err := pf.normalize(); err != nil {
 		return err
@@ -144,7 +183,7 @@ func (pf *PortForwarding) validate() error {
 			return fmt.Errorf("请选择 SSH 连接")
 		}
 		var conn SshConnection
-		if result := config.GetDB().First(&conn, "id = ?", pf.SshConnectionId); result.Error != nil {
+		if result := config.GetDB().Where("is_deleted = ?", false).First(&conn, "id = ?", pf.SshConnectionId); result.Error != nil {
 			return fmt.Errorf("SSH 连接不存在")
 		}
 	}
@@ -161,123 +200,41 @@ func (pf *PortForwarding) validate() error {
 	return nil
 }
 
-// ── Handlers ──────────────────────────────────────────────────────
-
-func GetPortForwardings(c *gin.Context) {
-	var rules []PortForwarding
-	config.GetDB().Order("id ASC").Find(&rules)
-	responses := make([]PortForwardingResponse, 0, len(rules))
-	for i := range rules {
-		// 存量行可能没有 direction，读路径同样按 local 兜底
-		_ = rules[i].normalize()
-		responses = append(responses, rules[i].toResponse())
-	}
-	c.JSON(200, responses)
+// beforeCreatePortForward 创建前规范化并校验（名称留空自动生成）。
+func beforeCreatePortForward(row any) error {
+	pf := row.(*PortForwarding)
+	pf.Status = false
+	return pf.validate()
 }
 
-func CreatePortForwarding(c *gin.Context) {
-	var rule PortForwarding
-	if err := c.ShouldBindJSON(&rule); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
+// afterUpdatePortForward 更新前校验；运行中的规则禁止任何修改，需先停止。
+func afterUpdatePortForward(row any) error {
+	pf := row.(*PortForwarding)
+	if running, _ := GlobalPortForwarder.Status(pf.ID); running {
+		return fmt.Errorf("该转发正在运行，请先停止后再修改")
 	}
-	rule.Status = false
-	if err := rule.validate(); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if result := config.GetDB().Create(&rule); result.Error != nil {
-		c.JSON(500, gin.H{"error": "创建失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "创建成功", "data": rule.toResponse()})
+	return pf.validate()
 }
 
-func UpdatePortForwarding(c *gin.Context) {
-	id := c.Param("id")
-	var rule PortForwarding
-	if result := config.GetDB().First(&rule, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "端口转发不存在"})
-		return
-	}
-	if running, _ := GlobalPortForwarder.Status(rule.Id); running {
-		c.JSON(400, gin.H{"error": "该转发正在运行，请先停止后再修改"})
-		return
-	}
-	_ = rule.normalize()
-	var req struct {
-		Name            *string
-		Direction       *string
-		Port            *int
-		BindAddress     *string
-		TargetHost      *string
-		TargetPort      *int
-		SshConnectionId *int
-		Remark          *string
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Name != nil {
-		rule.Name = *req.Name
-	}
-	if req.Direction != nil {
-		rule.Direction = *req.Direction
-	}
-	if req.Port != nil {
-		rule.Port = *req.Port
-	}
-	if req.BindAddress != nil {
-		rule.BindAddress = *req.BindAddress
-	}
-	if req.TargetHost != nil {
-		rule.TargetHost = *req.TargetHost
-	}
-	if req.TargetPort != nil {
-		rule.TargetPort = *req.TargetPort
-	}
-	if req.SshConnectionId != nil {
-		rule.SshConnectionId = *req.SshConnectionId
-	}
-	if req.Remark != nil {
-		rule.Remark = *req.Remark
-	}
-	if err := rule.validate(); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if result := config.GetDB().Save(&rule); result.Error != nil {
-		c.JSON(500, gin.H{"error": "更新失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "更新成功", "data": rule.toResponse()})
-}
-
-func DeletePortForwarding(c *gin.Context) {
-	id := c.Param("id")
-	var rule PortForwarding
-	if result := config.GetDB().First(&rule, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "端口转发不存在"})
-		return
-	}
-	if running, _ := GlobalPortForwarder.Status(rule.Id); running {
-		if err := GlobalPortForwarder.RemoveForward(rule.Id); err != nil {
-			c.JSON(500, gin.H{"error": "停止端口转发失败: " + err.Error()})
-			return
+// afterDeletePortForward 删除（软删）前若正在运行则先停掉隧道。
+func afterDeletePortForward(row any) error {
+	pf := row.(*PortForwarding)
+	if running, _ := GlobalPortForwarder.Status(pf.ID); running {
+		if err := GlobalPortForwarder.RemoveForward(pf.ID); err != nil {
+			return fmt.Errorf("停止端口转发失败: %v", err)
 		}
 	}
-	if result := config.GetDB().Delete(&rule); result.Error != nil {
-		c.JSON(500, gin.H{"error": "删除失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "删除成功"})
+	return nil
 }
 
+// ── 自定义路由：启停状态 ──────────────────────────────────────────
+
+// UpdatePortForwardingStatus 启停单条转发规则。
+// local/remote 经关联的 SSH 连接建立隧道；direct 直接在本机监听并直连目标。
 func UpdatePortForwardingStatus(c *gin.Context) {
 	id := c.Param("id")
 	var rule PortForwarding
-	if result := config.GetDB().First(&rule, "id = ?", id); result.Error != nil {
+	if result := config.GetDB().Where("is_deleted = ?", false).First(&rule, "id = ?", id); result.Error != nil {
 		c.JSON(404, gin.H{"error": "端口转发不存在"})
 		return
 	}
@@ -292,7 +249,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	running, _ := GlobalPortForwarder.Status(rule.Id)
+	running, _ := GlobalPortForwarder.Status(rule.ID)
 	if req.Status {
 		if running {
 			c.JSON(400, gin.H{"error": "该端口转发已启动"})
@@ -302,7 +259,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		var conn *SshConnection
 		if rule.Direction != DirectionDirect {
 			var loaded SshConnection
-			if result := config.GetDB().First(&loaded, "id = ?", rule.SshConnectionId); result.Error != nil {
+			if result := config.GetDB().Where("is_deleted = ?", false).First(&loaded, "id = ?", rule.SshConnectionId); result.Error != nil {
 				c.JSON(400, gin.H{"error": "SSH 连接不存在，无法启动"})
 				return
 			}
@@ -318,7 +275,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 			c.JSON(400, gin.H{"error": "该端口转发未启动"})
 			return
 		}
-		if err := GlobalPortForwarder.RemoveForward(rule.Id); err != nil {
+		if err := GlobalPortForwarder.RemoveForward(rule.ID); err != nil {
 			c.JSON(500, gin.H{"error": "停止端口转发失败: " + err.Error()})
 			return
 		}
@@ -329,4 +286,31 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"message": "状态更新成功", "data": rule.toResponse()})
+}
+
+// Register 把 SSH 端口转发两个资源挂载到给定路由组：纯 CRUD 交给 crud，扩展接口自实现。
+// Status 标记为受保护字段：仅经专用启停路由改写，通用 PATCH 无法绕过。
+func Register(rg *gin.RouterGroup) {
+	// SSH 连接信息：凭据仅后端使用，响应一律脱敏；测试接口自实现。
+	crud.Register(rg, "sshConns", &SshConnection{}, crud.Opts{
+		Searchable:   []string{"name", "host", "username", "remark"},
+		Sortable:     []string{"id", "name", "host", "username"},
+		ToResponse:   sshConnsToResponse,
+		BeforeCreate: beforeCreateSshConn,
+		AfterUpdate:  afterUpdateSshConn,
+		AfterDelete:  afterDeleteSshConn,
+	})
+	rg.Group("/sshConns").POST("/:id/test", TestSshConnection)
+
+	// 端口转发规则
+	crud.Register(rg, "portForwards", &PortForwarding{}, crud.Opts{
+		Searchable:   []string{"name", "direction", "target_host", "remark"},
+		Sortable:     []string{"id", "name", "direction", "port", "target_port"},
+		Protected:    []string{"Status"},
+		ToResponse:   portForwardingsToResponse,
+		BeforeCreate: beforeCreatePortForward,
+		AfterUpdate:  afterUpdatePortForward,
+		AfterDelete:  afterDeletePortForward,
+	})
+	rg.Group("/portForwards").PATCH("/:id/status", UpdatePortForwardingStatus)
 }

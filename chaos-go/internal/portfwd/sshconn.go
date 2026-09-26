@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"chaos-go/internal/crud"
+
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/ssh"
 )
@@ -22,16 +24,17 @@ const (
 
 // SshConnection SSH 连接信息。
 // 凭据（Password / PrivateKey / Passphrase）只用于后端建连，一律不经 API 返回、不写入日志。
+// 嵌入 crud.BaseModel 以获得统一主键 / 时间戳 / 软删除。
 type SshConnection struct {
-	Id         int `gorm:"primaryKey"`
+	crud.BaseModel
 	Name       string
 	Host       string
 	Port       int
 	Username   string
 	AuthType   string
-	Password   string
-	PrivateKey string
-	Passphrase string
+	Password   string `json:"-"`
+	PrivateKey string `json:"-"`
+	Passphrase string `json:"-"`
 	Remark     string
 }
 
@@ -41,8 +44,8 @@ func (SshConnection) TableName() string {
 
 // SshConnectionResponse 对外 DTO：只暴露「是否已配置凭据」，绝不返回凭据明文。
 type SshConnectionResponse struct {
-	Id            int
-	Name          string
+	ID            int    `json:"ID"`
+	Name          string `json:"Name"`
 	Host          string
 	Port          int
 	Username      string
@@ -55,7 +58,7 @@ type SshConnectionResponse struct {
 
 func (conn *SshConnection) toResponse() SshConnectionResponse {
 	return SshConnectionResponse{
-		Id:            conn.Id,
+		ID:            conn.ID,
 		Name:          conn.Name,
 		Host:          conn.Host,
 		Port:          conn.normalizedPort(),
@@ -66,6 +69,16 @@ func (conn *SshConnection) toResponse() SshConnectionResponse {
 		HasPrivateKey: conn.PrivateKey != "",
 		HasPassphrase: conn.Passphrase != "",
 	}
+}
+
+// sshConnsToResponse 整批把 []*SshConnection 转成响应 DTO（供 crud.ToResponse 调用）。
+func sshConnsToResponse(rows any) any {
+	conns := rows.([]*SshConnection)
+	out := make([]SshConnectionResponse, 0, len(conns))
+	for _, c := range conns {
+		out = append(out, c.toResponse())
+	}
+	return out
 }
 
 // ── 连接构建 ──────────────────────────────────────────────────────
@@ -173,135 +186,38 @@ func (conn *SshConnection) validateForSave(needCredential bool) error {
 	return nil
 }
 
-// ── Handlers ──────────────────────────────────────────────────────
-
-func GetSshConnections(c *gin.Context) {
-	var conns []SshConnection
-	config.GetDB().Order("id ASC").Find(&conns)
-	responses := make([]SshConnectionResponse, 0, len(conns))
-	for i := range conns {
-		responses = append(responses, conns[i].toResponse())
-	}
-	c.JSON(200, responses)
+// beforeCreateSshConn 创建前校验（需要凭据）；同时把空端口补成默认 22。
+func beforeCreateSshConn(row any) error {
+	conn := row.(*SshConnection)
+	return conn.validateForSave(true)
 }
 
-func CreateSshConnection(c *gin.Context) {
-	var req struct {
-		Name       string
-		Host       string
-		Port       int
-		Username   string
-		AuthType   string
-		Password   string
-		PrivateKey string
-		Passphrase string
-		Remark     string
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	conn := SshConnection{
-		Name: req.Name, Host: req.Host, Port: req.Port, Username: req.Username,
-		AuthType: req.AuthType, Password: req.Password, PrivateKey: req.PrivateKey,
-		Passphrase: req.Passphrase, Remark: req.Remark,
-	}
-	if err := conn.validateForSave(true); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if result := config.GetDB().Create(&conn); result.Error != nil {
-		c.JSON(500, gin.H{"error": "创建失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "创建成功", "data": conn.toResponse()})
+// afterUpdateSshConn 更新前校验（编辑时凭据可保持原值，故 needCredential=false）。
+func afterUpdateSshConn(row any) error {
+	conn := row.(*SshConnection)
+	return conn.validateForSave(false)
 }
 
-func UpdateSshConnection(c *gin.Context) {
-	id := c.Param("id")
-	var conn SshConnection
-	if result := config.GetDB().First(&conn, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "SSH 连接不存在"})
-		return
-	}
-	// 凭据字段为空表示保持原值，避免前端回显
-	var req struct {
-		Name       *string
-		Host       *string
-		Port       *int
-		Username   *string
-		AuthType   *string
-		Password   *string
-		PrivateKey *string
-		Passphrase *string
-		Remark     *string
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if req.Name != nil {
-		conn.Name = *req.Name
-	}
-	if req.Host != nil {
-		conn.Host = *req.Host
-	}
-	if req.Port != nil {
-		conn.Port = *req.Port
-	}
-	if req.Username != nil {
-		conn.Username = *req.Username
-	}
-	if req.AuthType != nil {
-		conn.AuthType = *req.AuthType
-	}
-	if req.Password != nil && *req.Password != "" {
-		conn.Password = *req.Password
-	}
-	if req.PrivateKey != nil && *req.PrivateKey != "" {
-		conn.PrivateKey = *req.PrivateKey
-	}
-	if req.Passphrase != nil && *req.Passphrase != "" {
-		conn.Passphrase = *req.Passphrase
-	}
-	if req.Remark != nil {
-		conn.Remark = *req.Remark
-	}
-	if err := conn.validateForSave(true); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	if result := config.GetDB().Save(&conn); result.Error != nil {
-		c.JSON(500, gin.H{"error": "更新失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "更新成功", "data": conn.toResponse()})
-}
-
-func DeleteSshConnection(c *gin.Context) {
-	id := c.Param("id")
-	var conn SshConnection
-	if result := config.GetDB().First(&conn, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "SSH 连接不存在"})
-		return
-	}
+// afterDeleteSshConn 删除前拦截：若仍被任意转发规则引用则拒绝，并回滚软删除。
+func afterDeleteSshConn(row any) error {
+	conn := row.(*SshConnection)
 	var count int64
-	config.GetDB().Model(&PortForwarding{}).Where("ssh_connection_id = ?", conn.Id).Count(&count)
+	config.GetDB().Model(&PortForwarding{}).
+		Where("ssh_connection_id = ? AND is_deleted = ?", conn.ID, false).
+		Count(&count)
 	if count > 0 {
-		c.JSON(400, gin.H{"error": fmt.Sprintf("该 SSH 连接被 %d 条转发规则引用，请先删除相关规则", count)})
-		return
+		return fmt.Errorf("该 SSH 连接被 %d 条转发规则引用，请先删除相关规则", count)
 	}
-	if result := config.GetDB().Delete(&conn); result.Error != nil {
-		c.JSON(500, gin.H{"error": "删除失败: " + result.Error.Error()})
-		return
-	}
-	c.JSON(200, gin.H{"message": "删除成功"})
+	return nil
 }
 
+// ── 自定义路由 ────────────────────────────────────────────────────
+
+// TestSshConnection 测试 SSH 连接可达性与凭据有效性（不启动端口转发）。
 func TestSshConnection(c *gin.Context) {
 	id := c.Param("id")
 	var conn SshConnection
-	if result := config.GetDB().First(&conn, "id = ?", id); result.Error != nil {
+	if result := config.GetDB().Where("is_deleted = ?", false).First(&conn, "id = ?", id); result.Error != nil {
 		c.JSON(404, gin.H{"error": "SSH 连接不存在"})
 		return
 	}

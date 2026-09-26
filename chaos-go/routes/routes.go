@@ -169,19 +169,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.GET("/weather", proxy.GetWeather)
 		api.GET("/hostname", proxy.GetHostname)
 
-		// SSH 连接信息（凭据仅后端使用，响应一律脱敏）
-		api.GET("/sshConns", portfwd.GetSshConnections)
-		api.POST("/sshConns", portfwd.CreateSshConnection)
-		api.PATCH("/sshConns/:id", portfwd.UpdateSshConnection)
-		api.DELETE("/sshConns/:id", portfwd.DeleteSshConnection)
-		api.POST("/sshConns/:id/test", portfwd.TestSshConnection)
-
-		// SSH 隧道端口转发规则
-		api.GET("/portForwards", portfwd.GetPortForwardings)
-		api.POST("/portForwards", portfwd.CreatePortForwarding)
-		api.PATCH("/portForwards/:id", portfwd.UpdatePortForwarding)
-		api.DELETE("/portForwards/:id", portfwd.DeletePortForwarding)
-		api.PATCH("/portForwards/:id/status", portfwd.UpdatePortForwardingStatus)
+		// SSH 端口转发：连接与转发规则两个资源接口自包含，本行仅做编排调用（路由实现在 internal/portfwd）
+		portfwd.Register(api)
 	}
 
 	// 数据库监控（只读自省：表名 / 大小 / 行数 / 索引等统计）；路由由本业务包自包含挂载

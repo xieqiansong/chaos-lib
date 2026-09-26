@@ -136,10 +136,10 @@ func run() {
 
 		// 记录「配置是否启用」与「当前是否运行」；运行中的先停掉旧连接。
 		configuredEnabled := rule.Status
-		running, _ := portfwd.GlobalPortForwarder.Status(rule.Id)
+		running, _ := portfwd.GlobalPortForwarder.Status(rule.ID)
 		if running {
-			if err := portfwd.GlobalPortForwarder.RemoveForward(rule.Id); err != nil {
-				slog.Warn("停止旧端口转发失败", "ruleId", rule.Id, "channel", msg.Channel, "err", err)
+			if err := portfwd.GlobalPortForwarder.RemoveForward(rule.ID); err != nil {
+				slog.Warn("停止旧端口转发失败", "ruleId", rule.ID, "channel", msg.Channel, "err", err)
 				continue
 			}
 		}
@@ -148,20 +148,20 @@ func run() {
 		rule.TargetHost = publicHost
 		rule.TargetPort = publicPort
 		if result := db.Save(&rule); result.Error != nil {
-			slog.Error("更新端口转发目标地址失败", "ruleId", rule.Id, "channel", msg.Channel, "err", result.Error)
+			slog.Error("更新端口转发目标地址失败", "ruleId", rule.ID, "channel", msg.Channel, "err", result.Error)
 			continue
 		}
 		slog.Info("端口转发目标地址已更新",
-			"ruleId", rule.Id, "channel", msg.Channel,
+			"ruleId", rule.ID, "channel", msg.Channel,
 			"target", publicHost+":"+strconv.Itoa(publicPort), "wasRunning", running)
 
 		// 规则配置为启动状态时，重新建立连接
 		if configuredEnabled {
 			if err := portfwd.GlobalPortForwarder.AddForward(&rule, nil); err != nil {
-				slog.Error("重新启动端口转发失败", "ruleId", rule.Id, "channel", msg.Channel, "err", err)
+				slog.Error("重新启动端口转发失败", "ruleId", rule.ID, "channel", msg.Channel, "err", err)
 				continue
 			}
-			slog.Info("端口转发已重新启动", "ruleId", rule.Id, "channel", msg.Channel)
+			slog.Info("端口转发已重新启动", "ruleId", rule.ID, "channel", msg.Channel)
 		}
 	}
 }
