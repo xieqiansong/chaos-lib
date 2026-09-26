@@ -7,6 +7,19 @@ html {
   font-size: min(100vw / 120, 16px);
 }
 
+/* ===== 横屏全屏模式（useLandscape 锁定横屏时给 html 加 fs-landscape） =====
+   手机横屏视口仅 ~780-920px，100vw/120 会把根字号压到 7px 上下，整页变成
+   「微缩模型」；且 Element Plus 样式不参与 px->rem 转换（postcss exclude
+   node_modules），其 14px 文字会溢出按 rem 收缩的菜单项造成重叠。
+   此处抬高根字号下限保证可读，代价是按 1920 设计稿书写的内容需横向滚动。 */
+html.fs-landscape {
+  font-size: max(100vw / 120, 12px);
+}
+
+html.fs-landscape .app-content {
+  overflow: auto; /* 窄视口下宽表格 / 看板可横向滚动 */
+}
+
 /* ===== 暗色主题（GitHub） ===== */
 /* 覆盖 Element Plus 暗色变量为 GitHub Dark（Primer dark）配色 */
 html.dark {

@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 /**
  * 在支持 Screen Orientation API 的设备（主要是 Android Chrome / WebView）上，
@@ -11,6 +11,12 @@ import { onMounted, onUnmounted, ref } from 'vue'
 export function useLandscape() {
   const locked = ref(false)
   const supported = ref(false)
+
+  // 横屏锁定态同步到 <html>：手机横屏视口较窄，全局 CSS 依赖该类
+  // 抬高根字号下限（见 style.css 的 html.fs-landscape），避免整页缩成微缩模型
+  watch(locked, on => {
+    document.documentElement.classList.toggle('fs-landscape', on)
+  })
 
   function isIOS(): boolean {
     const ua = navigator.userAgent
@@ -84,6 +90,7 @@ export function useLandscape() {
 
   onUnmounted(() => {
     document.removeEventListener('fullscreenchange', onFullscreenChange)
+    document.documentElement.classList.remove('fs-landscape')
   })
 
   return { locked, supported, enter, exit, toggle }
