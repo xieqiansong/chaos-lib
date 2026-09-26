@@ -415,13 +415,18 @@ onBeforeUnmount(() => {
   gap: var(--space-xs);
 }
 
+/* 工具栏与选项行之间的间距对齐 DataTable 工具栏的 row-gap（8px） */
+.polyform .section-toolbar {
+  margin-bottom: var(--space-sm);
+}
+
 .pf-options {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--space-lg);
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-sm);
   overflow-x: auto;
 }
 
@@ -438,9 +443,7 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   flex-shrink: 0;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--term-border);
-  border-radius: 2px;
+  padding: 0 var(--space-md);
 }
 
 .pf-opt-title {
