@@ -407,7 +407,7 @@ onUnmounted(() => {
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-xl);
+  padding: var(--space-lg);
 }
 </style>
 
