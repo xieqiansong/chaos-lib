@@ -258,7 +258,7 @@ onMounted(() => {
           </el-tab-pane>
         </el-tabs>
 
-        <el-table :data="filteredVariables" size="small" stripe height="100%" class="env-table">
+        <el-table :data="filteredVariables" size="small" stripe border height="100%" class="env-table">
           <el-table-column prop="0" label="变量名" min-width="120" sortable>
             <template #default="{ row }">
               <code>{{ row[0] }}</code>
