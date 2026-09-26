@@ -353,6 +353,7 @@ defineExpose({refresh, getData})
             v-else-if="col.type === 'switch'"
             :model-value="scope.row[col.field]"
             :disabled="!props.switchHandler"
+            size="small"
             @update:model-value="(val: boolean) => onSwitchChange(scope.row, val)"
         />
         <span v-else-if="col.formatter">{{ col.formatter(scope.row, scope.row[col.field]) }}</span>
