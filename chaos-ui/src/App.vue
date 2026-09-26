@@ -9,7 +9,7 @@ import PendingTaskBadge from './components/PendingTaskBadge.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
 import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
-import {Moon, Sunny} from '@element-plus/icons-vue'
+import {Moon, Sunny, FullScreen, Search as SearchIcon} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
 import {useLandscape} from './composables/useLandscape'
 import {buildMenu, flattenMenu} from './router'
@@ -198,10 +198,14 @@ onUnmounted(() => {
                 :title="locked ? '退出横屏全屏' : '横屏全屏查看'"
                 @click="toggleLandscape"
             >
-              <span class="term-prompt">{{ locked ? '⤡' : '⤢' }}</span>
+              <el-icon :size="16">
+                <FullScreen/>
+              </el-icon>
             </button>
             <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
-              <span class="term-prompt">$</span>
+              <el-icon :size="16">
+                <SearchIcon/>
+              </el-icon>
             </button>
           </div>
         </header>
