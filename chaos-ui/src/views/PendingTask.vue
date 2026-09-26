@@ -127,9 +127,8 @@ function onSelectionChange(rows: any[]) {
 }
 
 // 逾期行高亮：StartedAt 已到即标记（与原 cellStyle 行为一致，整行背景提示）
-function rowClassName(row: any): string {
-  const t = row as PendingTask
-  if (t.StartedAt && Date.now() > parseISO(t.StartedAt).getTime()) {
+function rowClassName({row, rowIndex,}: { row: PendingTask, rowIndex: number }): string {
+  if (row.StartedAt && Date.now() > parseISO(row.StartedAt).getTime()) {
     return 'pending-overdue-row'
   }
   return ''
@@ -500,8 +499,14 @@ defineExpose({refresh: reload})
 </style>
 
 <style>
-/* 逾期行高亮（跨 scoped，因 el-table 行 class 生成在组件根外） */
-.pending-overdue-row {
+/* 逾期行高亮（跨 scoped，因 el-table 行 class 生成在组件根外）。
+   背景须落在单元格 td 上：el-table 的 td 自带背景色，只改 tr 会被盖住。 */
+.el-table .pending-overdue-row > td.el-table__cell {
   background-color: rgba(245, 108, 108, 0.12);
+}
+
+/* 悬停时保持逾期底色（el-table 默认 hover 背景优先级更高，需显式覆盖） */
+.el-table .pending-overdue-row:hover > td.el-table__cell {
+  background-color: rgba(245, 108, 108, 0.2);
 }
 </style>
