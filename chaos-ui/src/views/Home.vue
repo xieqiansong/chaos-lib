@@ -3,6 +3,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import {Folder, Refresh, Setting} from '@element-plus/icons-vue'
 import BookmarkMenu from '@/components/BookmarkMenu.vue'
+import {favicon, hostnameOf} from '@/utils/url'
 import {
   refreshExtStatus,
   pushExtCommand,
@@ -32,19 +33,6 @@ const openFolderId = ref<string | null>(null)
 
 // 书签栏直接子节点（含文件夹），始终横向展示，不受顶部搜索影响
 const barChildren = computed<any[]>(() => bookmarksBarChildren.value || [])
-
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname
-  } catch {
-    return ''
-  }
-}
-
-function favicon(url: string): string {
-  const host = hostnameOf(url)
-  return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : ''
-}
 
 // 在书签树中定位「书签栏」节点（id "1"），兜底取第一个顶层容器
 function findBookmarksBar(tree: any[]): any {

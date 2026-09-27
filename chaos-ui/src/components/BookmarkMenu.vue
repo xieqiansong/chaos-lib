@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {ref} from 'vue'
 import {Folder} from '@element-plus/icons-vue'
+import {favicon} from '@/utils/url'
 
 const props = defineProps<{
   nodes: any[]
@@ -14,14 +15,6 @@ function toggle(id: string) {
   if (s.has(id)) s.delete(id)
   else s.add(id)
   expanded.value = s
-}
-
-function favicon(url: string): string {
-  try {
-    return `https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`
-  } catch {
-    return ''
-  }
 }
 </script>
 

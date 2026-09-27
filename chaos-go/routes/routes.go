@@ -155,6 +155,7 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
 		api.GET("/weather", proxy.GetWeather)
 		api.GET("/hostname", proxy.GetHostname)
+		api.GET("/favicon/:host", proxy.GetFavicon)
 
 		// SSH 端口转发：连接与转发规则两个资源接口自包含，本行仅做编排调用（路由实现在 internal/portfwd）
 		portfwd.Register(api)
