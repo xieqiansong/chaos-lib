@@ -43,7 +43,7 @@ function hostnameOf(url: string): string {
 
 function favicon(url: string): string {
   const host = hostnameOf(url)
-  return host ? `https://www.google.com/s2/favicons?domain=${host}&sz=32` : ''
+  return host ? `https://icons.duckduckgo.com/ip3/${host}.ico` : ''
 }
 
 // 在书签树中定位「书签栏」节点（id "1"），兜底取第一个顶层容器

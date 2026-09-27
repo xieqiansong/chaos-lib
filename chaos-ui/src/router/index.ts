@@ -145,6 +145,13 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/StandardData.vue'),
     meta: {title: '标准数据', icon: 'Grid'},
   },
+  {
+    // 数据缓存：配置驱动表格 + 一键 CRUD（前端 src/api/dataCache.ts）
+    path: '/dataCache',
+    name: 'dataCache',
+    component: () => import('@/views/DataCache.vue'),
+    meta: {title: '数据缓存', icon: 'Collection'},
+  },
 ]
 
 const routes: RouteRecordRaw[] = [

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"chaos-go/internal/cronjob"
+	"chaos-go/internal/datacache"
 	"chaos-go/internal/dbmonitor"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
@@ -54,6 +55,9 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 
 		// 标准参考表：资源接口自包含，本行仅做编排调用（路由实现在 internal/standarddata）
 		standarddata.Register(api)
+
+		// 数据缓存：资源接口自包含，本行仅做编排调用（路由实现在 internal/datacache）
+		datacache.Register(api)
 
 		quickEdits := api.Group("/quickEdits")
 		{

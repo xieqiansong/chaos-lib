@@ -18,7 +18,7 @@ function toggle(id: string) {
 
 function favicon(url: string): string {
   try {
-    return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`
+    return `https://icons.duckduckgo.com/ip3/${new URL(url).hostname}.ico`
   } catch {
     return ''
   }
