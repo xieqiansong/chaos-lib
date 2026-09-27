@@ -5,6 +5,7 @@
 // 字段命名与 DataTableColumn 对齐：field（字段名）/ title（标签）。
 import {computed} from 'vue'
 import type {FormField} from '@/components/dataTable/types'
+import {binarySummary, dataUrl, downloadBase64, isImageType, mimeOf} from '@/utils/binary'
 
 const props = defineProps<{
   modelValue: boolean
@@ -34,6 +35,26 @@ function fieldVisible(f: FormField): boolean {
   if (f.showIf.equals !== undefined) return cur === f.showIf.equals
   if (f.showIf.notEquals !== undefined) return cur !== f.showIf.notEquals
   return true
+}
+
+// ---- type='binary'：查看时按可读文本/中性标签展示，图片给预览，并可下载；编辑时直接编辑 base64 ----
+
+function binaryMime(f: FormField): string {
+  return mimeOf(props.form[f.binaryDataTypeField ?? 'DataType'])
+}
+
+function binaryIsImage(f: FormField): boolean {
+  return isImageType(props.form[f.binaryDataTypeField ?? 'DataType'])
+}
+
+// 查看模式：文本显示内容，二进制显示中性标签（base64 仅用于下载，不在弹窗里铺一屏）。
+function binaryView(f: FormField): string {
+  return binarySummary(String(props.form[f.field] ?? ''))
+}
+
+function downloadBinary(f: FormField) {
+  const name = props.form[f.binaryFilename ?? 'Key']
+  downloadBase64(String(props.form[f.field] ?? ''), name ? String(name) : 'download', binaryMime(f))
 }
 </script>
 
@@ -100,6 +121,28 @@ function fieldVisible(f: FormField): boolean {
                 :placeholder="f.placeholder ?? '可选'"
                 style="width: 100%"
             />
+            <!-- 二进制值：查看时给图片预览 + 文本/中性标签 + 下载；编辑/新建时编辑 base64 -->
+            <div v-else-if="f.type === 'binary'" class="binary-field">
+              <template v-if="readonly">
+                <el-image
+                    v-if="binaryIsImage(f)"
+                    :src="dataUrl(form[f.field], binaryMime(f))"
+                    :preview-src-list="[dataUrl(form[f.field], binaryMime(f))]"
+                    fit="contain"
+                    lazy
+                    class="binary-preview"
+                />
+                <el-input :model-value="binaryView(f)" type="textarea" :rows="f.rows ?? 4" readonly/>
+                <el-button size="small" type="primary" plain @click="downloadBinary(f)">下载二进制</el-button>
+              </template>
+              <el-input
+                  v-else
+                  v-model="form[f.field]"
+                  type="textarea"
+                  :rows="f.rows ?? 4"
+                  :placeholder="f.placeholder"
+              />
+            </div>
           </el-form-item>
         </el-col>
       </el-row>
@@ -113,3 +156,24 @@ function fieldVisible(f: FormField): boolean {
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.binary-preview {
+  width: 100%;
+  max-height: 14rem;
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--border-color, #d9d9d9);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.binary-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.binary-field :deep(.el-button) {
+  width: fit-content;
+  margin-top: var(--space-xs);
+}
+</style>

@@ -65,7 +65,7 @@ export type CrudAction = (typeof CRUD_ACTION)[keyof typeof CRUD_ACTION]
 export interface FormField {
   field: string
   title: string
-  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select' | 'password'
+  type: 'text' | 'textarea' | 'json' | 'number' | 'switch' | 'datetime' | 'select' | 'password' | 'binary'
   required?: boolean
   placeholder?: string
   rows?: number
@@ -82,4 +82,12 @@ export interface FormField {
   span?: number
   /** 条件显隐：仅当 form[showIf.field] equals/notEquals 指定值时才渲染该字段（如按认证方式切换凭据字段） */
   showIf?: { field: string; equals?: any; notEquals?: any }
+  /**
+   * 仅 type='binary' 时使用。
+   * 提供 MIME 的类型字段名（缺省 'DataType'）：用于图片预览判定与下载的 Content-Type。
+   * 视图中该字段不应再单独渲染，否则与 binary 预览重复。
+   */
+  binaryDataTypeField?: string
+  /** 仅 type='binary' 时使用。提供下载文件名的字段名（缺省 'Key'）；否则用 'download'。 */
+  binaryFilename?: string
 }

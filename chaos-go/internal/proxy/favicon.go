@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"chaos-go/internal/datacache"
@@ -23,47 +24,34 @@ const (
 	faviconCategory = "favicon"
 	faviconTTL      = 7 * 24 * time.Hour // 缓存 7 天
 	maxFaviconSize  = 1 << 20            // 单图标上限 1 MiB
-	faviconTimeout  = 8 * time.Second    // 单次抓取超时
+	faviconTimeout  = 5 * time.Second    // 单次抓取超时
 	faviconBudget   = 15 * time.Second   // 单次 favicon 请求总预算（代理+直连双跑的最坏界）
 )
 
-// 双路径客户端：
-//   - faviconProxyClient：默认 Transport（自动遵循环境 HTTP_PROXY/HTTPS_PROXY/NO_PROXY）
-//   - faviconDirectClient：强制直连（Proxy=nil，忽略任何代理变量）
-// 两者共用 safeRedirectPolicy：跟随重定向但每一跳都要重新过 SSRF 校验，
-// 防止 favicon 跳转跨站指向内网/本机地址（如默默跳到 localhost），绕过顶层校验。
+// 双路径客户端：faviconProxyClient 走代理，faviconDirectClient 强制直连。
+// 共用 redirectPolicy：跟随后每跳重定向都要再过一遍 safeHost，防跳转子网/本机绕过校验。
 var (
-	faviconProxyClient = &http.Client{
-		Timeout:       faviconTimeout,
-		CheckRedirect: safeRedirectPolicy(),
-	}
+	faviconProxyClient = &http.Client{Timeout: faviconTimeout, CheckRedirect: redirectPolicy}
 
 	faviconDirectTransport = func() *http.Transport {
 		t := http.DefaultTransport.(*http.Transport).Clone()
 		t.Proxy = nil
 		return t
 	}()
-	faviconDirectClient = &http.Client{
-		Timeout:       faviconTimeout,
-		Transport:     faviconDirectTransport,
-		CheckRedirect: safeRedirectPolicy(),
-	}
+	faviconDirectClient = &http.Client{Timeout: faviconTimeout, Transport: faviconDirectTransport, CheckRedirect: redirectPolicy}
 )
 
-// safeRedirectPolicy 限制重定向次数，并确保每个跳转目标都通过 SSRF 校验。
-// 校验失败返回 error——http.Client 会将错误连同原始响应一并返回，
-// fetchBytes 命中 err 分支即视为该源失败，落入下一个回源源。
-func safeRedirectPolicy() func(*http.Request, []*http.Request) error {
-	return func(req *http.Request, via []*http.Request) error {
-		const maxRedirects = 5
-		if len(via) >= maxRedirects {
-			return fmt.Errorf("favicon: 重定向次数超过上限 %d", maxRedirects)
-		}
-		if !safeHost(req.URL.Host) {
-			return fmt.Errorf("favicon: 重定向目标未通过 SSRF 校验 host=%s", req.URL.Host)
-		}
-		return nil
+// redirectPolicy 限跳 5 次，并确保每个重定向目标都通过 SSRF 校验。
+// 校验失败返回 error——http.Client 连同原始响应一并返回，fetchBytes 命中 err 即该路失败。
+func redirectPolicy(req *http.Request, via []*http.Request) error {
+	const maxRedirects = 5
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("favicon: 重定向次数超过上限 %d", maxRedirects)
 	}
+	if !safeHost(req.URL.Host) {
+		return fmt.Errorf("favicon: 重定向目标未通过 SSRF 校验 host=%s", req.URL.Host)
+	}
+	return nil
 }
 
 // GetFavicon GET /api/favicon/:host —— 返回图片二进制流与识别出的 Content-Type。
@@ -101,67 +89,73 @@ func GetFavicon(c *gin.Context) {
 	c.Data(http.StatusOK, ct, body)
 }
 
-// fetchFavicon 对「3 源 × 2 路径（代理/直连）」一次性全部并发，首个成功即返回。
-// 不同于逐源串行等待，这里所有任务同时竞争，整体耗时由最快成功路径决定。
+// fetchFavicon 并发抓取「3 源 × 2 路径（代理/直连）」，首个成功即返回。
 func fetchFavicon(ctx context.Context, hostPort string) ([]byte, string, error) {
 	// DDG / Google 只认纯域名，需剥掉端口；缓存 key 仍用完整 host:port
-	hostOnly := hostnameOnly(hostPort)
-	raws := []string{
-		fmt.Sprintf("https://icons.duckduckgo.com/ip3/%s.ico", hostOnly),
-		fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s&sz=64", url.QueryEscape(hostOnly)),
-		directFaviconURL(hostPort), // 直达目标站（host 已过 safeHost 校验），带端口+推断协议
+	host := hostnameOnly(hostPort)
+	urls := []string{
+		"https://icons.duckduckgo.com/ip3/" + host + ".ico",
+		"https://www.google.com/s2/favicons?domain=" + url.QueryEscape(host) + "&sz=64",
+		"https://" + hostPort + "/favicon.ico",
+		"http://" + hostPort + "/favicon.ico",
 	}
 
-	// 3 源 × 2 路径 任务列表：每源尽力包含「代理 + 直连」，只有配置了代理才加代理路径
-	type task struct {
-		client *http.Client
-		raw    string
-	}
-	var tasks []task
-	for _, raw := range raws {
-		if req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil); err == nil {
-			if p, err := http.ProxyFromEnvironment(req); err == nil && p != nil {
-				tasks = append(tasks, task{faviconProxyClient, raw})
-			}
+	// 组装任务表：每源至少一条直连任务；该源在环境中走代理时，再追加一条代理任务
+	tasks := make([]fetchTask, 0, len(urls)*2)
+	for _, u := range urls {
+		tasks = append(tasks, fetchTask{u, faviconDirectClient})
+		if usesProxy(u) {
+			tasks = append(tasks, fetchTask{u, faviconProxyClient})
 		}
-		tasks = append(tasks, task{faviconDirectClient, raw})
-	}
-	if len(tasks) == 0 {
-		return nil, "", fmt.Errorf("favicon: 无可用抓取路径 host=%s", hostPort)
 	}
 
-	type favResult struct {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	type hit struct {
 		body []byte
 		ct   string
-		ok   bool
 	}
-	ch := make(chan favResult, len(tasks))
+	ch := make(chan hit, 1) // 缓冲 1：首个成功写入，后续自动丢弃
+	var wg sync.WaitGroup
 	for _, t := range tasks {
-		go func(client *http.Client, raw string) {
-			b, err := fetchBytes(ctx, client, raw)
-			ct := ""
-			if err == nil {
-				ct = detectType(b)
+		wg.Add(1)
+		go func(t fetchTask) {
+			defer wg.Done()
+			b, err := fetchBytes(ctx, t.client, t.url)
+			if err != nil {
+				return // 失败静默，交由 wg 收尾
 			}
-			// 每个任务必发一条结果（含失败），保证主循环按任务数收满、不阻塞
+			ct := detectType(b)
+			cancel() // 首个成功夺标，作废其余任务
 			select {
-			case ch <- favResult{body: b, ct: ct, ok: ct != ""}:
-			case <-ctx.Done():
+			case ch <- hit{b, ct}:
+			default:
 			}
-		}(t.client, t.raw)
+		}(t)
 	}
-	for range tasks {
-		select {
-		case r := <-ch:
-			if r.ok {
-				return r.body, r.ct, nil
-			}
-			// 该路径失败，继续等其余并发任务
-		case <-ctx.Done():
-			return nil, "", fmt.Errorf("favicon: 抓取超时/取消 host=%s", hostPort)
-		}
+	wg.Wait()
+	select {
+	case h := <-ch:
+		return h.body, h.ct, nil
+	default:
+		return nil, "", fmt.Errorf("favicon: 所有回源均失败 host=%s", hostPort)
 	}
-	return nil, "", fmt.Errorf("favicon: 所有回源均失败 host=%s", hostPort)
+}
+
+// fetchTask 描述一次回源尝试：目标 URL 与其使用的客户端（代理或直连）。
+type fetchTask struct {
+	url    string
+	client *http.Client
+}
+
+// usesProxy 判断该 URL 在当前环境（HTTP_PROXY / NO_PROXY 等）下是否走代理。
+func usesProxy(rawURL string) bool {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return false
+	}
+	p, err := http.ProxyFromEnvironment(req)
+	return err == nil && p != nil
 }
 
 // hostnameOnly 去掉端口，返回纯域名（DDG/Google 图标服务不接受端口）。
@@ -170,15 +164,6 @@ func hostnameOnly(hostPort string) string {
 		return h
 	}
 	return hostPort
-}
-
-// directFaviconURL 末端直达目标站：显式端口且非 443 视为 http，否则默认 https。
-func directFaviconURL(hostPort string) string {
-	scheme := "https"
-	if _, port, err := net.SplitHostPort(hostPort); err == nil && port != "443" {
-		scheme = "http"
-	}
-	return fmt.Sprintf("%s://%s/favicon.ico", scheme, hostPort)
 }
 
 // fetchBytes 带上下文、状态校验与大小上限地抓取原始字节。
