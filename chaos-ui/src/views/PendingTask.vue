@@ -501,12 +501,15 @@ defineExpose({refresh: reload})
 <style>
 /* 逾期行高亮（跨 scoped，因 el-table 行 class 生成在组件根外）。
    背景须落在单元格 td 上：el-table 的 td 自带背景色，只改 tr 会被盖住。 */
+/* !important：需压过 el-table 斑马纹的 td 背景
+   （.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell，
+   其特异性高于本规则，否则灰底行红底色会被盖住） */
 .el-table .pending-overdue-row > td.el-table__cell {
-  background-color: rgba(245, 108, 108, 0.12);
+  background-color: rgba(245, 108, 108, 0.12) !important;
 }
 
 /* 悬停时保持逾期底色（el-table 默认 hover 背景优先级更高，需显式覆盖） */
 .el-table .pending-overdue-row:hover > td.el-table__cell {
-  background-color: rgba(245, 108, 108, 0.2);
+  background-color: rgba(245, 108, 108, 0.2) !important;
 }
 </style>
