@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YO90Ik8lhExvAXX1JL20A35T1IKG9ETohLtB9doXmWKSQmV0EvjEK6LXsmFoDil
+\restrict 48Yjo12VB9FAYfENoGa79cFLuPTwltL9Xb8c9u3vH7VAbNUJ3ubbUmqJhycSDuY
 
 -- Dumped from database version 17.10 (Debian 17.10-1.pgdg12+1)
 -- Dumped by pg_dump version 17.10 (Debian 17.10-1.pgdg12+1)
@@ -57,6 +57,62 @@ ALTER TABLE public.bookmarks
     OWNER TO postgres;
 
 --
+-- Name: TABLE bookmarks; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.bookmarks IS '书签表';
+
+
+--
+-- Name: COLUMN bookmarks.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.id IS '书签唯一标识';
+
+
+--
+-- Name: COLUMN bookmarks.parent_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.parent_id IS '父级书签/文件夹ID，NULL 表示顶级';
+
+
+--
+-- Name: COLUMN bookmarks.title; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.title IS '书签标题';
+
+
+--
+-- Name: COLUMN bookmarks.url; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.url IS '书签地址';
+
+
+--
+-- Name: COLUMN bookmarks.is_folder; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.is_folder IS '是否为文件夹';
+
+
+--
+-- Name: COLUMN bookmarks.sort_index; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.sort_index IS '排序序号';
+
+
+--
+-- Name: COLUMN bookmarks.date_added; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.bookmarks.date_added IS '添加时间戳';
+
+
+--
 -- Name: browser_histories; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -74,6 +130,62 @@ CREATE TABLE public.browser_histories
 
 ALTER TABLE public.browser_histories
     OWNER TO postgres;
+
+--
+-- Name: TABLE browser_histories; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.browser_histories IS '浏览器历史记录表';
+
+
+--
+-- Name: COLUMN browser_histories.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.id IS '历史记录唯一标识';
+
+
+--
+-- Name: COLUMN browser_histories.last_visit_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.last_visit_time IS '最后访问时间戳';
+
+
+--
+-- Name: COLUMN browser_histories.title; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.title IS '页面标题';
+
+
+--
+-- Name: COLUMN browser_histories.type_count; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.type_count IS '类型统计数';
+
+
+--
+-- Name: COLUMN browser_histories.url; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.url IS '页面地址';
+
+
+--
+-- Name: COLUMN browser_histories.visit_count; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.visit_count IS '访问次数';
+
+
+--
+-- Name: COLUMN browser_histories.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_histories.is_deleted IS '软删除标记';
+
 
 --
 -- Name: browser_history_visits; Type: TABLE; Schema: public; Owner: postgres
@@ -96,6 +208,69 @@ ALTER TABLE public.browser_history_visits
     OWNER TO postgres;
 
 --
+-- Name: TABLE browser_history_visits; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.browser_history_visits IS '浏览器历史访问明细表';
+
+
+--
+-- Name: COLUMN browser_history_visits.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.id IS '访问记录唯一标识';
+
+
+--
+-- Name: COLUMN browser_history_visits.history_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.history_id IS '所属历史记录ID';
+
+
+--
+-- Name: COLUMN browser_history_visits.is_local; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.is_local IS '是否本地访问';
+
+
+--
+-- Name: COLUMN browser_history_visits.referring_visit_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.referring_visit_id IS '来源访问ID';
+
+
+--
+-- Name: COLUMN browser_history_visits.transition; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.transition IS '访问过渡类型';
+
+
+--
+-- Name: COLUMN browser_history_visits.visit_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.visit_id IS '访问ID';
+
+
+--
+-- Name: COLUMN browser_history_visits.visit_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.visit_time IS '访问时间戳';
+
+
+--
+-- Name: COLUMN browser_history_visits.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.browser_history_visits.is_deleted IS '软删除标记';
+
+
+--
 -- Name: cron_job_runs; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -114,6 +289,69 @@ CREATE TABLE public.cron_job_runs
 
 ALTER TABLE public.cron_job_runs
     OWNER TO postgres;
+
+--
+-- Name: TABLE cron_job_runs; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.cron_job_runs IS '定时任务运行记录表';
+
+
+--
+-- Name: COLUMN cron_job_runs.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.id IS '运行记录唯一标识';
+
+
+--
+-- Name: COLUMN cron_job_runs.job_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.job_id IS '所属定时任务ID';
+
+
+--
+-- Name: COLUMN cron_job_runs.started_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.started_at IS '开始时间';
+
+
+--
+-- Name: COLUMN cron_job_runs.finished_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.finished_at IS '结束时间';
+
+
+--
+-- Name: COLUMN cron_job_runs.success; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.success IS '是否成功';
+
+
+--
+-- Name: COLUMN cron_job_runs.output; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.output IS '运行输出';
+
+
+--
+-- Name: COLUMN cron_job_runs.error; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.error IS '错误信息';
+
+
+--
+-- Name: COLUMN cron_job_runs.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_job_runs.created_at IS '创建时间';
+
 
 --
 -- Name: cron_job_runs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -161,6 +399,97 @@ ALTER TABLE public.cron_jobs
     OWNER TO postgres;
 
 --
+-- Name: TABLE cron_jobs; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.cron_jobs IS '定时任务表';
+
+
+--
+-- Name: COLUMN cron_jobs.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.id IS '任务唯一标识';
+
+
+--
+-- Name: COLUMN cron_jobs.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.name IS '任务名称';
+
+
+--
+-- Name: COLUMN cron_jobs.cron_expr; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.cron_expr IS 'cron 表达式';
+
+
+--
+-- Name: COLUMN cron_jobs.action_type; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.action_type IS '动作类型';
+
+
+--
+-- Name: COLUMN cron_jobs.action_config; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.action_config IS '动作配置';
+
+
+--
+-- Name: COLUMN cron_jobs.enabled; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.enabled IS '是否启用';
+
+
+--
+-- Name: COLUMN cron_jobs.timeout_sec; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.timeout_sec IS '超时秒数';
+
+
+--
+-- Name: COLUMN cron_jobs.last_run_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.last_run_at IS '上次运行时间';
+
+
+--
+-- Name: COLUMN cron_jobs.last_status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.last_status IS '上次运行状态';
+
+
+--
+-- Name: COLUMN cron_jobs.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN cron_jobs.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN cron_jobs.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.cron_jobs.updated_at IS '更新时间';
+
+
+--
 -- Name: cron_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -179,6 +508,142 @@ ALTER SEQUENCE public.cron_jobs_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.cron_jobs_id_seq OWNED BY public.cron_jobs.id;
+
+
+--
+-- Name: data_caches; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.data_caches
+(
+    id          bigint NOT NULL,
+    created_at  timestamp with time zone,
+    updated_at  timestamp with time zone,
+    is_deleted  boolean DEFAULT FALSE,
+    category    text,
+    key         text,
+    value       bytea,
+    expire_at   timestamp with time zone,
+    compression text,
+    data_type   text,
+    value_len   bigint  DEFAULT 0,
+    value_md5   text
+);
+
+
+ALTER TABLE public.data_caches
+    OWNER TO postgres;
+
+--
+-- Name: TABLE data_caches; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.data_caches IS '数据缓存表：按 category+key 存储程序内部缓存数据';
+
+
+--
+-- Name: COLUMN data_caches.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.id IS '主键 ID';
+
+
+--
+-- Name: COLUMN data_caches.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN data_caches.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN data_caches.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.is_deleted IS '软删除标记（TRUE 表示已删除）';
+
+
+--
+-- Name: COLUMN data_caches.category; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.category IS '分类（缓存命名空间）';
+
+
+--
+-- Name: COLUMN data_caches.key; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.key IS '缓存键';
+
+
+--
+-- Name: COLUMN data_caches.value; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.value IS '缓存值（二进制内容，前端按 base64 编解码）';
+
+
+--
+-- Name: COLUMN data_caches.expire_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.expire_at IS '过期时间';
+
+
+--
+-- Name: COLUMN data_caches.compression; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.compression IS '压缩算法（预留字段）';
+
+
+--
+-- Name: COLUMN data_caches.data_type; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.data_type IS '数据类型（预留，用于统计）';
+
+
+--
+-- Name: COLUMN data_caches.value_len; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.value_len IS '值长度（预留，用于统计）';
+
+
+--
+-- Name: COLUMN data_caches.value_md5; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.data_caches.value_md5 IS '值 MD5 摘要（预留，用于统计）';
+
+
+--
+-- Name: data_caches_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.data_caches_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.data_caches_id_seq OWNER TO postgres;
+
+--
+-- Name: data_caches_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.data_caches_id_seq OWNED BY public.data_caches.id;
 
 
 --
@@ -201,6 +666,76 @@ CREATE TABLE public.file_links
 
 ALTER TABLE public.file_links
     OWNER TO postgres;
+
+--
+-- Name: TABLE file_links; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.file_links IS '文件软链接表';
+
+
+--
+-- Name: COLUMN file_links.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.id IS '链接唯一标识';
+
+
+--
+-- Name: COLUMN file_links.source_path; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.source_path IS '源路径';
+
+
+--
+-- Name: COLUMN file_links.target_path; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.target_path IS '目标路径';
+
+
+--
+-- Name: COLUMN file_links.status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.status IS '状态';
+
+
+--
+-- Name: COLUMN file_links.remark; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.remark IS '备注';
+
+
+--
+-- Name: COLUMN file_links.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN file_links.sort; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.sort IS '排序序号';
+
+
+--
+-- Name: COLUMN file_links.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN file_links.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.file_links.updated_at IS '更新时间';
+
 
 --
 -- Name: file_link_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -238,6 +773,69 @@ ALTER TABLE public.mqtt_sync_messages
     OWNER TO postgres;
 
 --
+-- Name: TABLE mqtt_sync_messages; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.mqtt_sync_messages IS 'MQTT 同步消息表';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.id IS '消息唯一标识';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.msg_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.msg_id IS '消息ID';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.node_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.node_id IS '节点ID';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.channel; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.channel IS '频道';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.payload; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.payload IS '消息内容';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN mqtt_sync_messages.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_messages.updated_at IS '更新时间';
+
+
+--
 -- Name: mqtt_sync_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -272,6 +870,34 @@ CREATE TABLE public.mqtt_sync_nodes
 
 ALTER TABLE public.mqtt_sync_nodes
     OWNER TO postgres;
+
+--
+-- Name: TABLE mqtt_sync_nodes; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.mqtt_sync_nodes IS 'MQTT 同步节点表';
+
+
+--
+-- Name: COLUMN mqtt_sync_nodes.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_nodes.id IS '节点唯一标识';
+
+
+--
+-- Name: COLUMN mqtt_sync_nodes.node_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_nodes.node_id IS '节点ID';
+
+
+--
+-- Name: COLUMN mqtt_sync_nodes.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.mqtt_sync_nodes.created_at IS '创建时间';
+
 
 --
 -- Name: mqtt_sync_nodes_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -317,6 +943,83 @@ ALTER TABLE public.nowcoder_questions
     OWNER TO postgres;
 
 --
+-- Name: TABLE nowcoder_questions; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.nowcoder_questions IS '牛客网题目表';
+
+
+--
+-- Name: COLUMN nowcoder_questions.question_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.question_id IS '题目ID';
+
+
+--
+-- Name: COLUMN nowcoder_questions.uuid; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.uuid IS '唯一标识';
+
+
+--
+-- Name: COLUMN nowcoder_questions.title; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.title IS '题目标题';
+
+
+--
+-- Name: COLUMN nowcoder_questions.difficulty; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.difficulty IS '难度';
+
+
+--
+-- Name: COLUMN nowcoder_questions.exam_count; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.exam_count IS '练习次数';
+
+
+--
+-- Name: COLUMN nowcoder_questions.knowledge; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.knowledge IS '知识点';
+
+
+--
+-- Name: COLUMN nowcoder_questions.company_name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.company_name IS '公司名称';
+
+
+--
+-- Name: COLUMN nowcoder_questions.last_exam_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.last_exam_time IS '上次练习时间';
+
+
+--
+-- Name: COLUMN nowcoder_questions.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN nowcoder_questions.qtype; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.nowcoder_questions.qtype IS '题目类型';
+
+
+--
 -- Name: port_forwarding; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -341,6 +1044,111 @@ CREATE TABLE public.port_forwarding
 
 ALTER TABLE public.port_forwarding
     OWNER TO postgres;
+
+--
+-- Name: TABLE port_forwarding; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.port_forwarding IS '端口转发配置表';
+
+
+--
+-- Name: COLUMN port_forwarding.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.id IS '转发唯一标识';
+
+
+--
+-- Name: COLUMN port_forwarding.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.name IS '名称';
+
+
+--
+-- Name: COLUMN port_forwarding.port; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.port IS '本地监听端口';
+
+
+--
+-- Name: COLUMN port_forwarding.target_host; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.target_host IS '目标主机';
+
+
+--
+-- Name: COLUMN port_forwarding.target_port; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.target_port IS '目标端口';
+
+
+--
+-- Name: COLUMN port_forwarding.status; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.status IS '状态';
+
+
+--
+-- Name: COLUMN port_forwarding.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN port_forwarding.ssh_connection_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.ssh_connection_id IS '关联 SSH 连接ID';
+
+
+--
+-- Name: COLUMN port_forwarding.remark; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.remark IS '备注';
+
+
+--
+-- Name: COLUMN port_forwarding.direction; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.direction IS '转发方向';
+
+
+--
+-- Name: COLUMN port_forwarding.bind_address; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.bind_address IS '绑定地址';
+
+
+--
+-- Name: COLUMN port_forwarding.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN port_forwarding.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN port_forwarding.last_error; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.port_forwarding.last_error IS '上次错误信息';
+
 
 --
 -- Name: port_forwarding_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -428,10 +1236,24 @@ COMMENT ON COLUMN public.project_groups.updated_at IS '更新时间';
 
 
 --
+-- Name: COLUMN project_groups.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.project_groups.is_deleted IS '软删除标记';
+
+
+--
 -- Name: COLUMN project_groups.order_num; Type: COMMENT; Schema: public; Owner: postgres
 --
 
 COMMENT ON COLUMN public.project_groups.order_num IS '排序序号，越小越靠前';
+
+
+--
+-- Name: COLUMN project_groups.is_recycle_bin; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.project_groups.is_recycle_bin IS '是否为回收站';
 
 
 --
@@ -550,6 +1372,13 @@ COMMENT ON COLUMN public.projects.updated_at IS '更新时间';
 
 
 --
+-- Name: COLUMN projects.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.projects.is_deleted IS '软删除标记';
+
+
+--
 -- Name: projects_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -584,6 +1413,62 @@ ALTER TABLE public.quick_edit_files
     OWNER TO postgres;
 
 --
+-- Name: TABLE quick_edit_files; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.quick_edit_files IS '快捷编辑文件表';
+
+
+--
+-- Name: COLUMN quick_edit_files.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.id IS '文件唯一标识';
+
+
+--
+-- Name: COLUMN quick_edit_files.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.name IS '文件名称';
+
+
+--
+-- Name: COLUMN quick_edit_files.file_path; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.file_path IS '文件路径';
+
+
+--
+-- Name: COLUMN quick_edit_files.remark; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.remark IS '备注';
+
+
+--
+-- Name: COLUMN quick_edit_files.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN quick_edit_files.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN quick_edit_files.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_files.is_deleted IS '软删除标记';
+
+
+--
 -- Name: quick_edit_files_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -615,6 +1500,55 @@ CREATE TABLE public.quick_edit_snapshots
 
 ALTER TABLE public.quick_edit_snapshots
     OWNER TO postgres;
+
+--
+-- Name: TABLE quick_edit_snapshots; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.quick_edit_snapshots IS '快捷编辑快照表';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.id IS '快照唯一标识';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.file_id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.file_id IS '所属文件ID';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.content; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.content IS '文件内容快照';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.size_bytes; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.size_bytes IS '快照字节大小';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN quick_edit_snapshots.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.quick_edit_snapshots.is_deleted IS '软删除标记';
+
 
 --
 -- Name: quick_edit_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -655,6 +1589,13 @@ ALTER TABLE public.sdk_sources
 --
 
 COMMENT ON TABLE public.sdk_sources IS 'SDK 来源表：一行代表一个 SDK 类型(jdk/maven/python/...)，sources 存其来源数组';
+
+
+--
+-- Name: COLUMN sdk_sources.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.sdk_sources.id IS 'SDK 类型唯一标识';
 
 
 --
@@ -740,6 +1681,104 @@ ALTER TABLE public.ssh_connections
     OWNER TO postgres;
 
 --
+-- Name: TABLE ssh_connections; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.ssh_connections IS 'SSH 连接配置表';
+
+
+--
+-- Name: COLUMN ssh_connections.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.id IS '连接唯一标识';
+
+
+--
+-- Name: COLUMN ssh_connections.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.name IS '连接名称';
+
+
+--
+-- Name: COLUMN ssh_connections.host; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.host IS '主机地址';
+
+
+--
+-- Name: COLUMN ssh_connections.port; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.port IS '端口';
+
+
+--
+-- Name: COLUMN ssh_connections.username; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.username IS '用户名';
+
+
+--
+-- Name: COLUMN ssh_connections.auth_type; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.auth_type IS '认证类型';
+
+
+--
+-- Name: COLUMN ssh_connections.password; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.password IS '密码';
+
+
+--
+-- Name: COLUMN ssh_connections.private_key; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.private_key IS '私钥';
+
+
+--
+-- Name: COLUMN ssh_connections.passphrase; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.passphrase IS '私钥口令';
+
+
+--
+-- Name: COLUMN ssh_connections.remark; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.remark IS '备注';
+
+
+--
+-- Name: COLUMN ssh_connections.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN ssh_connections.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN ssh_connections.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ssh_connections.is_deleted IS '软删除标记';
+
+
+--
 -- Name: ssh_connections_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -785,6 +1824,111 @@ CREATE TABLE public.standard_datas
 
 ALTER TABLE public.standard_datas
     OWNER TO postgres;
+
+--
+-- Name: TABLE standard_datas; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.standard_datas IS '标准数据表';
+
+
+--
+-- Name: COLUMN standard_datas.id; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.id IS '数据唯一标识';
+
+
+--
+-- Name: COLUMN standard_datas.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.created_at IS '创建时间';
+
+
+--
+-- Name: COLUMN standard_datas.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.updated_at IS '更新时间';
+
+
+--
+-- Name: COLUMN standard_datas.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN standard_datas.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.name IS '名称';
+
+
+--
+-- Name: COLUMN standard_datas.code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.code IS '编码';
+
+
+--
+-- Name: COLUMN standard_datas.description; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.description IS '描述';
+
+
+--
+-- Name: COLUMN standard_datas.category; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.category IS '分类';
+
+
+--
+-- Name: COLUMN standard_datas.quantity; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.quantity IS '数量';
+
+
+--
+-- Name: COLUMN standard_datas.price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.price IS '价格';
+
+
+--
+-- Name: COLUMN standard_datas.enabled; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.enabled IS '是否启用';
+
+
+--
+-- Name: COLUMN standard_datas.config; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.config IS '配置';
+
+
+--
+-- Name: COLUMN standard_datas.effective_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.effective_at IS '生效时间';
+
+
+--
+-- Name: COLUMN standard_datas.sort; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.standard_datas.sort IS '排序序号';
+
 
 --
 -- Name: standard_datas_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -1150,6 +2294,118 @@ COMMENT ON COLUMN public.task_plans.updated_at IS '更新时间';
 
 
 --
+-- Name: COLUMN task_plans.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN task_plans.order_num; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.order_num IS '排序序号，越小越靠前';
+
+
+--
+-- Name: COLUMN task_plans.priority; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.priority IS '优先级';
+
+
+--
+-- Name: COLUMN task_plans.fsrs_state; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.fsrs_state IS 'fsrs: 卡片状态，plan_type=interval 时使用';
+
+
+--
+-- Name: COLUMN task_plans.fsrs_learning_steps; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.fsrs_learning_steps IS 'fsrs: 学习步骤，plan_type=interval 时使用';
+
+
+--
+-- Name: COLUMN task_plans.content_size; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.content_size IS '内容大小';
+
+
+--
+-- Name: COLUMN task_plans.is_suspended; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.is_suspended IS '是否暂停';
+
+
+--
+-- Name: COLUMN task_plans.code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.code IS '编码';
+
+
+--
+-- Name: COLUMN task_plans.interval_days; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.interval_days IS 'interval: 间隔天数';
+
+
+--
+-- Name: COLUMN task_plans.interval_hour; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.interval_hour IS 'interval: 间隔小时数';
+
+
+--
+-- Name: COLUMN task_plans.interval_minute; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.interval_minute IS 'interval: 间隔分钟数';
+
+
+--
+-- Name: COLUMN task_plans.task_count; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.task_count IS '任务总数（子任务计数）';
+
+
+--
+-- Name: COLUMN task_plans.completed_count; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.completed_count IS '已完成任务数';
+
+
+--
+-- Name: COLUMN task_plans.total_study_time; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.total_study_time IS '累计学习时长（秒）';
+
+
+--
+-- Name: COLUMN task_plans.last_completed_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.last_completed_at IS '上次完成时间';
+
+
+--
+-- Name: COLUMN task_plans.raw_link; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.task_plans.raw_link IS '原始链接';
+
+
+--
 -- Name: task_plans_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -1252,6 +2508,34 @@ COMMENT ON COLUMN public.tasks.created_at IS '记录创建时间';
 
 
 --
+-- Name: COLUMN tasks.is_deleted; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.tasks.is_deleted IS '软删除标记';
+
+
+--
+-- Name: COLUMN tasks.scheduled_date; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.tasks.scheduled_date IS '计划日期';
+
+
+--
+-- Name: COLUMN tasks.rating; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.tasks.rating IS '完成评分';
+
+
+--
+-- Name: COLUMN tasks.updated_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.tasks.updated_at IS '更新时间';
+
+
+--
 -- Name: tasks_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
@@ -1280,6 +2564,14 @@ ALTER TABLE ONLY public.cron_job_runs
 
 ALTER TABLE ONLY public.cron_jobs
     ALTER COLUMN id SET DEFAULT NEXTVAL('public.cron_jobs_id_seq'::regclass);
+
+
+--
+-- Name: data_caches id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.data_caches
+    ALTER COLUMN id SET DEFAULT NEXTVAL('public.data_caches_id_seq'::regclass);
 
 
 --
@@ -1352,6 +2644,14 @@ ALTER TABLE ONLY public.cron_job_runs
 
 ALTER TABLE ONLY public.cron_jobs
     ADD CONSTRAINT cron_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: data_caches data_caches_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.data_caches
+    ADD CONSTRAINT data_caches_pkey PRIMARY KEY (id);
 
 
 --
@@ -1630,5 +2930,5 @@ ALTER TABLE ONLY public.tasks
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YO90Ik8lhExvAXX1JL20A35T1IKG9ETohLtB9doXmWKSQmV0EvjEK6LXsmFoDil
+\unrestrict 48Yjo12VB9FAYfENoGa79cFLuPTwltL9Xb8c9u3vH7VAbNUJ3ubbUmqJhycSDuY
 
