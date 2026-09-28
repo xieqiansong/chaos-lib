@@ -287,18 +287,15 @@ function reload() {
   dataTableRef.value?.refresh()
 }
 
-let pendingTimer: ReturnType<typeof setInterval>
 let stopVersionWatch: () => void
 
 onMounted(() => {
   loadPlanTree()
-  pendingTimer = setInterval(() => reload(), 30000)
   // 订阅全局刷新信号：其它实例（如任务表格）操作后本实例实时同步
   stopVersionWatch = watch(pendingTasksVersion, () => reload())
 })
 
 onUnmounted(() => {
-  clearInterval(pendingTimer)
   stopVersionWatch?.()
 })
 
