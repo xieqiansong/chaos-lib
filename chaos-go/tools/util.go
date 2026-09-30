@@ -10,7 +10,7 @@ import (
 // Must 万能断言函数，利用泛型一劳永逸：err 非 nil 时直接退出进程。
 func Must[T any](v T, err error) T {
 	if err != nil {
-		slog.Error("err", err)
+		slog.Error("err", "err", err)
 		os.Exit(1)
 	}
 	return v

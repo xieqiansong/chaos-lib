@@ -390,7 +390,7 @@ func runClient(port int, wsUrl string) {
 
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Println(`TCP over WebSockets - 通过 WebSocket 转发 TCP 连接
+		fmt.Print(`TCP over WebSockets - 通过 WebSocket 转发 TCP 连接
 
 用法:
     tcp_over_websockets <mode> <port> [wsUrl]
