@@ -211,7 +211,7 @@ func raceFetch(ctx context.Context, tasks []fetchTask) ([]byte, string, error) {
 					lastErr = err
 				}
 				mu.Unlock()
-				return // 失败静默，交由 wg 收尾
+				return
 			}
 			if len(b) == 0 || !looksLikeImage(b) {
 				// 空响应或非图片（如源站回退的 HTML 错误页 / 纯文本）：不夺标，
@@ -270,9 +270,12 @@ func discoverFaviconTasks(ctx context.Context, hostPort string) []fetchTask {
 	if page == "" || base == nil {
 		return nil
 	}
+	linkIcons, manifestURL := parseIconCandidates(page, base)
 	cand := make([]string, 0, 16)
-	cand = append(cand, extractLinkIcons(page, base)...)
-	cand = append(cand, extractManifestIcons(ctx, page, base)...)
+	cand = append(cand, linkIcons...)
+	if manifestURL != "" {
+		cand = append(cand, fetchManifestIcons(ctx, manifestURL)...)
+	}
 
 	seen := make(map[string]struct{}, len(cand))
 	tasks := make([]fetchTask, 0, len(cand))
@@ -332,13 +335,13 @@ func fetchSiteRoot(ctx context.Context, hostPort string) (string, *url.URL) {
 	return "", nil
 }
 
-// extractLinkIcons 从首页 HTML 中找出 rel 含 icon 类的 <link> 并解析其 href 为绝对地址。
-func extractLinkIcons(page string, base *url.URL) []string {
+// parseIconCandidates 单次解析首页 HTML，提取 rel 含 icon 类的 <link> 绝对地址，
+// 以及 <link rel="manifest"> 的 manifest 地址（可能为空）。避免重复遍历 DOM。
+func parseIconCandidates(page string, base *url.URL) (icons []string, manifestURL string) {
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
-		return nil
+		return nil, ""
 	}
-	var out []string
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "link" {
@@ -351,9 +354,15 @@ func extractLinkIcons(page string, base *url.URL) []string {
 					href = a.Val
 				}
 			}
-			if href != "" && iconRel(rel) {
+			if href != "" {
 				if ref, err := url.Parse(href); err == nil {
-					out = append(out, base.ResolveReference(ref).String())
+					abs := base.ResolveReference(ref).String()
+					switch {
+					case rel == "manifest":
+						manifestURL = abs
+					case iconRel(rel):
+						icons = append(icons, abs)
+					}
 				}
 			}
 		}
@@ -362,7 +371,7 @@ func extractLinkIcons(page string, base *url.URL) []string {
 		}
 	}
 	walk(doc)
-	return out
+	return icons, manifestURL
 }
 
 // iconRel 判断 link 的 rel 是否为图标类。
@@ -376,39 +385,8 @@ func iconRel(rel string) bool {
 	return false
 }
 
-// extractManifestIcons 找 <link rel="manifest">，抓取并解析其 icons 数组，返回绝对地址。
-func extractManifestIcons(ctx context.Context, page string, base *url.URL) []string {
-	doc, err := html.Parse(strings.NewReader(page))
-	if err != nil {
-		return nil
-	}
-	var manifestURL string
-	var walk func(*html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "link" {
-			var rel, href string
-			for _, a := range n.Attr {
-				switch strings.ToLower(a.Key) {
-				case "rel":
-					rel = strings.ToLower(a.Val)
-				case "href":
-					href = a.Val
-				}
-			}
-			if rel == "manifest" && href != "" {
-				if ref, err := url.Parse(href); err == nil {
-					manifestURL = base.ResolveReference(ref).String()
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(doc)
-	if manifestURL == "" {
-		return nil
-	}
+// fetchManifestIcons 抓取 manifest，解析其 icons 数组，返回绝对地址。
+func fetchManifestIcons(ctx context.Context, manifestURL string) []string {
 	cl := faviconDirectClient
 	if usesProxy(manifestURL) {
 		cl = faviconProxyClient
