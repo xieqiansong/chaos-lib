@@ -19,6 +19,7 @@
 package crud
 
 import (
+	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
@@ -28,7 +29,6 @@ import (
 	"chaos-go/internal/pagination"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // BaseModel 标准基字段：所有简单表嵌入它即可获得统一的
@@ -103,6 +103,15 @@ func (h *handler) newModel() any { return reflect.New(h.elemType()).Interface() 
 // newSlice 返回指向新切片（如 *[]StandardData）的指针。
 func (h *handler) newSlice() any {
 	return reflect.New(reflect.SliceOf(h.elemType())).Interface()
+}
+
+// fail 统一错误响应：msg 可为 error 或任意值（字符串/拼接串），集中维护错误信封形态。
+func fail(c *gin.Context, status int, msg any) {
+	if e, ok := msg.(error); ok {
+		c.JSON(status, gin.H{"error": e.Error()})
+		return
+	}
+	c.JSON(status, gin.H{"error": fmt.Sprintf("%v", msg)})
 }
 
 func (h *handler) sortable(field string) bool {
@@ -183,24 +192,24 @@ func (h *handler) list(c *gin.Context) {
 	}
 
 	slice := h.newSlice()
-	var total int64
-	if err := base.Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+	total, err := pagination.PaginateAny(base, slice, q)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "查询失败: "+err.Error())
 		return
 	}
-	// Session 克隆避免 Count 的 SELECT 子句污染后续 Find。
-	if err := base.Session(&gorm.Session{}).Scopes(q.Scope).Find(slice).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
-		return
+	// ToResponse 未配置时直接返回原始切片，避免无谓的反射分配。
+	var items any = slice
+	if h.opts.ToResponse != nil {
+		items = h.viewRows(h.toPtrSlice(slice))
 	}
-	c.JSON(http.StatusOK, pagination.New(h.viewRows(h.toPtrSlice(slice)), total, q))
+	c.JSON(http.StatusOK, pagination.New(items, total, q))
 }
 
 // get 单条（含软删过滤）。
 func (h *handler) get(c *gin.Context) {
 	ptr := h.newModel()
 	if err := config.GetDB().Where("is_deleted = ?", false).First(ptr, "id = ?", c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
+		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
 	c.JSON(http.StatusOK, h.viewOne(ptr))
@@ -210,26 +219,26 @@ func (h *handler) get(c *gin.Context) {
 func (h *handler) create(c *gin.Context) {
 	ptr := h.newModel()
 	if err := c.ShouldBindJSON(ptr); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	if err := h.runHook(h.opts.BeforeCreate, ptr); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	tx := config.GetDB().Begin()
 	if err := tx.Create(ptr).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "创建失败: "+err.Error())
 		return
 	}
 	if err := h.runHook(h.opts.AfterCreate, ptr); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "创建失败: "+err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "创建成功", "data": h.viewOne(ptr)})
@@ -241,13 +250,13 @@ func (h *handler) update(c *gin.Context) {
 	ptr := h.newModel()
 	if err := tx.Where("is_deleted = ?", false).First(ptr, "id = ?", c.Param("id")).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
+		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
 	var patch map[string]any
 	if err := c.ShouldBindJSON(&patch); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	// 基字段不可经 PATCH 直接改写
@@ -267,17 +276,17 @@ func (h *handler) update(c *gin.Context) {
 	}
 	if err := tx.Model(ptr).Updates(patch).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "更新失败: "+err.Error())
 		return
 	}
 	tx.First(ptr, "id = ?", c.Param("id"))
 	if err := h.runHook(h.opts.AfterUpdate, ptr); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "更新失败: "+err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "data": h.viewOne(ptr)})
@@ -289,21 +298,21 @@ func (h *handler) delete(c *gin.Context) {
 	ptr := h.newModel()
 	if err := tx.Where("is_deleted = ?", false).First(ptr, "id = ?", c.Param("id")).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
+		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
 	if err := tx.Model(ptr).Update("is_deleted", true).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
 		return
 	}
 	if err := h.runHook(h.opts.AfterDelete, ptr); err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		fail(c, http.StatusBadRequest, err)
 		return
 	}
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
+		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
