@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"chaos-go/internal/datacache"
+	"chaos-go/internal/memcache"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +23,8 @@ import (
 
 const (
 	faviconCategory = "favicon"
-	faviconTTL      = 7 * 24 * time.Hour // 缓存 7 天
+	faviconTTL      = 7 * 24 * time.Hour // 持久缓存 7 天
+	faviconMemTTL   = 5 * time.Minute    // 内存缓存 5 分钟（短期兜底，缓解回源失败）
 	maxFaviconSize  = 1 << 20            // 单图标上限 1 MiB
 	faviconTimeout  = 5 * time.Second    // 单次抓取超时
 	faviconBudget   = 15 * time.Second   // 单次 favicon 请求总预算（代理+直连双跑的最坏界）
@@ -40,6 +42,10 @@ var (
 	}()
 	faviconDirectClient = &http.Client{Timeout: faviconTimeout, Transport: faviconDirectTransport, CheckRedirect: redirectPolicy}
 )
+
+// faviconMemCache 内存级短期缓存：进程内、重启即失，TTL 5 分钟。
+// 用于 datacache 缺失/过期或回源失败时的兜底，缓解溯源等高频重试场景下的回源失败。
+var faviconMemCache = memcache.New(1024, faviconMemTTL)
 
 // redirectPolicy 限跳 5 次，并确保每个重定向目标都通过 SSRF 校验。
 // 校验失败返回 error——http.Client 连同原始响应一并返回，fetchBytes 命中 err 即该路失败。
@@ -66,30 +72,60 @@ func GetFavicon(c *gin.Context) {
 		return
 	}
 
-	// 1) 缓存优先：最新一条且未过期则直接返回
+	// 1) 内存级短期缓存（memcache，TTL 5 分钟）第一道关卡：
+	//    - 命中且非空 → 直接返回（含近期成功回源结果，省去回源/查库）
+	//    - 命中但为空对象（负缓存，已知回源失败）→ 直接 404，不再回源/查库
+	if body, ok := faviconMemCache.Get(faviconCategory, host); ok {
+		if len(body) == 0 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.Data(http.StatusOK, detectType(body), body)
+		return
+	}
+
+	// 2) 持久缓存（datacache，TTL 7 天）：命中且未过期则直接返回
 	if row, err := datacache.Get(faviconCategory, host); err == nil && len(row.Value) > 0 {
 		if row.ExpireAt == nil || row.ExpireAt.After(time.Now()) {
 			c.Data(http.StatusOK, detectType(row.Value), row.Value)
+			faviconMemCache.Set(faviconCategory, host, row.Value)
 			return
 		}
 	}
 
-	// 2) 按序回源，成功即停；代理 / 直连双跑（并行竞争）
+	// 3) 按序回源，成功即停；代理 / 直连双跑（并行竞争）
 	ctx, cancel := context.WithTimeout(c.Request.Context(), faviconBudget)
 	defer cancel()
 	body, ct, err := fetchFavicon(ctx, host)
-	if err != nil {
+	if err != nil || len(body) == 0 {
+		// 溯源失败（含回源报错或返回空内容）：把空对象写入内存（负缓存 5 分钟），
+		// 避免溯源等高频重试短时间反复回源
+		faviconMemCache.Set(faviconCategory, host, nil)
 		c.Status(http.StatusNotFound)
 		return
 	}
 
-	// 3) 写入缓存（追加式，TTL 7 天）并返回
+	// 4) 溯源成功：同时写入持久缓存（TTL 7 天）与内存短期缓存（TTL 5 分钟）并返回
 	exp := time.Now().Add(faviconTTL)
 	_ = datacache.Set(faviconCategory, host, body, ct, "none", &exp)
+	faviconMemCache.Set(faviconCategory, host, body)
 	c.Data(http.StatusOK, ct, body)
 }
 
-// fetchFavicon 并发抓取「3 源 × 2 路径（代理/直连）」，首个成功即返回。
+// nonIconContentTypes 反向排查：以下类型为「非图标」，通常是源站未命中 favicon 时
+// 回退的 HTML 错误页或纯文本，不应作为图标缓存，需交由其它源/路径继续尝试。
+var nonIconContentTypes = map[string]struct{}{
+	"text/html; charset=utf-8": {},
+	"text/plain; charset=utf-8": {},
+}
+
+// isIconType 判断检测出的内容类型是否为有效图标类型（排除已知的非图标类型）。
+func isIconType(ct string) bool {
+	_, bad := nonIconContentTypes[ct]
+	return !bad
+}
+
+// fetchFavicon 并发抓取「3 源 × 2 路径（代理/直连）」，首个成功（且类型为图标）即返回。
 func fetchFavicon(ctx context.Context, hostPort string) ([]byte, string, error) {
 	// DDG / Google 只认纯域名，需剥掉端口；缓存 key 仍用完整 host:port
 	host := hostnameOnly(hostPort)
@@ -125,7 +161,15 @@ func fetchFavicon(ctx context.Context, hostPort string) ([]byte, string, error) 
 			if err != nil {
 				return // 失败静默，交由 wg 收尾
 			}
+			if len(b) == 0 {
+				return // 空响应非图标，不夺标，让其它源/路径继续尝试
+			}
 			ct := detectType(b)
+			if !isIconType(ct) {
+				// 类型非图标（如源站回退的 HTML 错误页 / 纯文本），本次回源视为异常：
+				// 不夺标、不取消其余任务，交由其它源/路径继续尝试。
+				return
+			}
 			cancel() // 首个成功夺标，作废其余任务
 			select {
 			case ch <- hit{b, ct}:

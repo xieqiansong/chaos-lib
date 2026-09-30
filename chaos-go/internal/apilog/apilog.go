@@ -50,7 +50,9 @@ func Register(rg *gin.RouterGroup) {
 
 // skipBodyPrefixes 命中这些路径前缀时不记录 body（默认空：完整记录）。
 // 如需规避敏感/超大 body，可在启动时向此切片追加前缀（如 "/api/envVariables"）。
-var skipBodyPrefixes = []string{}
+// 默认含 /api/favicon：该接口返回图标二进制，含 0x00 等字节，落入 text 列会被
+// PostgreSQL 以 UTF8 编码错误（SQLSTATE 22021）拒绝，且无文本记录价值。
+var skipBodyPrefixes = []string{"/api/favicon"}
 
 // responseWriter 包装 gin.ResponseWriter，在写入下游的同时把响应体缓存到 buf。
 type responseWriter struct {

@@ -97,7 +97,7 @@ func run() {
 		slog.Error("读取 STUN 消息失败", "err", err)
 		return
 	}
-	slog.Info("stun 端口转发同步开始", "channels", len(msgs))
+	slog.Debug("stun 端口转发同步开始", "channels", len(msgs))
 
 	for _, msg := range msgs {
 		var payload stunPayload
