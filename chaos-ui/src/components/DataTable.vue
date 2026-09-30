@@ -49,7 +49,11 @@ const props = withDefaults(
       enabledActions?: CrudAction[]
       stripe?: boolean
       border?: boolean
-      /** type=switch 列切换时的回调：返回 Promise，成功后自动刷新并提示；未提供则开关禁用 */
+      /**
+       * type=switch 列切换回调：返回 Promise，成功后自动刷新并提示。
+       * 未提供且 api 为完整 RestApi 时，开关默认直接调 api.update(row.ID, {[field]: next})（无副作用布尔字段零样板）；
+       * 二者皆无则开关禁用。
+       */
       switchHandler?: (row: any, next: boolean) => Promise<void> | void
       /** 初始排序：首次取数即带 sort 参数（后端默认按 id 排，需要按业务字段排时由此指定） */
       defaultSort?: { field: string; order: 'ascending' | 'descending' }
@@ -230,12 +234,20 @@ async function remove(row: any) {
   }
 }
 
-// 行内开关：type=switch 的列交由外部 switchHandler 处理；成功后刷新并提示，失败提示。
-// 具体调用哪个接口由消费方决定（标准 CRUD 基线不含状态切换），保持组件通用。
-async function onSwitchChange(row: any, next: boolean) {
-  if (!props.switchHandler) return
+// 行内开关（type=switch 列）：
+//  - 提供了 switch-handler（自定义副作用，如专属状态路由）→ 走它；
+//  - 否则若 api 是完整 RestApi（含 update）→ 直接调 api.update(row.ID, {[field]: next})，
+//    无副作用的布尔字段零样板，无需各资源再写回调与后端专属路由。
+// 两者皆无（本地数据 / 纯取数函数）时开关禁用。
+async function onSwitchChange(row: any, field: string, next: boolean) {
   try {
-    await props.switchHandler(row, next)
+    if (props.switchHandler) {
+      await props.switchHandler(row, next)
+    } else if (crudApi.value) {
+      await crudApi.value.update(row[props.rowKey], {[field]: next})
+    } else {
+      return
+    }
     ElMessage.success('状态已更新')
     refresh()
   } catch (e: any) {
@@ -352,9 +364,9 @@ defineExpose({refresh, getData})
         <el-switch
             v-else-if="col.type === 'switch'"
             :model-value="scope.row[col.field]"
-            :disabled="!props.switchHandler"
+            :disabled="!props.switchHandler && !crudApi"
             size="small"
-            @update:model-value="(val: boolean) => onSwitchChange(scope.row, val)"
+            @update:model-value="(val: boolean) => onSwitchChange(scope.row, col.field, val)"
         />
         <span v-else-if="col.formatter">{{ col.formatter(scope.row, scope.row[col.field]) }}</span>
         <span v-else-if="col.type === 'datetime'">{{ formatDateTime(scope.row[col.field], col.datetimeFormat) }}</span>
