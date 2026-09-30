@@ -15,6 +15,7 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -97,10 +98,10 @@ func validTableName(name string) bool {
 func GetOverview(c *gin.Context) {
 	ov, err := getOverview()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ov)
+	renv.Success(c, ov)
 }
 
 // ListTables 返回用户表统计的分页列表（行数为精确 COUNT(*)，
@@ -109,7 +110,7 @@ func GetOverview(c *gin.Context) {
 func ListTables(c *gin.Context) {
 	all, err := collectTables()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -135,7 +136,7 @@ func ListTables(c *gin.Context) {
 	if start > total {
 		start = total
 	}
-	end := start + q.Size
+	end := start + q.PageSize
 	if end > total {
 		end = total
 	}
@@ -143,26 +144,26 @@ func ListTables(c *gin.Context) {
 	if items == nil {
 		items = []TableStat{}
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "total": total})
+	renv.Success(c, gin.H{"items": items, "total": total})
 }
 
 // GetTableDetail 返回单表详情（统计 + 列 + 索引）。
 func GetTableDetail(c *gin.Context) {
 	name := c.Param("name")
 	if !validTableName(name) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的表名"})
+		renv.Error(c, http.StatusBadRequest, "非法的表名")
 		return
 	}
 	detail, err := getTableDetail(name)
 	if errors.Is(err, errTableNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "表不存在"})
+		renv.Error(c, http.StatusNotFound, "表不存在")
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, detail)
+	renv.Success(c, detail)
 }
 
 // Register 把数据库监控（只读自省）的路由挂载到给定路由组（通常来自 routes.go 的 api 组），

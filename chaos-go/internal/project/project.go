@@ -19,6 +19,7 @@ import (
 	"chaos-go/config"
 	"chaos-go/internal/crud"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -181,7 +182,7 @@ func listProjects(c *gin.Context) {
 	if gid := c.Query("groupId"); gid != "" {
 		id, err := strconv.Atoi(gid)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的groupId"})
+			renv.Error(c, http.StatusBadRequest, "无效的groupId")
 			return
 		}
 		groupID = &id
@@ -193,7 +194,7 @@ func listProjects(c *gin.Context) {
 
 	var projects []Project
 	if err := db.Order("last_accessed_at DESC NULLS LAST, created_at DESC, id DESC").Find(&projects).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -201,7 +202,7 @@ func listProjects(c *gin.Context) {
 	if groupID != nil {
 		var group ProjectGroup
 		if err := config.GetDB().Where("id = ? AND is_deleted = ?", *groupID, false).First(&group).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "项目组不存在"})
+			renv.Error(c, http.StatusNotFound, "项目组不存在")
 			return
 		}
 		items = buildProjectList(group, projects)
@@ -215,11 +216,11 @@ func listProjects(c *gin.Context) {
 	if start > len(items) {
 		start = len(items)
 	}
-	end := start + q.Size
+	end := start + q.PageSize
 	if end > len(items) {
 		end = len(items)
 	}
-	c.JSON(http.StatusOK, pagination.New(items[start:end], int64(len(items)), q))
+	renv.Success(c, pagination.New(items[start:end], int64(len(items)), q))
 }
 
 // buildProjectList 把已认领项目与磁盘未认领子目录合并；未认领项用负哨兵 ID 避免行 key 冲突。
@@ -285,7 +286,7 @@ func buildProjectList(group ProjectGroup, dbProjects []Project) []ProjectListIte
 func MoveProject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的项目ID")
 		return
 	}
 	var req struct {
@@ -294,29 +295,29 @@ func MoveProject(c *gin.Context) {
 		TargetAbsPath      string ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.TargetGroupID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "目标项目组ID不能为空"})
+		renv.Error(c, http.StatusBadRequest, "目标项目组ID不能为空")
 		return
 	}
 
 	var project Project
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
+		renv.Error(c, http.StatusNotFound, "项目不存在")
 		return
 	}
 
 	var group ProjectGroup
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", req.TargetGroupID, false).First(&group).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "目标项目组不存在"})
+		renv.Error(c, http.StatusNotFound, "目标项目组不存在")
 		return
 	}
 
 	newAbs, newRel, err := resolveProjectPaths(group, req.TargetAbsPath, req.TargetRelativePath)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -325,7 +326,7 @@ func MoveProject(c *gin.Context) {
 
 	if moved {
 		if err := MoveProjectFolder(oldAbs, newAbs); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "移动文件夹失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "移动文件夹失败: " + err.Error())
 			return
 		}
 	}
@@ -340,38 +341,35 @@ func MoveProject(c *gin.Context) {
 		if moved {
 			_ = RemoveDirSafe(newAbs)
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新路径失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新路径失败: " + err.Error())
 		return
 	}
 	tx.Commit()
 
 	config.GetDB().First(&project, id)
-	c.JSON(http.StatusOK, gin.H{
-		"message": "移动成功", "moved": moved, "project": project,
-		"oldAbsPath": oldAbs, "newAbsPath": newAbs,
-	})
+	renv.Success(c, nil)
 }
 
 // AccessProject 记录访问时间。
 func AccessProject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的项目ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的项目ID")
 		return
 	}
 	var project Project
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "项目不存在"})
+		renv.Error(c, http.StatusNotFound, "项目不存在")
 		return
 	}
 	now := time.Now()
 	if err := config.GetDB().Model(&project).Updates(map[string]interface{}{
 		"last_accessed_at": now, "updated_at": now,
 	}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新访问时间失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新访问时间失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "已记录访问", "lastAccessedAt": now})
+	renv.Success(c, nil)
 }
 
 // ── 路由注册（自包含）────────────────────────────────────────────

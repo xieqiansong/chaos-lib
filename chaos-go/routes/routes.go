@@ -13,6 +13,7 @@ import (
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/apilog"
+	renv "chaos-go/internal/resp"
 	"chaos-go/internal/standarddata"
 	"chaos-go/internal/stunpf"
 	stunsync "chaos-go/internal/stunsync"
@@ -135,19 +136,19 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		{
 			sysJobs.POST("/sweep", func(c *gin.Context) {
 				taskplan.SweepScheduledTaskPlans()
-				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+				renv.Success(c, nil)
 			})
 			sysJobs.POST("/portForwardSelfHeal", func(c *gin.Context) {
 				portfwd.SelfHealForwards()
-				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+				renv.Success(c, nil)
 			})
 			sysJobs.POST("/stunRuleSync", func(c *gin.Context) {
 				stunsync.RunSync()
-				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+				renv.Success(c, nil)
 			})
 			sysJobs.POST("/stunPortForwardSync", func(c *gin.Context) {
 				stunpf.RunSync()
-				c.JSON(http.StatusOK, gin.H{"message": "ok"})
+				renv.Success(c, nil)
 			})
 		}
 

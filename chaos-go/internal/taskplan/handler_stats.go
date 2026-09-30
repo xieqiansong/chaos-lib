@@ -1,6 +1,7 @@
 package taskplan
 
 import (
+	renv "chaos-go/internal/resp"
 	"chaos-go/config"
 	"fmt"
 	"net/http"
@@ -18,7 +19,7 @@ func GetTaskDailyStats(c *gin.Context) {
 
 	days, err := parseDaysParam(c, 29)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	cutoff := today.AddDate(0, 0, -days)
@@ -34,7 +35,7 @@ func GetTaskDailyStats(c *gin.Context) {
 			TaskStatusDone, false, cutoff).
 		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -59,7 +60,7 @@ func GetTaskDailyStats(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, result)
+	renv.Success(c, result)
 }
 
 // parseDaysParam 解析前端传入的 days（正整数），缺省时回退到默认值。
@@ -82,7 +83,7 @@ func GetTaskActiveStats(c *gin.Context) {
 
 	start, end, err := parseRange(c, today)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -97,7 +98,7 @@ func GetTaskActiveStats(c *gin.Context) {
 			TaskStatusActive, false, start, end.AddDate(0, 0, 1)).
 		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -121,7 +122,7 @@ func GetTaskActiveStats(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, result)
+	renv.Success(c, result)
 }
 
 // parseRange 解析前端传入的 start/end（YYYY-MM-DD），缺省时回退到默认范围
@@ -195,12 +196,12 @@ func GetTaskContributionStats(c *gin.Context) {
 	if pid := strings.TrimSpace(c.Query("planId")); pid != "" {
 		id, err := strconv.Atoi(pid)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 planId"})
+			renv.Error(c, http.StatusBadRequest, "无效的 planId")
 			return
 		}
 		var plan TaskPlan
 		if err := db.Where("id = ? AND is_deleted = ? AND is_suspended = ?", id, false, false).First(&plan).Error; err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+			renv.Error(c, http.StatusNotFound, "任务计划不存在")
 			return
 		}
 		roots = append(roots, plan)
@@ -210,7 +211,7 @@ func GetTaskContributionStats(c *gin.Context) {
 			rootName = "每日任务"
 		}
 		if err := db.Where("name = ? AND is_deleted = ? AND is_suspended = ?", rootName, false, false).Find(&roots).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "查询计划失败: " + err.Error())
 			return
 		}
 	}
@@ -225,7 +226,7 @@ func GetTaskContributionStats(c *gin.Context) {
 		var children []TaskPlan
 		if err := db.Where("parent_id = ? AND is_deleted = ? AND is_suspended = ?", root.ID, false, false).
 			Order("order_num ASC, id ASC").Find(&children).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询子计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "查询子计划失败: " + err.Error())
 			return
 		}
 		if len(children) == 0 {
@@ -241,7 +242,7 @@ func GetTaskContributionStats(c *gin.Context) {
 	for idx := range options {
 		ids, err := collectPlanWithDescendants(options[idx].ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "收集子计划失败: " + err.Error())
 			return
 		}
 		for _, id := range ids {
@@ -271,7 +272,7 @@ func GetTaskContributionStats(c *gin.Context) {
 				TaskStatusDone, false, start).
 			Where("tasks.plan_id IN ?", planIDs).
 			Find(&rows).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 			return
 		}
 
@@ -291,7 +292,7 @@ func GetTaskContributionStats(c *gin.Context) {
 		items = append(items, buildContributionSeries(opt.ID, opt.Name, start, today, counts[i]))
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"rootName": rootName,
 		"start":    start.Format("2006-01-02"),
 		"end":      today.Format("2006-01-02"),

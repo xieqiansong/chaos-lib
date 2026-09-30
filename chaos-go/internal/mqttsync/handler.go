@@ -8,6 +8,7 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/crud"
+	renv "chaos-go/internal/resp"
 	"github.com/gin-gonic/gin"
 )
 
@@ -51,7 +52,7 @@ func Register(rg *gin.RouterGroup) {
 // Status 处理 GET /api/mqttSync/status：暴露启用 / 连接状态与节点标识。
 func Status(c *gin.Context) {
 	cfg := config.GetConfig().Mqtt
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"enabled":   cfg.Enabled,
 		"connected": IsConnected(),
 		"broker":    cfg.Broker,
@@ -66,12 +67,12 @@ func Status(c *gin.Context) {
 func DeleteChannel(c *gin.Context) {
 	db := config.GetDB()
 	if db == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": ErrDBUnavailable.Error()})
+		renv.Error(c, http.StatusInternalServerError, ErrDBUnavailable.Error())
 		return
 	}
 	name := c.Query("name")
 	if name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		renv.Error(c, http.StatusBadRequest, "name is required")
 		return
 	}
 	res := db.Model(&MqttSyncMessage{}).
@@ -79,8 +80,8 @@ func DeleteChannel(c *gin.Context) {
 		Update("is_deleted", true)
 	if res.Error != nil {
 		slog.Error("MQTT 主题消息删除失败", "channel", name, "err", res.Error)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": res.Error.Error()})
+		renv.Error(c, http.StatusInternalServerError, res.Error.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"channel": name, "deleted": res.RowsAffected})
+	renv.Success(c, gin.H{"channel": name, "deleted": res.RowsAffected})
 }

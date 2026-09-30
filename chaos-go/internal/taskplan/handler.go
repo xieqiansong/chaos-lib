@@ -3,6 +3,7 @@ package taskplan
 import (
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 	"fmt"
 	"net/http"
 	"sort"
@@ -19,7 +20,7 @@ var fsrsInstance = NewFsrs(nil)
 func getPlanID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的ID")
 		return 0, false
 	}
 	return id, true
@@ -28,7 +29,7 @@ func getPlanID(c *gin.Context) (int, bool) {
 func getTaskID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的ID")
 		return 0, false
 	}
 	return id, true
@@ -166,7 +167,7 @@ func CreateTaskPlan(c *gin.Context) {
 		StartedAt *time.Time   ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -175,7 +176,7 @@ func CreateTaskPlan(c *gin.Context) {
 	}
 
 	if req.PlanType == TaskPlanTypeTodo && req.StartedAt == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "待办类型必须传 startedAt"})
+		renv.Error(c, http.StatusBadRequest, "待办类型必须传 startedAt")
 		return
 	}
 
@@ -201,7 +202,7 @@ func CreateTaskPlan(c *gin.Context) {
 	}
 
 	if err := config.GetDB().Create(&plan).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建任务计划失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "创建任务计划失败: " + err.Error())
 		return
 	}
 
@@ -223,13 +224,13 @@ func CreateTaskPlan(c *gin.Context) {
 	if plan.PlanType == TaskPlanTypeTodo {
 		firstTask, err := generateTask(&plan, *req.StartedAt, nil)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成任务失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "生成任务失败: " + err.Error())
 			return
 		}
 		resp["firstTask"] = buildTaskResponse(*firstTask)
 	}
 
-	c.JSON(http.StatusCreated, resp)
+	renv.Success(c, resp)
 }
 
 func ListTaskPlans(c *gin.Context) {
@@ -244,18 +245,18 @@ func ListTaskPlans(c *gin.Context) {
 
 	var plans []TaskPlan
 	if err := db.Order("order_num ASC, priority DESC, created_at DESC, id DESC").Find(&plans).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, plans)
+	renv.Success(c, plans)
 }
 
 func GetTaskPlanTree(c *gin.Context) {
 	var plans []TaskPlan
 	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended", "FsrsReps").
 		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -305,7 +306,7 @@ func GetTaskPlanTree(c *gin.Context) {
 	}
 
 	tree := buildTaskPlanTree(plans)
-	c.JSON(http.StatusOK, tree)
+	renv.Success(c, tree)
 }
 
 func GetTaskPlan(c *gin.Context) {
@@ -316,11 +317,11 @@ func GetTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
-	c.JSON(http.StatusOK, plan)
+	renv.Success(c, plan)
 }
 
 func UpdateTaskPlan(c *gin.Context) {
@@ -340,13 +341,13 @@ func UpdateTaskPlan(c *gin.Context) {
 		CronExpr *string      ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
@@ -376,21 +377,21 @@ func UpdateTaskPlan(c *gin.Context) {
 		updated["cron_expr"] = *req.CronExpr
 	}
 	if len(updated) == 0 {
-		c.JSON(http.StatusOK, plan)
+		renv.Success(c, plan)
 		return
 	}
 	updated["updated_at"] = time.Now()
 
 	if err := config.GetDB().Model(&plan).Updates(updated).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 	if err := config.GetDB().First(&plan, plan.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "读取失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, plan)
+	renv.Success(c, plan)
 }
 
 func StartTaskPlan(c *gin.Context) {
@@ -401,24 +402,24 @@ func StartTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	if plan.Status != TaskPlanStatusCreated && plan.Status != TaskPlanStatusStarted {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态不允许开启"})
+		renv.Error(c, http.StatusBadRequest, "当前状态不允许开启")
 		return
 	}
 
 	if plan.IsSuspended {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "计划已挂起，请先恢复再开启"})
+		renv.Error(c, http.StatusBadRequest, "计划已挂起，请先恢复再开启")
 		return
 	}
 
 	plan.Status = TaskPlanStatusStarted
 	plan.UpdatedAt = time.Now()
 	if err := config.GetDB().Save(&plan).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 
@@ -431,7 +432,7 @@ func StartTaskPlan(c *gin.Context) {
 		var err error
 		respTask, err = generateTask(&plan, time.Now(), nil)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成任务失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "生成任务失败: " + err.Error())
 			return
 		}
 	}
@@ -447,7 +448,7 @@ func StartTaskPlan(c *gin.Context) {
 		resp["firstTask"] = buildTaskResponse(*respTask)
 	}
 
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
 
 func CompleteTaskPlan(c *gin.Context) {
@@ -458,12 +459,12 @@ func CompleteTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	if plan.Status != TaskPlanStatusStarted {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态不允许完成"})
+		renv.Error(c, http.StatusBadRequest, "当前状态不允许完成")
 		return
 	}
 
@@ -475,7 +476,7 @@ func CompleteTaskPlan(c *gin.Context) {
 	}).Error
 	if err != nil {
 		db.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新任务失败: " + err.Error())
 		return
 	}
 
@@ -483,12 +484,12 @@ func CompleteTaskPlan(c *gin.Context) {
 	plan.UpdatedAt = now
 	if err := db.Save(&plan).Error; err != nil {
 		db.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 	db.Commit()
 
-	c.JSON(http.StatusOK, plan)
+	renv.Success(c, plan)
 }
 
 func ArchiveTaskPlan(c *gin.Context) {
@@ -499,23 +500,23 @@ func ArchiveTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	if plan.Status != TaskPlanStatusCompleted {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态不允许归档"})
+		renv.Error(c, http.StatusBadRequest, "当前状态不允许归档")
 		return
 	}
 
 	plan.Status = TaskPlanStatusArchived
 	plan.UpdatedAt = time.Now()
 	if err := config.GetDB().Save(&plan).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, plan)
+	renv.Success(c, plan)
 }
 
 func DeleteTaskPlan(c *gin.Context) {
@@ -529,7 +530,7 @@ func DeleteTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
@@ -537,7 +538,7 @@ func DeleteTaskPlan(c *gin.Context) {
 	if err := db.Model(&TaskPlan{}).
 		Where("parent_id = ? AND is_deleted = ?", id, false).
 		Count(&childCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查子任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "检查子任务失败: " + err.Error())
 		return
 	}
 
@@ -545,25 +546,17 @@ func DeleteTaskPlan(c *gin.Context) {
 	if err := db.Model(&Task{}).
 		Where("plan_id = ? AND status = ? AND is_deleted = ?", id, TaskStatusActive, false).
 		Count(&activeTaskCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "检查任务失败: " + err.Error())
 		return
 	}
 
 	if !cascade {
 		if childCount > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":      "存在子任务计划，无法删除",
-				"childCount": childCount,
-				"suggestion": "请先删除子任务计划，或使用 ?cascade=true 级联删除",
-			})
+			renv.Error(c, http.StatusBadRequest, "存在子任务计划，无法删除")
 			return
 		}
 		if activeTaskCount > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":           "存在未完成的任务，无法删除",
-				"activeTaskCount": activeTaskCount,
-				"suggestion":      "请先完成任务，或使用 ?cascade=true 级联删除",
-			})
+			renv.Error(c, http.StatusBadRequest, "存在未完成的任务，无法删除")
 			return
 		}
 	}
@@ -589,7 +582,7 @@ func DeleteTaskPlan(c *gin.Context) {
 	if cascade {
 		if err := collectPlanIDs(id); err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 			return
 		}
 
@@ -598,7 +591,7 @@ func DeleteTaskPlan(c *gin.Context) {
 				Where("plan_id IN ?", allPlanIDs).
 				Update("is_deleted", true).Error; err != nil {
 				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "删除任务失败: " + err.Error()})
+				renv.Error(c, http.StatusInternalServerError, "删除任务失败: " + err.Error())
 				return
 			}
 		}
@@ -610,7 +603,7 @@ func DeleteTaskPlan(c *gin.Context) {
 				"updated_at": time.Now(),
 			}).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除任务计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "删除任务计划失败: " + err.Error())
 			return
 		}
 	} else {
@@ -618,7 +611,7 @@ func DeleteTaskPlan(c *gin.Context) {
 			Where("plan_id = ?", id).
 			Update("is_deleted", true).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除任务失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "删除任务失败: " + err.Error())
 			return
 		}
 
@@ -628,7 +621,7 @@ func DeleteTaskPlan(c *gin.Context) {
 				"updated_at": time.Now(),
 			}).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除任务计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "删除任务计划失败: " + err.Error())
 			return
 		}
 	}
@@ -639,7 +632,7 @@ func DeleteTaskPlan(c *gin.Context) {
 	if cascade {
 		resp["deletedPlanCount"] = len(allPlanIDs)
 	}
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
 
 func SuspendTaskPlan(c *gin.Context) {
@@ -650,13 +643,13 @@ func SuspendTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	ids, err := collectPlanWithDescendants(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
@@ -667,15 +660,11 @@ func SuspendTaskPlan(c *gin.Context) {
 			"is_suspended": true,
 			"updated_at":   now,
 		}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "挂起失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "挂起失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "已挂起",
-		"suspendedID":   id,
-		"affectedCount": len(ids),
-	})
+	renv.Success(c, nil)
 }
 
 func ResumeTaskPlan(c *gin.Context) {
@@ -686,13 +675,13 @@ func ResumeTaskPlan(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	ids, err := collectPlanWithDescendants(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
@@ -703,15 +692,11 @@ func ResumeTaskPlan(c *gin.Context) {
 			"is_suspended": false,
 			"updated_at":   now,
 		}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "恢复失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "恢复失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "已恢复",
-		"resumedID":     id,
-		"affectedCount": len(ids),
-	})
+	renv.Success(c, nil)
 }
 
 func SetPriorityTaskPlan(c *gin.Context) {
@@ -724,23 +709,23 @@ func SetPriorityTaskPlan(c *gin.Context) {
 		Priority int ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "优先级必须为整数"})
+		renv.Error(c, http.StatusBadRequest, "优先级必须为整数")
 		return
 	}
 	if req.Priority < 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "优先级不能为负数"})
+		renv.Error(c, http.StatusBadRequest, "优先级不能为负数")
 		return
 	}
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	ids, err := collectPlanWithDescendants(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
@@ -751,16 +736,11 @@ func SetPriorityTaskPlan(c *gin.Context) {
 			"priority":   req.Priority,
 			"updated_at": now,
 		}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新优先级失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新优先级失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "已更新优先级",
-		"planID":        id,
-		"priority":      req.Priority,
-		"affectedCount": len(ids),
-	})
+	renv.Success(c, nil)
 }
 
 func ListPlanTasks(c *gin.Context) {
@@ -771,11 +751,11 @@ func ListPlanTasks(c *gin.Context) {
 
 	var tasks []Task
 	if err := config.GetDB().Where("plan_id = ? AND is_deleted = ?", id, false).Order("created_at DESC, id DESC").Find(&tasks).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, tasks)
+	renv.Success(c, tasks)
 }
 
 func GetPendingTasks(c *gin.Context) {
@@ -798,12 +778,12 @@ func GetPendingTasks(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("planId")); raw != "" {
 		planID, err := strconv.Atoi(raw)
 		if err != nil || planID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的计划ID"})
+			renv.Error(c, http.StatusBadRequest, "无效的计划ID")
 			return
 		}
 		planIDs, err := collectPlanWithDescendants(planID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "收集子计划失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "收集子计划失败: " + err.Error())
 			return
 		}
 		base = base.Where("tasks.plan_id IN ?", planIDs)
@@ -839,7 +819,7 @@ func GetPendingTasks(c *gin.Context) {
 
 	var total int64
 	if err := base.Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -857,7 +837,7 @@ func GetPendingTasks(c *gin.Context) {
 		Order(orderClause).
 		Scopes(q.Scope).
 		Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
@@ -877,7 +857,7 @@ func GetPendingTasks(c *gin.Context) {
 	}
 
 	// 统一分页响应：{ items, total, page, size }
-	c.JSON(http.StatusOK, pagination.New(result, total, q))
+	renv.Success(c, pagination.New(result, total, q))
 }
 
 // finishTask 标记任务完成、驱动 FSRS（interval 类型）并生成下一条任务。
@@ -928,30 +908,30 @@ func CompleteTask(c *gin.Context) {
 
 	var task Task
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
+		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
 
 	if task.Status != TaskStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "任务已完成"})
+		renv.Error(c, http.StatusBadRequest, "任务已完成")
 		return
 	}
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "所属任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "所属任务计划不存在")
 		return
 	}
 
 	var rating *FsrsRating
 	if plan.PlanType == TaskPlanTypeInterval {
 		if req.Rating == nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "interval 类型任务必须传 rating，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy"})
+			renv.Error(c, http.StatusBadRequest, "interval 类型任务必须传 rating，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy")
 			return
 		}
 		r := FsrsRating(*req.Rating)
 		if r < RatingAgain || r > RatingEasy {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy"})
+			renv.Error(c, http.StatusBadRequest, "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy")
 			return
 		}
 		rating = &r
@@ -959,7 +939,7 @@ func CompleteTask(c *gin.Context) {
 
 	nextTask, err := finishTask(&task, &plan, rating)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "完成任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "完成任务失败: " + err.Error())
 		return
 	}
 
@@ -968,7 +948,7 @@ func CompleteTask(c *gin.Context) {
 		resp["nextTask"] = buildTaskResponse(*nextTask)
 	}
 
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
 
 
@@ -1009,31 +989,28 @@ func PostponeTask(c *gin.Context) {
 		Days int ``
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.Days <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "延期天数必须为正整数"})
+		renv.Error(c, http.StatusBadRequest, "延期天数必须为正整数")
 		return
 	}
 
 	var task Task
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
+		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
 
 	updates, ok2, reason := computePostponeUpdates(&task, req.Days)
 	if !ok2 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": reason})
+		renv.Error(c, http.StatusBadRequest, reason)
 		return
 	}
 
 	if err := config.GetDB().Model(&task).Updates(updates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "延期失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "延期失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": fmt.Sprintf("已延期 %d 天", req.Days),
-		"days":    req.Days,
-	})
+	renv.Success(c, nil)
 }
 
 // BatchPostponeTasks 批量延期：对同一组任务应用相同天数延期，逐条跳过不可延期的任务。
@@ -1044,11 +1021,11 @@ func BatchPostponeTasks(c *gin.Context) {
 		Days int   `json:"days"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.Days <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "延期天数必须为正整数"})
+		renv.Error(c, http.StatusBadRequest, "延期天数必须为正整数")
 		return
 	}
 	if len(req.IDs) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择至少一个任务"})
+		renv.Error(c, http.StatusBadRequest, "请选择至少一个任务")
 		return
 	}
 
@@ -1076,19 +1053,14 @@ func BatchPostponeTasks(c *gin.Context) {
 			continue
 		}
 		if err := db.Model(&task).Updates(updates).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "延期失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "延期失败: " + err.Error())
 			return
 		}
 		results = append(results, ItemResult{ID: id, Status: "postponed"})
 		postponed++
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"postponed": postponed,
-		"skipped":   skipped,
-		"details":   results,
-		"message":   fmt.Sprintf("已延期 %d 个任务，跳过 %d 个", postponed, skipped),
-	})
+	renv.Success(c, nil)
 }
 
 func CancelTask(c *gin.Context) {
@@ -1099,23 +1071,23 @@ func CancelTask(c *gin.Context) {
 
 	var task Task
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
+		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
 
 	if task.Status != TaskStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "任务已完成或已取消"})
+		renv.Error(c, http.StatusBadRequest, "任务已完成或已取消")
 		return
 	}
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "所属任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "所属任务计划不存在")
 		return
 	}
 
 	if plan.PlanType != TaskPlanTypeCron && plan.PlanType != TaskPlanTypeInterval {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "仅周期重复任务支持取消"})
+		renv.Error(c, http.StatusBadRequest, "仅周期重复任务支持取消")
 		return
 	}
 
@@ -1123,7 +1095,7 @@ func CancelTask(c *gin.Context) {
 	task.Status = TaskStatusCancelled
 	task.CompletedAt = &now
 	if err := config.GetDB().Save(&task).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 
@@ -1131,11 +1103,11 @@ func CancelTask(c *gin.Context) {
 
 	nextTask, err := generateTask(&plan, now, nil)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成下一条任务失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "生成下一条任务失败: " + err.Error())
 		return
 	}
 	resp["nextTask"] = buildTaskResponse(*nextTask)
 
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
-
+

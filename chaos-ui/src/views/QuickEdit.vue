@@ -202,11 +202,11 @@ async function fetchSnapshots() {
     const result = await sendMessage(
         `quickEdits/${activeFileId.value}/snapshots`,
         'GET',
-        {page: snapshotPage.value, size: 20}
+        {page: snapshotPage.value, page_size: 20}
     )
-    if (result && Array.isArray(result.items)) {
-      snapshots.value = result.items
-      snapshotTotal.value = result.total || 0
+    if (result && Array.isArray(result.list)) {
+      snapshots.value = result.list
+      snapshotTotal.value = result.pagination?.total || 0
     } else if (Array.isArray(result)) {
       snapshots.value = result
     }

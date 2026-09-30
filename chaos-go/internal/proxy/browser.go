@@ -3,6 +3,7 @@ package proxy
 import (
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -49,21 +50,21 @@ func GetBrowserHistories(c *gin.Context) {
 	var histories []BrowserHistory
 	total, err := pagination.Paginate(base, &histories, q)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, 500, "查询失败: " + err.Error())
 		return
 	}
 	// 响应统一为 { items, total, page, size }
-	c.JSON(200, pagination.New(histories, total, q))
+	renv.Success(c, pagination.New(histories, total, q))
 }
 
 func SaveBrowserHistory(c *gin.Context) {
 	var histories []BrowserHistory
 	if err := c.ShouldBindJSON(&histories); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	if len(histories) == 0 {
-		c.JSON(400, gin.H{"error": "数组不能为空"})
+		renv.Error(c, 400, "数组不能为空")
 		return
 	}
 	for i := range histories {
@@ -74,20 +75,20 @@ func SaveBrowserHistory(c *gin.Context) {
 	}
 	res := config.GetDB().Debug().Clauses(clause.OnConflict{UpdateAll: true}).Create(&histories)
 	if err := res.Error; err != nil {
-		c.JSON(500, gin.H{"error": "数据库写入失败: " + err.Error()})
+		renv.Error(c, 500, "数据库写入失败: " + err.Error())
 		return
 	}
-	c.JSON(200, gin.H{"message": "批量保存成功", "count": len(histories), "saved_items": histories})
+	renv.Success(c, nil)
 }
 
 func SaveBrowserHistoryVisits(c *gin.Context) {
 	var visits []BrowserHistoryVisit
 	if err := c.ShouldBindJSON(&visits); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	if len(visits) == 0 {
-		c.JSON(400, gin.H{"error": "数组不能为空"})
+		renv.Error(c, 400, "数组不能为空")
 		return
 	}
 	for i := range visits {
@@ -107,8 +108,8 @@ func SaveBrowserHistoryVisits(c *gin.Context) {
 	}
 	res := config.GetDB().Clauses(clause.OnConflict{UpdateAll: true}).Create(&uniqueList)
 	if err := res.Error; err != nil {
-		c.JSON(500, gin.H{"error": "数据库写入失败: " + err.Error()})
+		renv.Error(c, 500, "数据库写入失败: " + err.Error())
 		return
 	}
-	c.JSON(200, gin.H{"message": "批量保存成功", "count": len(visits), "saved_items": visits})
+	renv.Success(c, nil)
 }

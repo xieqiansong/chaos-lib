@@ -152,7 +152,7 @@ async function fetchTables(params: DataTableApiParams): Promise<DataTableApiResu
     if (v !== '' && v !== null && v !== undefined) query[k] = v
   }
   const res = await getTables(query)
-  return {rows: res.items ?? [], total: res.total ?? 0}
+  return {rows: res.list ?? [], total: res.pagination?.total ?? 0}
 }
 
 function formatBytes(n: number): string {

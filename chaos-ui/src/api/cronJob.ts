@@ -37,8 +37,8 @@ export const cronJobApi = {
   setStatus: (id: number, status: boolean) => sendMessage(`cronJob/${id}/status`, 'PATCH', {status}),
   // 立即执行一次，返回本次运行记录
   run: (id: number): Promise<CronJobRun> => sendMessage(`cronJob/${id}/run`, 'POST', {}),
-  // 运行历史（分页）
-  runs: (id: number, params?: Record<string, any>): Promise<{ items: CronJobRun[]; total: number }> =>
+  // 运行历史（分页）：响应为统一信封的 data，即 { list, pagination }
+  runs: (id: number, params?: Record<string, any>): Promise<{ list: CronJobRun[]; pagination: { page: number; page_size: number; total: number; total_pages: number } }> =>
       sendMessage(`cronJob/${id}/runs`, 'GET', params),
   // cron 表达式校验 + 未来若干次触发时间预览
   preview: (cronExpr: string, count = 5): Promise<{ valid: boolean; error?: string; nextRuns: string[] }> =>

@@ -17,6 +17,7 @@ import (
 	"chaos-go/config"
 	"chaos-go/internal/crud"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -124,12 +125,12 @@ func validateAction(job *CronJob) error {
 func loadJob(c *gin.Context) (CronJob, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的ID")
 		return CronJob{}, false
 	}
 	var job CronJob
 	if err := config.GetDB().Where("is_deleted = ?", false).First(&job, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "定时任务不存在"})
+		renv.Error(c, http.StatusNotFound, "定时任务不存在")
 		return CronJob{}, false
 	}
 	return job, true
@@ -142,7 +143,7 @@ func status(c *gin.Context) {
 		Status bool `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	job, ok := loadJob(c)
@@ -153,7 +154,7 @@ func status(c *gin.Context) {
 		"enabled":    req.Status,
 		"updated_at": time.Now(),
 	}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "状态更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "状态更新失败: " + err.Error())
 		return
 	}
 	job.Enabled = req.Status
@@ -165,7 +166,7 @@ func status(c *gin.Context) {
 			view.NextRun = &t
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "状态更新成功", "data": &view})
+	renv.Success(c, &view)
 }
 
 // run 立即手动触发一次（POST /cronJob/:id/run），返回本次运行记录。
@@ -177,17 +178,17 @@ func run(c *gin.Context) {
 	ExecuteJob(&job)
 	var latest CronJobRun
 	if err := config.GetDB().Where("job_id = ?", job.ID).Order("started_at DESC").First(&latest).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取运行记录失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "读取运行记录失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, &latest)
+	renv.Success(c, &latest)
 }
 
 // runs 查询某任务的运行历史（GET /cronJob/:id/runs，分页）。
 func runs(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的ID"})
+		renv.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 	q := pagination.Parse(c)
@@ -195,10 +196,10 @@ func runs(c *gin.Context) {
 	base := config.GetDB().Model(&CronJobRun{}).Where("job_id = ?", id).Order("started_at DESC")
 	total, err := pagination.Paginate(base, &list, q)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, pagination.New(list, total, q))
+	renv.Success(c, pagination.New(list, total, q))
 }
 
 // preview 校验 cron 表达式并返回未来若干次触发时间（POST /cronJob/preview，body {cronExpr,count}）。
@@ -208,11 +209,11 @@ func preview(c *gin.Context) {
 		Count    int    `json:"count"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.CronExpr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cron 表达式不能为空"})
+		renv.Error(c, http.StatusBadRequest, "cron 表达式不能为空")
 		return
 	}
 	if req.Count <= 0 || req.Count > 20 {
@@ -220,10 +221,10 @@ func preview(c *gin.Context) {
 	}
 	next, err := NextRuns(req.CronExpr, req.Count)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"valid": false, "error": err.Error(), "nextRuns": []time.Time{}})
+		renv.Error(c, http.StatusOK, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"valid": true, "nextRuns": next})
+	renv.Success(c, gin.H{"valid": true, "nextRuns": next})
 }
 
 // ── 默认数据 ──

@@ -36,7 +36,7 @@ func TestTmpRootCause(t *testing.T) {
 	t.Logf("无 Model 直接 Count -> %v", errNoModel)
 
 	var snaps []verifySnapshot
-	total, err := Paginate(db.Where("file_id = ?", 5).Order("created_at DESC"), &snaps, Query{Page: 2, Size: 20})
+	total, err := Paginate(db.Where("file_id = ?", 5).Order("created_at DESC"), &snaps, Query{Page: 2, PageSize: 20})
 	t.Logf("Paginate -> total=%d err=%v", total, err)
 	if err != nil {
 		t.Fatalf("Paginate 仍失败: %v", err)

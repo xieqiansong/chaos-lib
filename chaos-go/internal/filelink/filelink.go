@@ -19,6 +19,7 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/crud"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -163,7 +164,7 @@ func status(c *gin.Context) {
 		Status bool `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -171,41 +172,41 @@ func status(c *gin.Context) {
 	var link FileLink
 	if err := tx.Where("is_deleted = ?", false).First(&link, "id = ?", c.Param("id")).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusNotFound, gin.H{"error": "文件连接不存在"})
+		renv.Error(c, http.StatusNotFound, "文件连接不存在")
 		return
 	}
 
 	if req.Status {
 		if link.Status {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "文件连接已启用"})
+			renv.Error(c, http.StatusBadRequest, "文件连接已启用")
 			return
 		}
 		if _, err := os.Stat(link.SourcePath); os.IsNotExist(err) {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "源路径不存在"})
+			renv.Error(c, http.StatusBadRequest, "源路径不存在")
 			return
 		}
 		if _, err := os.Lstat(link.TargetPath); err == nil {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "目标路径已存在，请先删除或移动"})
+			renv.Error(c, http.StatusBadRequest, "目标路径已存在，请先删除或移动")
 			return
 		}
 		if err := CreateJunction(link.SourcePath, link.TargetPath); err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建目录联接点失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "创建目录联接点失败: " + err.Error())
 			return
 		}
 		link.Status = true
 	} else {
 		if !link.Status {
 			tx.Rollback()
-			c.JSON(http.StatusBadRequest, gin.H{"error": "文件连接已禁用"})
+			renv.Error(c, http.StatusBadRequest, "文件连接已禁用")
 			return
 		}
 		if err := os.Remove(link.TargetPath); err != nil && !os.IsNotExist(err) {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除联接点失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "删除联接点失败: " + err.Error())
 			return
 		}
 		link.Status = false
@@ -213,12 +214,12 @@ func status(c *gin.Context) {
 
 	if err := tx.Model(&link).Update("status", link.Status).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "状态更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "状态更新失败: " + err.Error())
 		return
 	}
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "状态更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "状态更新失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "状态更新成功", "data": toOne(&link)})
+	renv.Success(c, toOne(&link))
 }

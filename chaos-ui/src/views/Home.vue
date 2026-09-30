@@ -88,7 +88,7 @@ async function loadFrequent(search?: string) {
   frequentLoading.value = true
   try {
     const res = await getFrequentBookmarks(1, 20, search || undefined)
-    frequentBookmarks.value = res?.items ?? []
+    frequentBookmarks.value = res?.list ?? []
   } catch {
     frequentBookmarks.value = []
   } finally {

@@ -12,6 +12,7 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/crud"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -52,18 +53,18 @@ func status(c *gin.Context) {
 		Status bool `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	var row StandardData
 	if err := config.GetDB().Where("is_deleted = ?", false).First(&row, "id = ?", c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "记录不存在"})
+		renv.Error(c, http.StatusNotFound, "记录不存在")
 		return
 	}
 	if err := config.GetDB().Model(&row).Update("enabled", req.Status).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "状态更新失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "状态更新失败: " + err.Error())
 		return
 	}
 	config.GetDB().First(&row, "id = ?", c.Param("id"))
-	c.JSON(http.StatusOK, gin.H{"message": "状态更新成功", "data": &row})
+	renv.Success(c, &row)
 }

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	renv "chaos-go/internal/resp"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -133,7 +134,7 @@ func GetSdkVersions(c *gin.Context) {
 		}
 		result[s.Name] = getSdkInfo(s)
 	}
-	c.JSON(200, result)
+	renv.Success(c, result)
 }
 
 // GetSdkVersion 返回指定类型的版本信息。
@@ -141,10 +142,10 @@ func GetSdkVersion(c *gin.Context) {
 	typ := c.Param("type")
 	var s SdkSource
 	if err := config.GetDB().Where("name = ? AND is_deleted = ?", typ, false).First(&s).Error; err != nil {
-		c.JSON(404, gin.H{"error": "SDK type not found"})
+		renv.Error(c, 404, "SDK type not found")
 		return
 	}
-	c.JSON(200, getSdkInfo(s))
+	renv.Success(c, getSdkInfo(s))
 }
 
 // UpdateSdkVersion 切换版本：仅对 repo 来源生效，更新 symlink + .current-version + Current 绝对路径。
@@ -153,7 +154,7 @@ func UpdateSdkVersion(c *gin.Context) {
 	db := config.GetDB()
 	var s SdkSource
 	if err := db.Where("name = ? AND is_deleted = ?", typ, false).First(&s).Error; err != nil {
-		c.JSON(404, gin.H{"error": "SDK type not found"})
+		renv.Error(c, 404, "SDK type not found")
 		return
 	}
 
@@ -161,7 +162,7 @@ func UpdateSdkVersion(c *gin.Context) {
 		Version string
 	}
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON body"})
+		renv.Error(c, 400, "Invalid JSON body")
 		return
 	}
 
@@ -180,7 +181,7 @@ func UpdateSdkVersion(c *gin.Context) {
 		}
 	}
 	if !found {
-		c.JSON(400, gin.H{"error": "Target version does not exist: " + req.Version})
+		renv.Error(c, 400, "Target version does not exist: " + req.Version)
 		return
 	}
 
@@ -192,11 +193,11 @@ func UpdateSdkVersion(c *gin.Context) {
 		os.Remove(link)
 	}
 	if err := os.Symlink(target, link); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to create symlink: " + err.Error() + ". (Maybe need admin rights?)"})
+		renv.Error(c, 500, "Failed to create symlink: " + err.Error() + ". (Maybe need admin rights?)")
 		return
 	}
 	if err := os.WriteFile(verFile, []byte(req.Version), 0644); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to write version file: " + err.Error()})
+		renv.Error(c, 500, "Failed to write version file: " + err.Error())
 		return
 	}
 
@@ -204,10 +205,7 @@ func UpdateSdkVersion(c *gin.Context) {
 	absCurrent := target
 	db.Model(&s).Update("current", absCurrent)
 
-	c.JSON(200, gin.H{
-		"message": "Successfully switched to " + req.Version,
-		"version": req.Version,
-	})
+	renv.Success(c, nil)
 }
 
 // ---------------- SDK 类型 CRUD ----------------
@@ -216,41 +214,41 @@ func UpdateSdkVersion(c *gin.Context) {
 func ListSdkSources(c *gin.Context) {
 	var srcs []SdkSource
 	config.GetDB().Where("is_deleted = ?", false).Find(&srcs)
-	c.JSON(200, srcs)
+	renv.Success(c, srcs)
 }
 
 // CreateSdkSource 新增 SDK 类型。
 func CreateSdkSource(c *gin.Context) {
 	var req SdkSource
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	if req.Name == "" {
-		c.JSON(400, gin.H{"error": "Name is required"})
+		renv.Error(c, 400, "Name is required")
 		return
 	}
 	for _, it := range parseSources(req.Sources) {
 		if it.Kind != "repo" && it.Kind != "single" {
-			c.JSON(400, gin.H{"error": "Source kind must be 'repo' or 'single'"})
+			renv.Error(c, 400, "Source kind must be 'repo' or 'single'")
 			return
 		}
 		if it.Root == "" {
-			c.JSON(400, gin.H{"error": "Source root is required"})
+			renv.Error(c, 400, "Source root is required")
 			return
 		}
 	}
 	var count int64
 	config.GetDB().Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", req.Name, false).Count(&count)
 	if count > 0 {
-		c.JSON(409, gin.H{"error": "SDK type already exists: " + req.Name})
+		renv.Error(c, 409, "SDK type already exists: " + req.Name)
 		return
 	}
 	if err := config.GetDB().Create(&req).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		renv.Error(c, 500, err.Error())
 		return
 	}
-	c.JSON(201, req)
+	renv.Success(c, req)
 }
 
 // UpdateSdkSource 编辑 SDK 类型（Sources/Current/Enabled/Note）。
@@ -259,7 +257,7 @@ func UpdateSdkSource(c *gin.Context) {
 	db := config.GetDB()
 	var s SdkSource
 	if err := db.Where("name = ? AND is_deleted = ?", name, false).First(&s).Error; err != nil {
-		c.JSON(404, gin.H{"error": "SDK type not found"})
+		renv.Error(c, 404, "SDK type not found")
 		return
 	}
 	var patch struct {
@@ -269,18 +267,18 @@ func UpdateSdkSource(c *gin.Context) {
 		Note    string
 	}
 	if err := c.ShouldBindJSON(&patch); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	updates := map[string]interface{}{}
 	if patch.Sources != nil {
 		for _, it := range parseSources(patch.Sources) {
 			if it.Kind != "repo" && it.Kind != "single" {
-				c.JSON(400, gin.H{"error": "Source kind must be 'repo' or 'single'"})
+				renv.Error(c, 400, "Source kind must be 'repo' or 'single'")
 				return
 			}
 			if it.Root == "" {
-				c.JSON(400, gin.H{"error": "Source root is required"})
+				renv.Error(c, 400, "Source root is required")
 				return
 			}
 		}
@@ -296,11 +294,11 @@ func UpdateSdkSource(c *gin.Context) {
 		updates["note"] = patch.Note
 	}
 	if len(updates) == 0 {
-		c.JSON(200, s)
+		renv.Success(c, s)
 		return
 	}
 	db.Model(&s).Updates(updates)
-	c.JSON(200, s)
+	renv.Success(c, s)
 }
 
 // DeleteSdkSource 软删除 SDK 类型。
@@ -309,9 +307,9 @@ func DeleteSdkSource(c *gin.Context) {
 	db := config.GetDB()
 	var s SdkSource
 	if err := db.Where("name = ? AND is_deleted = ?", name, false).First(&s).Error; err != nil {
-		c.JSON(404, gin.H{"error": "SDK type not found"})
+		renv.Error(c, 404, "SDK type not found")
 		return
 	}
 	db.Model(&s).Update("is_deleted", true)
-	c.JSON(200, gin.H{"message": "deleted: " + name})
+	renv.Success(c, nil)
 }

@@ -3,6 +3,7 @@ package proxy
 import (
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm/clause"
@@ -37,19 +38,19 @@ type FrequentBookmark struct {
 func SaveBookmarks(c *gin.Context) {
 	var items []Bookmark
 	if err := c.ShouldBindJSON(&items); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	if len(items) == 0 {
-		c.JSON(400, gin.H{"error": "数组不能为空"})
+		renv.Error(c, 400, "数组不能为空")
 		return
 	}
 	res := config.GetDB().Clauses(clause.OnConflict{UpdateAll: true}).Create(&items)
 	if err := res.Error; err != nil {
-		c.JSON(500, gin.H{"error": "数据库写入失败: " + err.Error()})
+		renv.Error(c, 500, "数据库写入失败: " + err.Error())
 		return
 	}
-	c.JSON(200, gin.H{"message": "批量保存成功", "count": len(items), "saved_items": items})
+	renv.Success(c, nil)
 }
 
 // GetFrequentBookmarks 返回「常用书签」：书签 ∪ 历史访问次数，按访问频率降序，统一分页（默认 20）。
@@ -76,9 +77,9 @@ func GetFrequentBookmarks(c *gin.Context) {
 	var items []FrequentBookmark
 	total, err := pagination.Paginate(base, &items, q)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, 500, "查询失败: " + err.Error())
 		return
 	}
 	// 响应统一为 { items, total, page, size }
-	c.JSON(200, pagination.New(items, total, q))
+	renv.Success(c, pagination.New(items, total, q))
 }

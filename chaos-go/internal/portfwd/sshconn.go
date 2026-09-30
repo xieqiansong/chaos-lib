@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"chaos-go/internal/crud"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/ssh"
@@ -217,22 +218,19 @@ func TestSshConnection(c *gin.Context) {
 	id := c.Param("id")
 	var conn SshConnection
 	if result := config.GetDB().Where("is_deleted = ?", false).First(&conn, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "SSH 连接不存在"})
+		renv.Error(c, 404, "SSH 连接不存在")
 		return
 	}
 	client, err := conn.dial()
 	if err != nil {
 		slog.Warn("SSH 连接测试失败", "sshAddr", conn.sshAddr(), "username", conn.Username, "err", err)
-		c.JSON(400, gin.H{"error": "连接失败: " + err.Error()})
+		renv.Error(c, 400, "连接失败: " + err.Error())
 		return
 	}
 	defer client.Close()
-	c.JSON(200, gin.H{
-		"message": "连接成功",
-		"data": gin.H{
+	renv.Success(c, gin.H{
 			"sshAddr":       conn.sshAddr(),
 			"serverVersion": string(client.ServerVersion()),
 			"remoteAddr":    client.RemoteAddr().String(),
-		},
-	})
+		})
 }

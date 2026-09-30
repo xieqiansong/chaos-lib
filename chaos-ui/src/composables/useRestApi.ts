@@ -24,7 +24,7 @@ export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T>
   async function fetch(params: DataTableApiParams) {
     const query: Record<string, any> = {
       page: params.page,
-      size: params.pageSize,
+      page_size: params.pageSize,
     }
     if (params.sort?.field) {
       query.sort = toSnake(params.sort.field)
@@ -36,11 +36,11 @@ export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T>
       }
     }
     const res = await sendMessage(prefix, 'GET', query)
-    // 兼容不同后端构建的响应形态：分页包可能是 {items}（crud 基线）或 {rows}（旧接口），
-    // 主键字段可能是 ID 或 Id；统一规整为 {rows, total} 且每行必含 ID。
-    const raw = (res?.items ?? res?.rows ?? res?.data?.items ?? res?.data?.rows ?? []) as any[]
+    // 统一信封解包后 res 即 data：分页时为 { list, pagination }；
+    // 同时兼容尚未迁移的旧形态（items/rows/total）以平滑过渡。
+    const raw = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
     const rows = raw.map((it: any) => ({...it, ID: it.ID ?? it.Id})) as T[]
-    const total = res?.total ?? res?.data?.total ?? rows.length
+    const total = res?.pagination?.total ?? res?.total ?? rows.length
     return {rows, total}
   }
 

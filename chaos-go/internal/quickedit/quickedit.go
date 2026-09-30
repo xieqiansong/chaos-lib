@@ -3,6 +3,7 @@ package quickedit
 import (
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 	"fmt"
 	"net/http"
 	"os"
@@ -87,7 +88,7 @@ func TakeSnapshot(fileID int, content string) (*QuickEditSnapshot, error) {
 func findFileByID(c *gin.Context, id int) (*QuickEditFile, bool) {
 	var file QuickEditFile
 	if err := config.GetDB().First(&file, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文件不存在"})
+		renv.Error(c, http.StatusNotFound, "文件不存在")
 		return nil, false
 	}
 	return &file, true
@@ -118,14 +119,14 @@ const maxContentLength = 10 * 1024 * 1024
 func ListQuickEdits(c *gin.Context) {
 	var files []QuickEditFile
 	if err := config.GetDB().Order("created_at DESC, id DESC").Find(&files).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 	responses := make([]QuickEditFileResponse, 0, len(files))
 	for _, f := range files {
 		responses = append(responses, buildFileResponse(f))
 	}
-	c.JSON(http.StatusOK, responses)
+	renv.Success(c, responses)
 }
 
 func CreateQuickEdit(c *gin.Context) {
@@ -135,30 +136,30 @@ func CreateQuickEdit(c *gin.Context) {
 		Remark   string
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	absPath, err := filepath.Abs(req.FilePath)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "路径无效: " + err.Error()})
+		renv.Error(c, http.StatusBadRequest, "路径无效: " + err.Error())
 		return
 	}
 	if _, err := os.Stat(absPath); os.IsNotExist(err) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "文件路径不存在"})
+		renv.Error(c, http.StatusBadRequest, "文件路径不存在")
 		return
 	}
 	var existing QuickEditFile
 	if err := config.GetDB().Where("file_path = ?", absPath).First(&existing).Error; err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "该文件已在管控列表中"})
+		renv.Error(c, http.StatusBadRequest, "该文件已在管控列表中")
 		return
 	}
 	data, err := os.ReadFile(absPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取文件失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "读取文件失败: " + err.Error())
 		return
 	}
 	if len(data) > maxContentLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "文件过大，暂不支持"})
+		renv.Error(c, http.StatusBadRequest, "文件过大，暂不支持")
 		return
 	}
 	name := req.Name
@@ -173,16 +174,16 @@ func CreateQuickEdit(c *gin.Context) {
 		UpdatedAt: time.Now(),
 	}
 	if err := config.GetDB().Create(&file).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "创建失败: " + err.Error())
 		return
 	}
 	snapshot, err := TakeSnapshot(file.ID, string(data))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件已登记，但快照失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "文件已登记，但快照失败: " + err.Error())
 		return
 	}
 	resp := buildFileResponse(file)
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"message":         "创建成功",
 		"data":            resp,
 		"firstSnapshotId": snapshot.ID,
@@ -192,25 +193,25 @@ func CreateQuickEdit(c *gin.Context) {
 func DeleteQuickEdit(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 id")
 		return
 	}
 	var file QuickEditFile
 	if err := config.GetDB().First(&file, "id = ?", id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "文件不存在"})
+		renv.Error(c, http.StatusNotFound, "文件不存在")
 		return
 	}
 	if err := config.GetDB().Delete(&file).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "删除失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+	renv.Success(c, nil)
 }
 
 func GetQuickEditContent(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 id")
 		return
 	}
 	file, ok := findFileByID(c, id)
@@ -219,29 +220,29 @@ func GetQuickEditContent(c *gin.Context) {
 	}
 	if isEnvVirtualFile(file.FilePath) {
 		if EnvReadContent == nil {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "EnvReadContent 回调未初始化"})
+			renv.Error(c, http.StatusNotImplemented, "EnvReadContent 回调未初始化")
 			return
 		}
 		content, size, err := EnvReadContent()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取环境变量失败: " + err.Error()})
+			renv.Error(c, http.StatusInternalServerError, "读取环境变量失败: " + err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"content": content, "filePath": file.FilePath, "sizeBytes": size})
+		renv.Success(c, gin.H{"content": content, "filePath": file.FilePath, "sizeBytes": size})
 		return
 	}
 	data, err := os.ReadFile(file.FilePath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取文件失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "读取文件失败: " + err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"content": string(data), "filePath": file.FilePath, "sizeBytes": len(data)})
+	renv.Success(c, gin.H{"content": string(data), "filePath": file.FilePath, "sizeBytes": len(data)})
 }
 
 func UpdateQuickEditContent(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 id")
 		return
 	}
 	file, ok := findFileByID(c, id)
@@ -250,16 +251,16 @@ func UpdateQuickEditContent(c *gin.Context) {
 	}
 	var req struct{ Content string }
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if len([]byte(req.Content)) > maxContentLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "内容过大，暂不支持"})
+		renv.Error(c, http.StatusBadRequest, "内容过大，暂不支持")
 		return
 	}
 	if isEnvVirtualFile(file.FilePath) {
 		if EnvWriteContent == nil {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "EnvWriteContent 回调未初始化"})
+			renv.Error(c, http.StatusNotImplemented, "EnvWriteContent 回调未初始化")
 			return
 		}
 		warnings, writeErr := EnvWriteContent(req.Content)
@@ -268,34 +269,34 @@ func UpdateQuickEditContent(c *gin.Context) {
 		}
 		afterSnap, snapErr := TakeSnapshot(file.ID, req.Content)
 		if snapErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "环境变量已更新，但快照失败: " + snapErr.Error(), "warnings": warnings})
+			renv.Error(c, http.StatusInternalServerError, "环境变量已更新，但快照失败: " + snapErr.Error())
 			return
 		}
 		file.UpdatedAt = time.Now()
 		config.GetDB().Model(&QuickEditFile{}).Where("id = ?", file.ID).Update("updated_at", file.UpdatedAt)
 		resp := buildFileResponse(*file)
-		c.JSON(http.StatusOK, gin.H{"message": "环境变量已更新", "data": resp, "snapshotId": afterSnap.ID, "snapshotTime": afterSnap.CreatedAt, "warnings": warnings})
+		renv.Success(c, gin.H{"message": "环境变量已更新", "data": resp, "snapshotId": afterSnap.ID, "snapshotTime": afterSnap.CreatedAt, "warnings": warnings})
 		return
 	}
 	if err := os.WriteFile(file.FilePath, []byte(req.Content), 0644); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败 (可能需要管理员权限): " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "写入文件失败 (可能需要管理员权限): " + err.Error())
 		return
 	}
 	afterSnap, snapErr := TakeSnapshot(file.ID, req.Content)
 	if snapErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件已更新，但快照失败: " + snapErr.Error()})
+		renv.Error(c, http.StatusInternalServerError, "文件已更新，但快照失败: " + snapErr.Error())
 		return
 	}
 	file.UpdatedAt = time.Now()
 	config.GetDB().Model(&QuickEditFile{}).Where("id = ?", file.ID).Update("updated_at", file.UpdatedAt)
 	resp := buildFileResponse(*file)
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "data": resp, "snapshotId": afterSnap.ID, "snapshotTime": afterSnap.CreatedAt})
+	renv.Success(c, gin.H{"message": "更新成功", "data": resp, "snapshotId": afterSnap.ID, "snapshotTime": afterSnap.CreatedAt})
 }
 
 func ListQuickEditSnapshots(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 id")
 		return
 	}
 	if _, ok := findFileByID(c, id); !ok {
@@ -309,25 +310,25 @@ func ListQuickEditSnapshots(c *gin.Context) {
 		q,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 	items := make([]QuickEditSnapshotResponse, 0, len(snaps))
 	for _, s := range snaps {
 		items = append(items, QuickEditSnapshotResponse{ID: s.ID, FileID: s.FileID, SizeBytes: s.SizeBytes, CreatedAt: s.CreatedAt})
 	}
-	c.JSON(http.StatusOK, pagination.New(items, total, q))
+	renv.Success(c, pagination.New(items, total, q))
 }
 
 func GetQuickEditSnapshot(c *gin.Context) {
 	fileID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 file id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 file id")
 		return
 	}
 	snapID, err := strconv.Atoi(c.Param("snapshotId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 snapshot id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 snapshot id")
 		return
 	}
 	if _, ok := findFileByID(c, fileID); !ok {
@@ -335,16 +336,16 @@ func GetQuickEditSnapshot(c *gin.Context) {
 	}
 	var snap QuickEditSnapshot
 	if err := config.GetDB().Where("id = ? AND file_id = ?", snapID, fileID).First(&snap).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "快照不存在"})
+		renv.Error(c, http.StatusNotFound, "快照不存在")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": snap.ID, "fileId": snap.FileID, "content": snap.Content, "sizeBytes": snap.SizeBytes, "createdAt": snap.CreatedAt})
+	renv.Success(c, gin.H{"id": snap.ID, "fileId": snap.FileID, "content": snap.Content, "sizeBytes": snap.SizeBytes, "createdAt": snap.CreatedAt})
 }
 
 func RestoreQuickEdit(c *gin.Context) {
 	fileID, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 id")
 		return
 	}
 	file, ok := findFileByID(c, fileID)
@@ -353,17 +354,17 @@ func RestoreQuickEdit(c *gin.Context) {
 	}
 	var req struct{ SnapshotID int }
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	var snap QuickEditSnapshot
 	if err := config.GetDB().Where("id = ? AND file_id = ?", req.SnapshotID, fileID).First(&snap).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "快照不存在"})
+		renv.Error(c, http.StatusNotFound, "快照不存在")
 		return
 	}
 	if isEnvVirtualFile(file.FilePath) {
 		if EnvWriteContent == nil {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "EnvWriteContent 回调未初始化"})
+			renv.Error(c, http.StatusNotImplemented, "EnvWriteContent 回调未初始化")
 			return
 		}
 		writeWarnings, writeErr := EnvWriteContent(snap.Content)
@@ -377,20 +378,20 @@ func RestoreQuickEdit(c *gin.Context) {
 		file.UpdatedAt = time.Now()
 		config.GetDB().Model(&QuickEditFile{}).Where("id = ?", file.ID).Update("updated_at", file.UpdatedAt)
 		resp := buildFileResponse(*file)
-		c.JSON(http.StatusOK, gin.H{"message": "环境变量已回滚", "data": resp, "fromSnapshotId": snap.ID, "snapshotId": afterSnap.ID, "warnings": writeWarnings})
+		renv.Success(c, gin.H{"message": "环境变量已回滚", "data": resp, "fromSnapshotId": snap.ID, "snapshotId": afterSnap.ID, "warnings": writeWarnings})
 		return
 	}
 	if err := os.WriteFile(file.FilePath, []byte(snap.Content), 0644); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败 (可能需要管理员权限): " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "写入文件失败 (可能需要管理员权限): " + err.Error())
 		return
 	}
 	afterSnap, snapErr := TakeSnapshot(fileID, snap.Content)
 	if snapErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "文件已回滚，但快照失败: " + snapErr.Error()})
+		renv.Error(c, http.StatusInternalServerError, "文件已回滚，但快照失败: " + snapErr.Error())
 		return
 	}
 	file.UpdatedAt = time.Now()
 	config.GetDB().Model(&QuickEditFile{}).Where("id = ?", file.ID).Update("updated_at", file.UpdatedAt)
 	resp := buildFileResponse(*file)
-	c.JSON(http.StatusOK, gin.H{"message": "回滚成功", "data": resp, "fromSnapshotId": snap.ID, "snapshotId": afterSnap.ID})
+	renv.Success(c, gin.H{"message": "回滚成功", "data": resp, "fromSnapshotId": snap.ID, "snapshotId": afterSnap.ID})
 }

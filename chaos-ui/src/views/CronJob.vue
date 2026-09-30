@@ -97,8 +97,8 @@ async function openHistory(row: CronJob) {
   showHistory.value = true
   runsLoading.value = true
   try {
-    const res = await cronJobApi.runs(row.ID, {page: 1, size: 50})
-    runs.value = res?.items ?? []
+    const res = await cronJobApi.runs(row.ID, {page: 1, page_size: 50})
+    runs.value = res?.list ?? []
   } catch (e: any) {
     ElMessage.error(e?.message || '加载历史失败')
     runs.value = []

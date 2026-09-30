@@ -3,6 +3,7 @@ package envvar
 import (
 	"chaos-go/config"
 	"chaos-go/internal/quickedit"
+	renv "chaos-go/internal/resp"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -43,7 +44,7 @@ func ensureEnvFileID() (int, error) {
 func GetEnvVariables(c *gin.Context) {
 	fileID, err := ensureEnvFileID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	snap, readErr := ReadAllEnvFromSystem()
@@ -64,56 +65,50 @@ func GetEnvVariables(c *gin.Context) {
 	if latest.ID > 0 {
 		resp.SnapshotTime = latest.CreatedAt.Format(time.RFC3339)
 	}
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
 
 func SyncEnvVariables(c *gin.Context) {
 	fileID, err := ensureEnvFileID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	snap, readErr := ReadAllEnvFromSystem()
 	tomlStr, tomlErr := MarshalEnvToTOML(snap)
 	if tomlErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": tomlErr.Error()})
+		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
 		return
 	}
-	afterSnap, snapErr := quickedit.TakeSnapshot(fileID, tomlStr)
-	if snapErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("快照失败: %v", snapErr)})
+	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
+		renv.Error(c, http.StatusInternalServerError, fmt.Sprintf("快照失败: %v", snapErr))
 		return
 	}
 	warnings := []string{}
 	if readErr != nil {
 		warnings = append(warnings, fmt.Sprintf("读取部分失败: %v", readErr))
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "已从系统刷新并生成新快照",
-		"snapshotId":   afterSnap.ID,
-		"snapshotTime": afterSnap.CreatedAt.Format(time.RFC3339),
-		"warnings":     warnings,
-	})
+	renv.Success(c, nil)
 }
 
 func PatchEnvVariables(c *gin.Context) {
 	fileID, err := ensureEnvFileID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	var req EnvPatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.System == nil && req.User == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求体不能为空（至少需要 system 或 user 之一）"})
+		renv.Error(c, http.StatusBadRequest, "请求体不能为空（至少需要 system 或 user 之一）")
 		return
 	}
 	snap, readErr := ReadAllEnvFromSystem()
 	if snap == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("读取环境变量失败: %v", readErr)})
+		renv.Error(c, http.StatusInternalServerError, fmt.Sprintf("读取环境变量失败: %v", readErr))
 		return
 	}
 	ApplySectionPatch(&snap.System, req.System)
@@ -124,30 +119,24 @@ func PatchEnvVariables(c *gin.Context) {
 	}
 	tomlStr, tomlErr := MarshalEnvToTOML(snap)
 	if tomlErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": tomlErr.Error()})
+		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
 		return
 	}
-	afterSnap, snapErr := quickedit.TakeSnapshot(fileID, tomlStr)
-	if snapErr != nil {
+	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
 		writeWarnings = append(writeWarnings, fmt.Sprintf("快照失败: %v", snapErr))
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "更新成功",
-		"snapshotId":   afterSnap.ID,
-		"snapshotTime": afterSnap.CreatedAt.Format(time.RFC3339),
-		"warnings":     writeWarnings,
-	})
+	renv.Success(c, nil)
 }
 
 func PutEnvVariables(c *gin.Context) {
 	fileID, err := ensureEnvFileID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	var req EnvPutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	current, _ := ReadAllEnvFromSystem()
@@ -169,41 +158,35 @@ func PutEnvVariables(c *gin.Context) {
 	}
 	tomlStr, tomlErr := MarshalEnvToTOML(current)
 	if tomlErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": tomlErr.Error()})
+		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
 		return
 	}
-	afterSnap, snapErr := quickedit.TakeSnapshot(fileID, tomlStr)
-	if snapErr != nil {
+	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
 		writeWarnings = append(writeWarnings, fmt.Sprintf("快照失败: %v", snapErr))
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "覆盖成功",
-		"snapshotId":   afterSnap.ID,
-		"snapshotTime": afterSnap.CreatedAt.Format(time.RFC3339),
-		"warnings":     writeWarnings,
-	})
+	renv.Success(c, nil)
 }
 
 func GetEnvSnapshotDetail(c *gin.Context) {
 	fileID, err := ensureEnvFileID()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	snapIDStr := c.Param("snapshotId")
 	snapID, err := strconv.Atoi(snapIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 snapshot id"})
+		renv.Error(c, http.StatusBadRequest, "无效的 snapshot id")
 		return
 	}
 	var snap quickedit.QuickEditSnapshot
 	if err := config.GetDB().Where("id = ? AND file_id = ?", snapID, fileID).First(&snap).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "快照不存在"})
+		renv.Error(c, http.StatusNotFound, "快照不存在")
 		return
 	}
 	parsed, parseErr := ParseEnvFromTOML(snap.Content)
 	if parseErr != nil {
-		c.JSON(http.StatusOK, gin.H{
+		renv.Success(c, gin.H{
 			"id":         snap.ID,
 			"fileId":     snap.FileID,
 			"rawContent": snap.Content,
@@ -213,7 +196,7 @@ func GetEnvSnapshotDetail(c *gin.Context) {
 		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"id":         snap.ID,
 		"fileId":     snap.FileID,
 		"meta":       parsed.Meta,

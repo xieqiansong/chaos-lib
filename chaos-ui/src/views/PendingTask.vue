@@ -119,7 +119,7 @@ async function fetchPending(params: DataTableApiParams): Promise<DataTableApiRes
     }
   }
   const result = await sendMessage('tasks/pending', 'GET', query)
-  return {rows: (result?.items ?? []) as PendingTask[], total: result?.total ?? 0}
+  return {rows: (result?.list ?? []) as PendingTask[], total: result?.pagination?.total ?? 0}
 }
 
 function onSelectionChange(rows: any[]) {

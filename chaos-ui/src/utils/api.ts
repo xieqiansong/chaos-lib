@@ -61,15 +61,26 @@ export async function sendMessage(path: string, method: string, payload?: any): 
     }
     const response = await fetchWithRetry(url, options)
     const contentType = response.headers.get('content-type') || ''
-    if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        throw new Error(`Request failed: ${text}`)
-    }
     if (!contentType.includes('application/json')) {
         const text = await response.text().catch(() => '')
+        if (!response.ok) {
+            throw new Error(`Request failed: ${text}`)
+        }
         throw new Error(`Request returned non-JSON response. URL: ${url}. Is the backend running? Response preview: ${text.substring(0, 200)}`)
     }
-    return response.json()
+    const body = await response.json()
+    // 统一信封：{ code, message, data }。code 非 0 视为业务错误，抛出 message。
+    if (body && typeof body === 'object' && 'code' in body) {
+        if (body.code !== 0) {
+            throw new Error(body.message || '请求失败')
+        }
+        return body.data
+    }
+    // 旧接口兼容（尚未迁移到统一信封的端点）：无 code 字段则原样返回。
+    if (!response.ok) {
+        throw new Error(`Request failed: ${JSON.stringify(body)}`)
+    }
+    return body
 }
 
 // ---- SDK 版本切换 ----
@@ -150,17 +161,17 @@ export interface BrowserHistoryItem {
     VisitCount: number
 }
 
-/** 拉取浏览器历史；size 控制返回条数（后端按 last_visit_time DESC 排序）。
- *  后端遵循统一分页规范，返回 { items, total, page, size }，此处仅取出 items。
- *  无 size 时取 MaxSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
-export function getBrowserHistories(size?: number): Promise<BrowserHistoryItem[]> {
-    const query: Record<string, any> = {size: size && size > 0 ? size : 200}
-    return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.items ?? res)
+/** 拉取浏览器历史；page_size 控制返回条数（后端按 last_visit_time DESC 排序）。
+ *  后端遵循统一分页规范，返回 { code, message, data:{ list, pagination } }，此处仅取出 list。
+ *  无 page_size 时取 MaxPageSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
+export function getBrowserHistories(page_size?: number): Promise<BrowserHistoryItem[]> {
+    const query: Record<string, any> = {page_size: page_size && page_size > 0 ? page_size : 200}
+    return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.list ?? [])
 }
 
 /** 按关键词全文搜索浏览器历史（标题 / URL）。取较大分页近似「全部命中」，避免前端搜索态截断。 */
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
-    return sendMessage('browserHistories', 'GET', {search: q, size: 200}).then((res: any) => res?.items ?? res)
+    return sendMessage('browserHistories', 'GET', {search: q, page_size: 200}).then((res: any) => res?.list ?? [])
 }
 
 // ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
@@ -176,15 +187,19 @@ export interface FrequentBookmarkItem {
 }
 
 export interface PagedResult<T> {
-    items: T[]
-    total: number
-    page: number
-    size: number
+    list: T[]
+    pagination: {
+        page: number
+        page_size: number
+        total: number
+        total_pages: number
+    }
 }
 
-/** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。 */
-export function getFrequentBookmarks(page = 1, size = 20, search?: any): Promise<PagedResult<FrequentBookmarkItem>> {
-    const query: Record<string, any> = {page, size}
+/** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。
+ *  入参 page + page_size；响应为统一信封的 data，即 { list, pagination }。 */
+export function getFrequentBookmarks(page = 1, page_size = 20, search?: any): Promise<PagedResult<FrequentBookmarkItem>> {
+    const query: Record<string, any> = {page, page_size}
     if (search && typeof search === "string") {
         query.search = search
     }

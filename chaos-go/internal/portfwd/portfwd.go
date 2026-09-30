@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"chaos-go/internal/crud"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -234,24 +235,24 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 	id := c.Param("id")
 	var rule PortForwarding
 	if result := config.GetDB().Where("is_deleted = ?", false).First(&rule, "id = ?", id); result.Error != nil {
-		c.JSON(404, gin.H{"error": "端口转发不存在"})
+		renv.Error(c, 404, "端口转发不存在")
 		return
 	}
 	if err := rule.normalize(); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	var req struct {
 		Status bool
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		renv.Error(c, 400, err.Error())
 		return
 	}
 	running, _ := GlobalPortForwarder.Status(rule.ID)
 	if req.Status {
 		if running {
-			c.JSON(400, gin.H{"error": "该端口转发已启动"})
+			renv.Error(c, 400, "该端口转发已启动")
 			return
 		}
 		// 直接转发不经 SSH 隧道，无需加载 SSH 连接；其余方向必须存在对应连接。
@@ -259,32 +260,32 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 		if rule.Direction != DirectionDirect {
 			var loaded SshConnection
 			if result := config.GetDB().Where("is_deleted = ?", false).First(&loaded, "id = ?", rule.SshConnectionId); result.Error != nil {
-				c.JSON(400, gin.H{"error": "SSH 连接不存在，无法启动"})
+				renv.Error(c, 400, "SSH 连接不存在，无法启动")
 				return
 			}
 			conn = &loaded
 		}
 		if err := GlobalPortForwarder.AddForward(&rule, conn); err != nil {
-			c.JSON(500, gin.H{"error": "启动端口转发失败: " + err.Error()})
+			renv.Error(c, 500, "启动端口转发失败: " + err.Error())
 			return
 		}
 		rule.Status = true
 	} else {
 		if !running {
-			c.JSON(400, gin.H{"error": "该端口转发未启动"})
+			renv.Error(c, 400, "该端口转发未启动")
 			return
 		}
 		if err := GlobalPortForwarder.RemoveForward(rule.ID); err != nil {
-			c.JSON(500, gin.H{"error": "停止端口转发失败: " + err.Error()})
+			renv.Error(c, 500, "停止端口转发失败: " + err.Error())
 			return
 		}
 		rule.Status = false
 	}
 	if result := config.GetDB().Save(&rule); result.Error != nil {
-		c.JSON(500, gin.H{"error": "更新状态失败: " + result.Error.Error()})
+		renv.Error(c, 500, "更新状态失败: " + result.Error.Error())
 		return
 	}
-	c.JSON(200, gin.H{"message": "状态更新成功", "data": rule.toResponse()})
+	renv.Success(c, rule.toResponse())
 }
 
 // Register 把 SSH 端口转发两个资源挂载到给定路由组：纯 CRUD 交给 crud，扩展接口自实现。

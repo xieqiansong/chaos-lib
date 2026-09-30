@@ -27,6 +27,7 @@ import (
 
 	"chaos-go/config"
 	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -114,10 +115,10 @@ func firstElem(v any) any {
 // fail 统一错误响应：msg 可为 error 或任意值（字符串/拼接串），集中维护错误信封形态。
 func fail(c *gin.Context, status int, msg any) {
 	if e, ok := msg.(error); ok {
-		c.JSON(status, gin.H{"error": e.Error()})
+		renv.Error(c, status, e.Error())
 		return
 	}
-	c.JSON(status, gin.H{"error": fmt.Sprintf("%v", msg)})
+	renv.Error(c, status, fmt.Sprintf("%v", msg))
 }
 
 // viewOne 单条：包成 1 元素切片复用同一个批量回调，再取首元素。
@@ -168,7 +169,7 @@ func (h *handler[T]) list(c *gin.Context) {
 	if h.opts.ToResponse != nil {
 		items = h.opts.ToResponse(list)
 	}
-	c.JSON(http.StatusOK, pagination.New(items, total, q))
+	renv.Success(c, pagination.New(items, total, q))
 }
 
 // get 单条（含软删过滤）。
@@ -178,7 +179,7 @@ func (h *handler[T]) get(c *gin.Context) {
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
-	c.JSON(http.StatusOK, h.viewOne(&row))
+	renv.Success(c, h.viewOne(&row))
 }
 
 // create 创建（事务内执行 AfterCreate，钩子失败即回滚）。
@@ -207,7 +208,7 @@ func (h *handler[T]) create(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "创建失败: "+err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "创建成功", "data": h.viewOne(ptr)})
+	renv.Success(c, h.viewOne(ptr))
 }
 
 // update 部分字段更新（PATCH，事务内执行 AfterUpdate，钩子失败即回滚）。
@@ -255,7 +256,7 @@ func (h *handler[T]) update(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "更新失败: "+err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "更新成功", "data": h.viewOne(&ptr)})
+	renv.Success(c, h.viewOne(&ptr))
 }
 
 // delete 软删除（事务内执行 AfterDelete，钩子失败即回滚）。
@@ -281,7 +282,7 @@ func (h *handler[T]) delete(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
+	renv.Success(c, nil)
 }
 
 // camelToSnake 把 Status 这类驼峰字段名转成 status，便于 Protected 同时覆盖两种写法。

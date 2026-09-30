@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	renv "chaos-go/internal/resp"
 	"net/http"
 	"os"
 	"os/user"
@@ -13,7 +14,7 @@ import (
 func GetHostname(c *gin.Context) {
 	host, err := os.Hostname()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取主机名失败: " + err.Error()})
+		renv.Error(c, http.StatusInternalServerError, "获取主机名失败: " + err.Error())
 		return
 	}
 	username := ""
@@ -25,5 +26,5 @@ func GetHostname(c *gin.Context) {
 	if idx := strings.LastIndex(username, "\\"); idx >= 0 {
 		username = username[idx+1:]
 	}
-	c.JSON(http.StatusOK, gin.H{"hostname": host, "username": username})
+	renv.Success(c, gin.H{"hostname": host, "username": username})
 }

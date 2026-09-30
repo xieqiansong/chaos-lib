@@ -3,6 +3,7 @@ package taskplan
 import (
 	"chaos-go/config"
 	"chaos-go/internal/deepseek"
+	renv "chaos-go/internal/resp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,22 +23,22 @@ func GetTaskPlanRaw(c *gin.Context) {
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
 	if plan.RawLink == nil || *plan.RawLink == "" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "该计划没有 raw_link，无法获取原文"})
+		renv.Error(c, http.StatusNotFound, "该计划没有 raw_link，无法获取原文")
 		return
 	}
 
 	content, err := fetchRawContent(*plan.RawLink)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "获取原文失败: " + err.Error()})
+		renv.Error(c, http.StatusBadGateway, "获取原文失败: " + err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"rawLink": *plan.RawLink,
 		"content": content,
 	})
@@ -75,21 +76,21 @@ func ReviewTaskPlan(c *gin.Context) {
 		AI     *reviewAIResult `json:"ai"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.Rating < int(RatingAgain) || req.Rating > int(RatingEasy) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy"})
+		renv.Error(c, http.StatusBadRequest, "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy")
 		return
 	}
 
 	var plan TaskPlan
 	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "任务计划不存在"})
+		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 	if plan.Status == TaskPlanStatusCompleted || plan.Status == TaskPlanStatusArchived {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "已完成/已归档的计划不可复习"})
+		renv.Error(c, http.StatusBadRequest, "已完成/已归档的计划不可复习")
 		return
 	}
 
@@ -99,12 +100,12 @@ func ReviewTaskPlan(c *gin.Context) {
 	if err != nil {
 		// 没有进行中的任务：按需生成一条（等价于"现在就复习一次"）
 		if plan.Status != TaskPlanStatusStarted && plan.Status != TaskPlanStatusCreated {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "当前状态无法发起复习"})
+			renv.Error(c, http.StatusBadRequest, "当前状态无法发起复习")
 			return
 		}
 		generated, gerr := generateTask(&plan, time.Now(), nil)
 		if gerr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "生成复习任务失败: " + gerr.Error()})
+			renv.Error(c, http.StatusInternalServerError, "生成复习任务失败: " + gerr.Error())
 			return
 		}
 		task = *generated
@@ -133,7 +134,7 @@ func ReviewTaskPlan(c *gin.Context) {
 
 	nextTask, ferr := finishTask(&task, &plan, rating)
 	if ferr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "复习失败: " + ferr.Error()})
+		renv.Error(c, http.StatusInternalServerError, "复习失败: " + ferr.Error())
 		return
 	}
 
@@ -150,7 +151,7 @@ func ReviewTaskPlan(c *gin.Context) {
 		resp["nextReviewAt"] = nextTask.StartedAt
 	}
 
-	c.JSON(http.StatusOK, resp)
+	renv.Success(c, resp)
 }
 
 // reviewScoreSystemPrompt 是固定的角色与评分标准提示（每次调用相同，省 token）。
@@ -195,13 +196,13 @@ func AiReviewScore(c *gin.Context) {
 		Answer   string `json:"answer"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请求格式错误: " + err.Error()})
+		renv.Error(c, http.StatusBadRequest, "请求格式错误: " + err.Error())
 		return
 	}
 	original := strings.TrimSpace(req.Original)
 	answer := strings.TrimSpace(req.Answer)
 	if original == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少原文内容，无法评分"})
+		renv.Error(c, http.StatusBadRequest, "缺少原文内容，无法评分")
 		return
 	}
 
@@ -217,7 +218,7 @@ func AiReviewScore(c *gin.Context) {
 
 	raw, err := deepseek.Chat(reviewScoreSystemPrompt, userMsg)
 	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "AI 评分失败: " + err.Error()})
+		renv.Error(c, http.StatusBadGateway, "AI 评分失败: " + err.Error())
 		return
 	}
 
@@ -231,7 +232,7 @@ func AiReviewScore(c *gin.Context) {
 		SuggestedRating int `json:"suggestedRating"`
 	}
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "AI 返回解析失败", "raw": raw})
+		renv.Error(c, http.StatusBadGateway, "AI 返回解析失败")
 		return
 	}
 
@@ -255,7 +256,7 @@ func AiReviewScore(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	renv.Success(c, gin.H{
 		"points":          result.Points,
 		"coverage":        result.Coverage,
 		"suggestedRating": result.SuggestedRating,

@@ -89,8 +89,8 @@ async function projectsFetch(params: DataTableApiParams) {
     if (v !== '' && v != null) query[toSnake(k)] = v
   }
   const res = await sendMessage('projects', 'GET', query)
-  const rows = (res?.items ?? res?.rows ?? []) as any[]
-  const total = res?.total ?? rows.length
+  const rows = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
+  const total = res?.pagination?.total ?? res?.total ?? rows.length
   return {rows, total}
 }
 
