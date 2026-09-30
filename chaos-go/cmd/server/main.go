@@ -4,6 +4,7 @@ import (
 	"chaos-go/config"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
+	"chaos-go/internal/apilog"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	mqttsync "chaos-go/internal/mqttsync"
@@ -135,6 +136,7 @@ func main() {
 		&cronjob.CronJobRun{},
 		&standarddata.StandardData{},
 		&datacache.DataCache{},
+		&apilog.ApiLog{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}

@@ -12,6 +12,7 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
+	"chaos-go/internal/apilog"
 	"chaos-go/internal/standarddata"
 	"chaos-go/internal/stunpf"
 	stunsync "chaos-go/internal/stunsync"
@@ -30,6 +31,9 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
+
+	// 接口访问日志：记录每个 /api 请求的元数据与请求/响应体，异步批量落库。
+	r.Use(apilog.Middleware())
 
 	api := r.Group("/api")
 	{
@@ -55,6 +59,9 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 
 		// 标准参考表：资源接口自包含，本行仅做编排调用（路由实现在 internal/standarddata）
 		standarddata.Register(api)
+
+		// 接口访问日志（标准数据范式）：资源接口自包含，本行仅做编排调用（路由实现在 internal/apilog）
+		apilog.Register(api)
 
 		// 数据缓存：资源接口自包含，本行仅做编排调用（路由实现在 internal/datacache）
 		datacache.Register(api)
