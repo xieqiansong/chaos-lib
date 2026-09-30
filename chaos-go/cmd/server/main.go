@@ -2,20 +2,17 @@ package main
 
 import (
 	"chaos-go/config"
+	"chaos-go/internal/apilog"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
-	"chaos-go/internal/apilog"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
-	mqttsync "chaos-go/internal/mqttsync"
-	_ "chaos-go/internal/notify"
+	"chaos-go/internal/mqttsync"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/standarddata"
-	_ "chaos-go/internal/stunsync"
-	_ "chaos-go/internal/stunpf"
 	"chaos-go/internal/taskplan"
 	"chaos-go/routes"
 	"chaos-go/scheduler"
@@ -154,9 +151,6 @@ func main() {
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
-
-	// 端口转发自愈等原内置周期任务已改为 API（/api/systemJobs/*），
-	// 由定时任务模块按 cron 触发，见下方 cronjob 启动逻辑。
 
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
