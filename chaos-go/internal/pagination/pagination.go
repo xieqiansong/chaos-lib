@@ -83,18 +83,3 @@ func Paginate[T any](base *gorm.DB, dest *[]T, q Query) (int64, error) {
 	}
 	return total, nil
 }
-
-// PaginateAny 与 Paginate 等价，但接收反射得到的切片指针（*[]T），供无法在编译期确定元素类型的调用方
-// （如 crud 包基于模型零值反射构造切片）复用同一套 count + 分页逻辑，避免各业务重写。
-// 要求 base 已通过 Model 指定元素类型（count 依赖 Statement.Model 推导表名）。
-func PaginateAny(base *gorm.DB, dest any, q Query) (int64, error) {
-	var total int64
-	if err := base.Count(&total).Error; err != nil {
-		return 0, err
-	}
-	// Session 克隆避免 Count 的 SELECT 子句污染后续 Find。
-	if err := base.Session(&gorm.Session{}).Scopes(q.Scope).Find(dest).Error; err != nil {
-		return 0, err
-	}
-	return total, nil
-}

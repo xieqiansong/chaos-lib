@@ -38,7 +38,7 @@ func (StandardData) TableName() string { return "standard_datas" }
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 纯 CRUD 交给通用 crud；状态切换在基线之外由本包自实现并挂载，避免污染标准实现。
 func Register(rg *gin.RouterGroup) {
-	crud.Register(rg, "standardData", &StandardData{}, crud.Opts{
+	crud.Register[StandardData](rg, "standardData", crud.Opts[StandardData]{
 		Searchable: []string{"name", "code", "description"},
 		Sortable:   []string{"id", "sort", "created_at"},
 	})

@@ -110,10 +110,9 @@ func toOne(l *FileLink) FileLinkResponse {
 }
 
 // toResponse 整批转换（crud.Opts.ToResponse）：入参固定 []*FileLink，便于后续批量/并发优化。
-func toResponse(rows any) any {
-	links := rows.([]*FileLink)
-	out := make([]FileLinkResponse, 0, len(links))
-	for _, l := range links {
+func toResponse(rows []*FileLink) any {
+	out := make([]FileLinkResponse, 0, len(rows))
+	for _, l := range rows {
 		out = append(out, toOne(l))
 	}
 	return out
@@ -124,14 +123,14 @@ func toResponse(rows any) any {
 // Register 把本资源的路由挂载到给定路由组。
 // 纯 CRUD 交给通用 crud；状态切换在基线之外由本包自实现并挂载。
 func Register(rg *gin.RouterGroup) {
-	crud.Register(rg, "fileLinks", &FileLink{}, crud.Opts{
+	crud.Register[FileLink](rg, "fileLinks", crud.Opts[FileLink]{
 		Searchable: []string{"source_path", "target_path", "remark"},
 		Sortable:   []string{"id", "sort"},
 		// Status 只能走 /:id/status（带建删联接点副作用），禁止通用 PATCH 改写
 		Protected:  []string{"status"},
 		ToResponse: toResponse,
-		AfterCreate: func(row any) error {
-			l := row.(*FileLink)
+		AfterCreate: func(row *FileLink) error {
+			l := row
 			if strings.TrimSpace(l.SourcePath) == "" || strings.TrimSpace(l.TargetPath) == "" {
 				return fmt.Errorf("源路径和目标路径不能为空")
 			}
@@ -140,8 +139,8 @@ func Register(rg *gin.RouterGroup) {
 			}
 			return nil
 		},
-		AfterDelete: func(row any) error {
-			l := row.(*FileLink)
+		AfterDelete: func(row *FileLink) error {
+			l := row
 			if !l.Status {
 				return nil
 			}

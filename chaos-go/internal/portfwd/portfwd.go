@@ -149,10 +149,9 @@ func (pf *PortForwarding) toResponse() PortForwardingResponse {
 }
 
 // portForwardingsToResponse 整批把 []*PortForwarding 转成响应 DTO（供 crud.ToResponse 调用）。
-func portForwardingsToResponse(rows any) any {
-	rules := rows.([]*PortForwarding)
-	out := make([]PortForwardingResponse, 0, len(rules))
-	for _, r := range rules {
+func portForwardingsToResponse(rows []*PortForwarding) any {
+	out := make([]PortForwardingResponse, 0, len(rows))
+	for _, r := range rows {
 		// 存量行可能没有 direction，读路径同样按 local 兜底
 		_ = r.normalize()
 		out = append(out, r.toResponse())
@@ -201,15 +200,15 @@ func (pf *PortForwarding) validate() error {
 }
 
 // beforeCreatePortForward 创建前规范化并校验（名称留空自动生成）。
-func beforeCreatePortForward(row any) error {
-	pf := row.(*PortForwarding)
+func beforeCreatePortForward(row *PortForwarding) error {
+	pf := row
 	pf.Status = false
 	return pf.validate()
 }
 
 // afterUpdatePortForward 更新前校验；运行中的规则禁止任何修改，需先停止。
-func afterUpdatePortForward(row any) error {
-	pf := row.(*PortForwarding)
+func afterUpdatePortForward(row *PortForwarding) error {
+	pf := row
 	if running, _ := GlobalPortForwarder.Status(pf.ID); running {
 		return fmt.Errorf("该转发正在运行，请先停止后再修改")
 	}
@@ -217,8 +216,8 @@ func afterUpdatePortForward(row any) error {
 }
 
 // afterDeletePortForward 删除（软删）前若正在运行则先停掉隧道。
-func afterDeletePortForward(row any) error {
-	pf := row.(*PortForwarding)
+func afterDeletePortForward(row *PortForwarding) error {
+	pf := row
 	if running, _ := GlobalPortForwarder.Status(pf.ID); running {
 		if err := GlobalPortForwarder.RemoveForward(pf.ID); err != nil {
 			return fmt.Errorf("停止端口转发失败: %v", err)
@@ -292,7 +291,7 @@ func UpdatePortForwardingStatus(c *gin.Context) {
 // Status 标记为受保护字段：仅经专用启停路由改写，通用 PATCH 无法绕过。
 func Register(rg *gin.RouterGroup) {
 	// SSH 连接信息：凭据仅后端使用，响应一律脱敏；测试接口自实现。
-	crud.Register(rg, "sshConns", &SshConnection{}, crud.Opts{
+	crud.Register[SshConnection](rg, "sshConns", crud.Opts[SshConnection]{
 		Searchable:   []string{"name", "host", "username", "remark"},
 		Sortable:     []string{"id", "name", "host", "username"},
 		ToResponse:   sshConnsToResponse,
@@ -303,7 +302,7 @@ func Register(rg *gin.RouterGroup) {
 	rg.Group("/sshConns").POST("/:id/test", TestSshConnection)
 
 	// 端口转发规则
-	crud.Register(rg, "portForwards", &PortForwarding{}, crud.Opts{
+	crud.Register[PortForwarding](rg, "portForwards", crud.Opts[PortForwarding]{
 		Searchable:   []string{"name", "direction", "target_host", "remark"},
 		Sortable:     []string{"id", "name", "direction", "port", "target_port"},
 		Protected:    []string{"Status"},

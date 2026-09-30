@@ -72,10 +72,9 @@ func (conn *SshConnection) toResponse() SshConnectionResponse {
 }
 
 // sshConnsToResponse 整批把 []*SshConnection 转成响应 DTO（供 crud.ToResponse 调用）。
-func sshConnsToResponse(rows any) any {
-	conns := rows.([]*SshConnection)
-	out := make([]SshConnectionResponse, 0, len(conns))
-	for _, c := range conns {
+func sshConnsToResponse(rows []*SshConnection) any {
+	out := make([]SshConnectionResponse, 0, len(rows))
+	for _, c := range rows {
 		out = append(out, c.toResponse())
 	}
 	return out
@@ -187,20 +186,20 @@ func (conn *SshConnection) validateForSave(needCredential bool) error {
 }
 
 // beforeCreateSshConn 创建前校验（需要凭据）；同时把空端口补成默认 22。
-func beforeCreateSshConn(row any) error {
-	conn := row.(*SshConnection)
+func beforeCreateSshConn(row *SshConnection) error {
+	conn := row
 	return conn.validateForSave(true)
 }
 
 // afterUpdateSshConn 更新前校验（编辑时凭据可保持原值，故 needCredential=false）。
-func afterUpdateSshConn(row any) error {
-	conn := row.(*SshConnection)
+func afterUpdateSshConn(row *SshConnection) error {
+	conn := row
 	return conn.validateForSave(false)
 }
 
 // afterDeleteSshConn 删除前拦截：若仍被任意转发规则引用则拒绝，并回滚软删除。
-func afterDeleteSshConn(row any) error {
-	conn := row.(*SshConnection)
+func afterDeleteSshConn(row *SshConnection) error {
+	conn := row
 	var count int64
 	config.GetDB().Model(&PortForwarding{}).
 		Where("ssh_connection_id = ? AND is_deleted = ?", conn.ID, false).

@@ -16,17 +16,14 @@ import (
 //     新建消息（create）经 AfterCreate 广播到集群，即「发送」语义。
 //   - 扩展能力（状态查询、按主题删除）由本包自实现并挂载到 /mqttSync 子路由。
 func Register(rg *gin.RouterGroup) {
-	crud.Register(rg, "mqttSync", &MqttSyncMessage{}, crud.Opts{
+	crud.Register[MqttSyncMessage](rg, "mqttSync", crud.Opts[MqttSyncMessage]{
 		Searchable: []string{"channel", "node_id", "payload"},
 		Sortable:   []string{"id", "created_at"},
 		ToResponse: toMessageDTOs,
 		// AfterCreate：新建消息即向集群广播（与落库共用同一 MsgID，便于对端去重）。
 		// 通道未启用时返回错误，事务回滚，避免「本地已存却没广播」的误导。
-		AfterCreate: func(row any) error {
-			m, ok := row.(*MqttSyncMessage)
-			if !ok {
-				return nil
-			}
+		AfterCreate: func(row *MqttSyncMessage) error {
+			m := row
 			cfg := config.GetConfig().Mqtt
 			if !cfg.Enabled {
 				return errors.New("MQTT 未启用，无法发送")

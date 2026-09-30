@@ -71,13 +71,9 @@ func toDTO(m MqttSyncMessage) MessageDTO {
 }
 
 // toMessageDTOs 是 crud 的 ToResponse 回调：把 []*MqttSyncMessage 整批转为 []MessageDTO。
-func toMessageDTOs(rows any) any {
-	ptrs, ok := rows.([]*MqttSyncMessage)
-	if !ok {
-		return rows
-	}
-	out := make([]MessageDTO, 0, len(ptrs))
-	for _, m := range ptrs {
+func toMessageDTOs(rows []*MqttSyncMessage) any {
+	out := make([]MessageDTO, 0, len(rows))
+	for _, m := range rows {
 		out = append(out, toDTO(*m))
 	}
 	return out

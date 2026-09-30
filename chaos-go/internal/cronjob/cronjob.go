@@ -24,14 +24,14 @@ import (
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 标准 CRUD 由通用 crud 反射生成，扩展能力挂在同一前缀下，routes.go 只写一行 cronjob.Register(api)。
 func Register(rg *gin.RouterGroup) {
-	crud.Register(rg, "cronJob", &CronJob{}, crud.Opts{
+	crud.Register[CronJob](rg, "cronJob", crud.Opts[CronJob]{
 		Searchable:  []string{"name", "cron_expr", "action_type"},
 		Sortable:    []string{"id", "name", "enabled", "created_at"},
 		ToResponse:  toResponse,
 		AfterCreate: afterSave,
 		AfterUpdate: afterSave,
-		AfterDelete: func(row any) error {
-			RemoveJob(row.(*CronJob).ID)
+		AfterDelete: func(row *CronJob) error {
+			RemoveJob(row.ID)
 			return nil
 		},
 	})
@@ -48,11 +48,8 @@ func Register(rg *gin.RouterGroup) {
 
 // afterSave 在 create / update 事务内、提交前执行：先校验（失败即回滚，
 // 既不写库也不进调度器），通过后再把最新状态同步进 cron 调度器。
-func afterSave(row any) error {
-	job, ok := row.(*CronJob)
-	if !ok {
-		return nil
-	}
+func afterSave(row *CronJob) error {
+	job := row
 	if err := validateJob(job); err != nil {
 		return err
 	}
@@ -61,13 +58,9 @@ func afterSave(row any) error {
 }
 
 // toResponse 把查询结果整批转换为响应形态（模型 + 派生的下次执行时间）。
-func toResponse(rows any) any {
-	list, ok := rows.([]*CronJob)
-	if !ok {
-		return rows
-	}
-	out := make([]CronJobView, 0, len(list))
-	for _, job := range list {
+func toResponse(rows []*CronJob) any {
+	out := make([]CronJobView, 0, len(rows))
+	for _, job := range rows {
 		view := CronJobView{CronJob: *job}
 		if job.Enabled && !job.IsDeleted {
 			if next, err := NextRuns(job.CronExpr, 1); err == nil && len(next) > 0 {

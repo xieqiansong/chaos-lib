@@ -82,8 +82,8 @@ func resolveProjectPaths(group ProjectGroup, absolutePath, relativePath string) 
 // ── 写方向回调（注入磁盘副作用，保持基线纯 CRUD 不被污染）──────────────
 
 // beforeCreateGroup 建组前校验名称/根目录并创建根目录。
-func beforeCreateGroup(row any) error {
-	g := row.(*ProjectGroup)
+func beforeCreateGroup(row *ProjectGroup) error {
+	g := row
 	if g.Name == "" {
 		return fmt.Errorf("项目组名称不能为空")
 	}
@@ -98,8 +98,8 @@ func beforeCreateGroup(row any) error {
 }
 
 // afterDeleteGroup 删组（软删）后级联软删其子项目。
-func afterDeleteGroup(row any) error {
-	g := row.(*ProjectGroup)
+func afterDeleteGroup(row *ProjectGroup) error {
+	g := row
 	now := time.Now()
 	if err := config.GetDB().Model(&Project{}).
 		Where("group_id = ? AND is_deleted = ?", g.ID, false).
@@ -110,8 +110,8 @@ func afterDeleteGroup(row any) error {
 }
 
 // afterUpdateGroup 组根目录变更后重算各子项目的绝对路径。
-func afterUpdateGroup(row any) error {
-	g := row.(*ProjectGroup)
+func afterUpdateGroup(row *ProjectGroup) error {
+	g := row
 	var children []Project
 	if err := config.GetDB().Where("group_id = ? AND is_deleted = ?", g.ID, false).Find(&children).Error; err != nil {
 		return err
@@ -130,8 +130,8 @@ func afterUpdateGroup(row any) error {
 }
 
 // beforeCreateProject 建项目前解析路径、校验目录存在、补全名称与访问时间。
-func beforeCreateProject(row any) error {
-	p := row.(*Project)
+func beforeCreateProject(row *Project) error {
+	p := row
 	if p.GroupID == 0 {
 		return fmt.Errorf("所属项目组ID不能为空")
 	}
@@ -162,8 +162,8 @@ func beforeCreateProject(row any) error {
 }
 
 // afterDeleteProject 删项目（软删）后清空物理目录；物理删除失败仅记录，DB 记录照常软删。
-func afterDeleteProject(row any) error {
-	p := row.(*Project)
+func afterDeleteProject(row *Project) error {
+	p := row
 	if err := RemoveDirSafe(p.AbsolutePath); err != nil {
 		// 与历史行为一致：DB 记录已删除，仅物理目录残留，不阻断流程。
 		fmt.Printf("项目物理目录删除失败（已软删记录）：%s: %v\n", p.AbsolutePath, err)
@@ -379,7 +379,7 @@ func AccessProject(c *gin.Context) {
 // Register 把项目管理两套资源的路由挂载到给定路由组。
 // 标准 CRUD 交给通用 crud；项目列表（合并未认领目录）与移动/访问为扩展能力，自定义挂载。
 func Register(rg *gin.RouterGroup) {
-	crud.Register(rg, "projectGroups", &ProjectGroup{}, crud.Opts{
+	crud.Register[ProjectGroup](rg, "projectGroups", crud.Opts[ProjectGroup]{
 		Searchable:  []string{"name"},
 		Sortable:    []string{"order_num", "created_at", "id"},
 		BeforeCreate: beforeCreateGroup,
@@ -387,7 +387,7 @@ func Register(rg *gin.RouterGroup) {
 		AfterDelete:  afterDeleteGroup,
 	})
 
-	crud.Register(rg, "projects", &Project{}, crud.Opts{
+	crud.Register[Project](rg, "projects", crud.Opts[Project]{
 		Searchable: []string{"name"},
 		Sortable:   []string{"last_accessed_at", "created_at", "id"},
 		// 路径类字段只能经带副作用的专属流程（建项目 / 移动）改写，禁止通用 PATCH 绕过。
