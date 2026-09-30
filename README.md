@@ -1,6 +1,6 @@
 # chaos-lib
 
-自托管的个人工具箱：Go 后端（Gin + GORM）+ Vue 3 前端，覆盖任务与间隔复习、项目管理、环境变量、文件连接、快捷编辑、SDK 版本切换、SSH 端口转发等日常开发场景。前端构建后经 `//go:embed` 内嵌进单个可执行文件，默认使用 SQLite，零外部依赖即可启动。
+自托管的个人工具箱：Go 后端（Gin + GORM）+ Vue 3 前端，覆盖任务与间隔复习、项目管理、环境变量、文件连接、快捷编辑、SDK 版本切换、SSH 端口转发等日常开发场景。前端构建产物外置为 exe 同目录的 `ui/`，后端启动时从 `CHAOS_UI_DIR` 或 `./ui` 读取，默认使用 PostgreSQL（也可切 SQLite）。
 
 ## 功能一览
 
@@ -67,7 +67,7 @@
 |---|------|
 | 后端 | Go 1.26 + Gin 1.12 + GORM 1.31（gzip 压缩、内置 pprof） |
 | 前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + ECharts 6 + Monaco Editor |
-| 数据库 | SQLite3（`glebarez/sqlite`，默认）/ PostgreSQL（`gorm.io/driver/postgres`） |
+| 数据库 | PostgreSQL（`gorm.io/driver/postgres`，默认）/ SQLite3（`glebarez/sqlite`） |
 | 任务调度 | robfig/cron v3 + 内置 `scheduler` 周期调度器 |
 | 其他 | 后端：`x/crypto/ssh`（端口转发）、`eclipse/paho.mqtt.golang`（MQTT 同步）、`go-toml`（快照）、`x/sys`（Windows API）；前端：markdown-it + DOMPurify、date-fns、polyform-tools（格式转换） |
 
@@ -80,11 +80,11 @@
 ```bash
 cd chaos-go
 
-# 复制配置模板（已内置 SQLite 默认值，开箱即用）
+# 复制配置模板
 cp .env.example .env
 
-# 运行（默认 SQLite，自动建表）
-go run cmd/server/main.go -env=dev
+# 运行（自动建表）
+go run cmd/server/main.go
 
 # 或构建
 go build -o chaos-go.exe ./cmd/server
@@ -99,11 +99,11 @@ pnpm dev        # 开发模式，/api 代理到 http://localhost:8080
 pnpm build      # 构建到 dist/
 ```
 
-后端通过 `//go:embed web` 内嵌前端静态文件，内嵌目录为 `chaos-go/cmd/server/web`。发布流程：`pnpm build` 后将 `dist/` 内容拷入该目录，再重新编译后端二进制。
+后端**不内嵌前端**：启动时从 `CHAOS_UI_DIR` 环境变量或 exe 同目录的 `ui/` 读取静态资源（见 `chaos-go/cmd/server/main.go` 的 `resolveUIFS`）。前端改动只需重新 `pnpm build` 并重拷 `dist/`，无需重编后端二进制。
 
 ### 一键部署（Windows）
 
-`scripts/chaos.deploy.ps1`：安装依赖并构建前端 → 拷贝 `chaos-ui/dist` 到 `chaos-go/cmd/server/web` → `go build` 输出二进制 → `nssm restart chaos` 重启服务。
+`scripts/chaos.deploy.ps1`：并行构建前端（`chaos-ui`）与浏览器扩展（`chaos-browser-extension`）→ 前端产物拷到 exe 同目录 `ui/`、扩展产物拷到 `D:\data\chaos\chrome-mv3` → `go build` 输出二进制 → `nssm restart chaos` 重启服务。
 
 ## 配置
 
@@ -111,8 +111,8 @@ pnpm build      # 构建到 dist/
 |----------|------|--------|
 | `SERVER_PORT` | HTTP 服务端口 | `8080` |
 | `SERVER_HOST` | HTTP 监听地址 | `0.0.0.0` |
-| `DB_TYPE` | 数据库类型：`sqlite` / `postgres` | `sqlite` |
-| `DB_PATH` | SQLite 文件路径 | `data/chaos.db` |
+| `DB_TYPE` | 数据库类型：`postgres` / `sqlite` | `postgres` |
+| `DB_PATH` | SQLite 文件路径（`DB_TYPE=sqlite` 时生效） | `chaos.db` |
 | `DB_HOST` | PostgreSQL 主机 | `localhost` |
 | `DB_PORT` | PostgreSQL 端口 | `5432` |
 | `DB_USER` | PostgreSQL 用户 | `postgres` |
@@ -123,6 +123,7 @@ pnpm build      # 构建到 dist/
 | `PPROF_PORT` | pprof 端口 | `6060` |
 | `PPROF_HOST` | pprof 地址 | `localhost` |
 | `FEATURE_FILE_LINK` | 文件连接功能开关 | `true` |
+| `FEATURE_CRON_SHELL` | 定时任务「执行命令/脚本」动作总开关（危险能力，默认关闭） | `false` |
 | `LOG_LEVEL` | 日志级别 | `info` |
 | `DEEPSEEK_API_KEY` | DeepSeek 密钥（余额查询 / AI 评分，可选） | - |
 | `BAIDU_AK` | 百度地图 AK（手机看板天气，可选） | - |
@@ -132,16 +133,21 @@ pnpm build      # 构建到 dist/
 | `SUPABASE_SCHEMA` | 目标 schema | `public` |
 | `SUPABASE_TIMEOUT_SEC` | 单次请求超时（秒） | `15` |
 | `SUPABASE_TABLES` | 允许访问的表名清单（逗号分隔，留空则该通道不可用） | - |
+| `MQTT_ENABLED` | MQTT 多节点同步总开关 | `false` |
+| `MQTT_BROKER` | MQTT broker 地址 | `tcp://broker.emqx.io:1883` |
+| `MQTT_PREFIX` | 集群公共主题前缀 | `test/` |
+| `MQTT_ENCRYPT` | 是否启用 AES-256-GCM 载荷加密 | `false` |
+| `MQTT_ENCRYPT_KEY` | 32 字节共享密钥（仅进 `.env`，禁止提交） | - |
+| `CHAOS_UI_DIR` | 前端静态资源目录覆盖（缺省读 exe 同目录 `ui/`） | - |
 
-环境切换：`-env=dev|prod` 优先于 `APP_ENV`，默认 `dev`；加载顺序为 `.env` > `.env.{env}`。详见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md)。
+启动时从当前工作目录加载 `.env`（缺失则全部使用内置默认值）；更多配置项见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md)。
 
 ## 项目结构
 
 ```
 chaos-lib/
 ├── chaos-go/                    # Go 后端（module chaos-go）
-│   ├── cmd/server/              # HTTP 服务入口，//go:embed web 内嵌前端
-│   │   └── web/                 # 前端构建产物（部署脚本生成）
+│   ├── cmd/server/              # HTTP 服务入口，启动时读外部 UI 目录（CHAOS_UI_DIR 或 exe 同目录 ui/）
 │   ├── cmd/tcp_over_websockets/ # TCP over WebSocket 隧道（独立服务）
 │   ├── cmd/test/                # 一次性脚本：批量导入任务计划 / 连通性探针
 │   ├── internal/                # 业务逻辑，按功能分包（模型 + handler 同包）
@@ -152,18 +158,22 @@ chaos-lib/
 │   │   ├── quickedit/           # 文件快照 / 回滚
 │   │   ├── proxy/               # SDK 切换 / 浏览器历史 / 天气 / 余额
 │   │   ├── portfwd/             # SSH 连接 + 端口转发
+│   │   ├── cronjob/             # 定时任务（robfig/cron）
 │   │   ├── mqttsync/            # MQTT 多节点消息广播 + AES 加密
-│   │   ├── extchannel/          # 浏览器扩展直连通道（书签管理）
+│   │   ├── stunpf/ stunsync/    # STUN 公网地址同步
+│   │   ├── datacache/           # 数据缓存
+│   │   ├── apilog/              # 接口访问日志
 │   │   ├── dbmonitor/           # 数据库只读自省
 │   │   ├── notify/              # Windows 通知 / WxPusher
 │   │   ├── deepseek/            # DeepSeek Chat API 客户端
 │   │   ├── supabase/            # Supabase PostgREST 客户端
+│   │   ├── crud/                # 通用 CRUD 基线
 │   │   └── pagination/          # 统一分页
 │   ├── config/                  # 配置加载 / DB 单例 / 日志
 │   ├── routes/                  # 路由注册 + SPA 回退
-│   ├── scheduler/               # 后台周期任务调度器
+│   ├── scheduler/               # 内置周期任务调度器
 │   ├── sql/                     # PostgreSQL 基准快照 + 增量变更日志
-│   └── models/ tools/ tasks/    # 非现役实现（新增代码一律落 `internal/`）
+│   └── tools/                   # 通用工具函数（Windows API / HTTP / 通知等）
 ├── chaos-ui/                    # Vue 3 + TypeScript 前端
 │   └── src/                     # views / components / router / utils
 ├── openspec/                    # 规格驱动开发（specs / changes / archive）
