@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/mqttsync"
-	"chaos-go/tools"
+	"chaos-go/pkg/tools"
 )
 
 const (

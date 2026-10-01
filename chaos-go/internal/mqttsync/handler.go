@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 	renv "chaos-go/internal/resp"
 	"github.com/gin-gonic/gin"

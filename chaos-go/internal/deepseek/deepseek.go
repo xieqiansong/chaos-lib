@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 )
 
 const (

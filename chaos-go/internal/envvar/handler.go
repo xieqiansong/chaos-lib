@@ -1,7 +1,7 @@
 package envvar
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/quickedit"
 	renv "chaos-go/internal/resp"
 	"fmt"

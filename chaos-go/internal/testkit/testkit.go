@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"

@@ -3,7 +3,7 @@ package dbmonitor
 import (
 	"fmt"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"gorm.io/gorm"
 )
 

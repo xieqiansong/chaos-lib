@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"database/sql"
 
 	_ "github.com/lib/pq"

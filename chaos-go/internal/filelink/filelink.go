@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 	renv "chaos-go/internal/resp"
 

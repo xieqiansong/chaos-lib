@@ -1,7 +1,7 @@
 package portfwd
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"fmt"
 	"net"
 	"strconv"

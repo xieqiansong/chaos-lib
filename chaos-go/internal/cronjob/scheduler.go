@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 
 	"github.com/robfig/cron/v3"
 )

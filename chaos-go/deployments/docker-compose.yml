@@ -1,0 +1,10 @@
+services:
+  chaos-go:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    ports:
+      - "30030:30030"
+    environment:
+      - CHAOS_UI_DIR=/app/ui
+    restart: unless-stopped

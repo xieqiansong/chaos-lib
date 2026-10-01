@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 )

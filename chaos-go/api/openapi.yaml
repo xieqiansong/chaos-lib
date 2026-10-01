@@ -1,0 +1,14 @@
+openapi: 3.0.3
+info:
+  title: chaos-go API
+  description: chaos-go 后端服务接口定义（由 routes 中的 gin 路由自动/手工维护）
+  version: 0.1.0
+servers:
+  - url: http://localhost:30030
+paths:
+  /api/health:
+    get:
+      summary: 健康检查
+      responses:
+        '200':
+          description: 服务正常

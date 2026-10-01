@@ -2,7 +2,7 @@ package proxy
 
 import (
 	renv "chaos-go/internal/resp"
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"io"
 	"log/slog"
 	"net/http"

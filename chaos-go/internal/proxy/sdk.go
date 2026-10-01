@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 
 	"github.com/gin-gonic/gin"
 )

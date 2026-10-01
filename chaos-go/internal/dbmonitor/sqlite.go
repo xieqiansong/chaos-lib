@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"gorm.io/gorm"
 )
 

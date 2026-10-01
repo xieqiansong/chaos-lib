@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/apilog"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
@@ -14,8 +14,8 @@ import (
 	"chaos-go/internal/quickedit"
 	"chaos-go/internal/standarddata"
 	"chaos-go/internal/taskplan"
-	"chaos-go/routes"
-	"chaos-go/scheduler"
+	"chaos-go/internal/router"
+	"chaos-go/internal/scheduler"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -161,7 +161,7 @@ func main() {
 	cronjob.Start()
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
-	r := routes.SetupRouter(resolveUIFS())
+	r := router.SetupRouter(resolveUIFS())
 	go r.Run(cfg.Server.GetAddress())
 
 	slog.Info("HTTP 服务启动完成")

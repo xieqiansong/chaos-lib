@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 
 	"golang.org/x/crypto/ssh"
 )

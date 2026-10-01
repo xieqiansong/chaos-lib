@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/mqttsync"
 	"chaos-go/internal/portfwd"
 )

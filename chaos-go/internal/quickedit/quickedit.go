@@ -1,7 +1,7 @@
 package quickedit
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
 	"fmt"

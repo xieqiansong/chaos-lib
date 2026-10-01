@@ -1,0 +1,12 @@
+# chaos-go 配置示例（不提交敏感配置）
+# 真实配置通过环境变量 / 本地 config.yaml 注入，切勿将密钥、Token、内网地址提交进仓库。
+# 本文件仅作为字段示例，具体字段以 internal/config 中结构体为准。
+server:
+  addr: ":30030"
+pprof:
+  enabled: false
+  addr: ":6060"
+db:
+  dsn: "替换为实际数据库连接串"
+log:
+  level: "info"

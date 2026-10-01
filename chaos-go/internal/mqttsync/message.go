@@ -3,7 +3,7 @@ package mqttsync
 import (
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 	"gorm.io/gorm"
 )

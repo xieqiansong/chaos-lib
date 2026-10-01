@@ -2,7 +2,7 @@ package taskplan
 
 import (
 	renv "chaos-go/internal/resp"
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"fmt"
 	"net/http"
 	"strconv"

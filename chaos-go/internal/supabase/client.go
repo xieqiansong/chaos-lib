@@ -21,7 +21,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 )
 
 const (

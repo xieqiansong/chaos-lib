@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"

@@ -1,7 +1,7 @@
 package taskplan
 
 import (
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/deepseek"
 	renv "chaos-go/internal/resp"
 	"encoding/json"

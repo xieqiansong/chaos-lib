@@ -10,7 +10,7 @@ import (
 	"encoding/hex"
 	"time"
 
-	"chaos-go/config"
+	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 
 	"github.com/gin-gonic/gin"

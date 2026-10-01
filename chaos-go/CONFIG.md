@@ -100,7 +100,7 @@ LOG_LEVEL=info
 在代码中获取配置：
 
 ```go
-import "chaos-go/config"
+import "chaos-go/internal/config"
 
 // 获取完整配置
 cfg := config.GetConfig()
