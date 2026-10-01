@@ -12,6 +12,7 @@ import {
   themeColors,
   type CappedItem,
 } from './chartHelpers'
+import {getDailyStats} from '@/api/dashboard'
 
 // 近一年每日完成任务数的折线图（带面积渐变）
 const chartOption = ref({})
@@ -21,8 +22,7 @@ const days = 44
 
 async function fetchStats() {
   try {
-    const res = await fetch(`/api/tasks/dailyStats?days=${days}`)
-    const data: { date: string; count: number }[] = await res.json()
+    const data = await getDailyStats(days)
     const capped: CappedItem[] = capValues(data.map(d => d.count))
     const colors = themeColors()
 

@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
 import {ElMessage} from 'element-plus'
-import {API_BASE} from '@/utils/api'
-
-interface EnvResponse {
-  Meta: { SavedAt: string; Hostname: string; Username: string }
-  System: Record<string, string>
-  User: Record<string, string>
-  SnapshotId: number
-  SnapshotTime: string
-  Warnings: string[]
-}
+import {getEnvVariables, syncEnvVariables, patchEnvVariables, type EnvResponse} from '@/api/environment'
 
 const props = defineProps<{
   searchText: string
@@ -44,11 +35,9 @@ const filteredVariables = computed(() => {
 async function fetchEnv() {
   loading.value = true
   try {
-    const res = await fetch(API_BASE + '/envVariables')
-    if (!res.ok) throw new Error('获取环境变量失败')
-    data.value = await res.json()
+    data.value = await getEnvVariables()
   } catch (e: any) {
-    ElMessage.error(e.message || '获取环境变量失败')
+    ElMessage.error(e?.message || '获取环境变量失败')
   } finally {
     loading.value = false
   }
@@ -57,13 +46,11 @@ async function fetchEnv() {
 async function syncEnv() {
   loading.value = true
   try {
-    const res = await fetch(API_BASE + '/envVariables/sync', {method: 'POST'})
-    const result = await res.json()
-    if (!res.ok) throw new Error(result.error || '同步失败')
+    await syncEnvVariables()
     ElMessage.success('同步成功')
     await fetchEnv()
   } catch (e: any) {
-    ElMessage.error(e.message || '同步失败')
+    ElMessage.error(e?.message || '同步失败')
   } finally {
     loading.value = false
   }
@@ -147,19 +134,13 @@ async function saveEdit() {
   const value = editMode.value === 'array' ? editArrayItems.value.join(';') : editValue.value
   const payload = {[scope]: {set: {[editingKey.value]: value}}}
   try {
-    const res = await fetch(API_BASE + '/envVariables', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    })
-    const result = await res.json()
-    if (!res.ok) throw new Error(result.error || '保存失败')
-    if (result.warnings?.length) ElMessage.warning(result.warnings.join('; '))
+    const result = await patchEnvVariables(payload)
+    if (result?.Warnings?.length) ElMessage.warning(result.Warnings.join('; '))
     else ElMessage.success('保存成功')
     editingKey.value = ''
     await fetchEnv()
   } catch (e: any) {
-    ElMessage.error(e.message || '保存失败')
+    ElMessage.error(e?.message || '保存失败')
   } finally {
     editSaving.value = false
   }
@@ -170,17 +151,11 @@ async function deleteVar(key: string) {
   const scope = activeTab.value
   const payload = {[scope]: {unset: [key]}}
   try {
-    const res = await fetch(API_BASE + '/envVariables', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    })
-    const result = await res.json()
-    if (!res.ok) throw new Error(result.error || '删除失败')
+    await patchEnvVariables(payload)
     ElMessage.success(`已删除 ${key}`)
     await fetchEnv()
   } catch (e: any) {
-    ElMessage.error(e.message || '删除失败')
+    ElMessage.error(e?.message || '删除失败')
   }
 }
 
@@ -195,20 +170,14 @@ async function addVariable() {
   const scope = activeTab.value
   const payload = {[scope]: {set: {[newKey.value.trim()]: newValue.value}}}
   try {
-    const res = await fetch(API_BASE + '/envVariables', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    })
-    const result = await res.json()
-    if (!res.ok) throw new Error(result.error || '添加失败')
+    await patchEnvVariables(payload)
     ElMessage.success(`已添加 ${newKey.value}`)
     showAddDialog.value = false
     newKey.value = ''
     newValue.value = ''
     await fetchEnv()
   } catch (e: any) {
-    ElMessage.error(e.message || '添加失败')
+    ElMessage.error(e?.message || '添加失败')
   } finally {
     addSaving.value = false
   }

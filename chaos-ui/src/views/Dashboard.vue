@@ -4,6 +4,7 @@ import {useRouter} from 'vue-router'
 import ContributionPanel from '../components/ContributionPanel.vue'
 import DailyStatsChart from '../components/DailyStatsChart.vue'
 import ActiveStatsChart from '../components/ActiveStatsChart.vue'
+import {getDeepSeekBalance, getContributionStats} from '@/api/dashboard'
 
 const router = useRouter()
 
@@ -24,16 +25,11 @@ const contributionItems = ref<{
 async function fetchBalance() {
   loading.value = true
   try {
-    const res = await fetch('/api/balance/deepseek')
-    const data = await res.json()
-    if (!res.ok) {
-      balance.value = `查询失败: ${data.error || '未知错误'}`
-      return
-    }
+    const data = await getDeepSeekBalance()
     const total = data.balance_infos?.[0]?.total_balance
     balance.value = total || '未获取到余额'
   } catch (e: any) {
-    balance.value = `请求失败: ${e.message}`
+    balance.value = `查询失败: ${e?.message || '未知错误'}`
   } finally {
     loading.value = false
   }
@@ -42,8 +38,7 @@ async function fetchBalance() {
 async function fetchContribution() {
   contributionLoading.value = true
   try {
-    const res = await fetch('/api/tasks/contributionStats')
-    const data = await res.json()
+    const data = await getContributionStats()
     contributionRoot.value = data.rootName || '每日任务'
     contributionItems.value = data.items || []
   } catch (e: any) {

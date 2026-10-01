@@ -5,6 +5,7 @@ import VChart from 'vue-echarts'
 import '../plugins/echarts'
 import {theme} from '@/theme'
 import {type CappedItem, capTooltip, capValues, capYAxis, MAX_VISUAL, themeColors,} from './chartHelpers'
+import {getActiveStats} from '@/api/dashboard'
 
 // 每日待办任务数的直方图：过期（早于今天）标红，未过期标琥珀
 const chartOption = ref({})
@@ -14,9 +15,7 @@ const endDate = ref(format(addDays(new Date(), 39), 'yyyy-MM-dd'))
 
 async function fetchStats() {
   try {
-    const params = new URLSearchParams({start: startDate.value, end: endDate.value})
-    const res = await fetch(`/api/tasks/activeStats?${params.toString()}`)
-    const data: { date: string; count: number }[] = await res.json()
+    const data = await getActiveStats(startDate.value, endDate.value)
 
     const today = new Date().toISOString().slice(0, 10)
     const capped: CappedItem[] = capValues(data.map(d => d.count))
