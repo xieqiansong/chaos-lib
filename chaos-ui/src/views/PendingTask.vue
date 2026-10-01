@@ -107,7 +107,7 @@ async function fetchPending(params: DataTableApiParams): Promise<DataTableApiRes
   const query: Record<string, any> = {
     early: earlyMode.value ? 1 : 0,
     page: params.page,
-    size: params.pageSize,
+    page_size: params.pageSize,
   }
   if (params.search?.PlanName) query.name = params.search.PlanName
   if (filterPlanId.value) query.planId = filterPlanId.value
