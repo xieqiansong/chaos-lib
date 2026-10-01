@@ -2,7 +2,6 @@ package taskplan
 
 import (
 	renv "chaos-go/internal/resp"
-	"chaos-go/internal/config"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,7 +12,6 @@ import (
 )
 
 func GetTaskDailyStats(c *gin.Context) {
-	db := config.GetDB()
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 
@@ -24,24 +22,15 @@ func GetTaskDailyStats(c *gin.Context) {
 	}
 	cutoff := today.AddDate(0, 0, -days)
 
-	type Row struct {
-		CompletedAt time.Time
-	}
-	var rows []Row
-	if err := db.Table("tasks").
-		Select("completed_at").
-		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
-		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.completed_at IS NOT NULL AND tasks.completed_at >= ?",
-			TaskStatusDone, false, cutoff).
-		Where("task_plans.is_suspended = ?", false).
-		Find(&rows).Error; err != nil {
+	rows, err := DailyCompletionRows(cutoff)
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
 	rowMap := make(map[string]int, len(rows))
 	for _, r := range rows {
-		local := r.CompletedAt.In(time.Local)
+		local := r.In(time.Local)
 		key := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local).Format("2006-01-02")
 		rowMap[key]++
 	}
@@ -77,7 +66,6 @@ func parseDaysParam(c *gin.Context, def int) (int, error) {
 }
 
 func GetTaskActiveStats(c *gin.Context) {
-	db := config.GetDB()
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 
@@ -87,24 +75,15 @@ func GetTaskActiveStats(c *gin.Context) {
 		return
 	}
 
-	type Row struct {
-		StartedAt time.Time
-	}
-	var rows []Row
-	if err := db.Table("tasks").
-		Select("started_at").
-		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
-		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ? AND tasks.started_at < ?",
-			TaskStatusActive, false, start, end.AddDate(0, 0, 1)).
-		Where("task_plans.is_suspended = ?", false).
-		Find(&rows).Error; err != nil {
+	rows, err := ActiveStartRows(start, end)
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
 	rowMap := make(map[string]int, len(rows))
 	for _, r := range rows {
-		local := r.StartedAt.In(time.Local)
+		local := r.In(time.Local)
 		key := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local).Format("2006-01-02")
 		rowMap[key]++
 	}
@@ -185,7 +164,6 @@ func buildContributionSeries(id int, name string, start, today time.Time, counts
 // 不合并）；子计划为空时退化为根计划自身。可用 ?planId= 直接指定根计划，
 // 或用 ?rootName= 指定根计划名。
 func GetTaskContributionStats(c *gin.Context) {
-	db := config.GetDB()
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	// 往前多取一天，由前端对齐到整周（周日）后渲染
@@ -199,21 +177,23 @@ func GetTaskContributionStats(c *gin.Context) {
 			renv.Error(c, http.StatusBadRequest, "无效的 planId")
 			return
 		}
-		var plan TaskPlan
-		if err := db.Where("id = ? AND is_deleted = ? AND is_suspended = ?", id, false, false).First(&plan).Error; err != nil {
+		plan, err := FindActiveUnsuspendedPlanByID(id)
+		if err != nil {
 			renv.Error(c, http.StatusNotFound, "任务计划不存在")
 			return
 		}
-		roots = append(roots, plan)
+		roots = append(roots, *plan)
 	} else {
 		rootName := strings.TrimSpace(c.Query("rootName"))
 		if rootName == "" {
 			rootName = "每日任务"
 		}
-		if err := db.Where("name = ? AND is_deleted = ? AND is_suspended = ?", rootName, false, false).Find(&roots).Error; err != nil {
+		plans, err := FindActiveUnsuspendedPlansByName(rootName)
+		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "查询计划失败: " + err.Error())
 			return
 		}
+		roots = plans
 	}
 
 	// 可切换的统计项 = 根计划的直接子计划（保持与任务树一致的排序）
@@ -223,9 +203,8 @@ func GetTaskContributionStats(c *gin.Context) {
 		if rootName == "" {
 			rootName = root.Name
 		}
-		var children []TaskPlan
-		if err := db.Where("parent_id = ? AND is_deleted = ? AND is_suspended = ?", root.ID, false, false).
-			Order("order_num ASC, id ASC").Find(&children).Error; err != nil {
+		children, err := ListChildren(root.ID)
+		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "查询子计划失败: " + err.Error())
 			return
 		}
@@ -240,7 +219,7 @@ func GetTaskContributionStats(c *gin.Context) {
 	// 归集各统计项的子树计划：planID -> 选项下标
 	owner := make(map[int]int)
 	for idx := range options {
-		ids, err := collectPlanWithDescendants(options[idx].ID)
+		ids, err := CollectDescendantPlanIDs(options[idx].ID)
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "收集子计划失败: " + err.Error())
 			return
@@ -261,17 +240,8 @@ func GetTaskContributionStats(c *gin.Context) {
 			planIDs = append(planIDs, id)
 		}
 
-		type Row struct {
-			PlanID    int
-			StartedAt time.Time
-		}
-		var rows []Row
-		if err := db.Table("tasks").
-			Select("tasks.plan_id, tasks.started_at").
-			Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ?",
-				TaskStatusDone, false, start).
-			Where("tasks.plan_id IN ?", planIDs).
-			Find(&rows).Error; err != nil {
+		rows, err := ContributionRows(planIDs, start)
+		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 			return
 		}

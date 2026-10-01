@@ -1,9 +1,8 @@
 package taskplan
 
 import (
-	"chaos-go/internal/config"
-	"chaos-go/internal/deepseek"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/deepseek"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,8 +20,8 @@ func GetTaskPlanRaw(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -84,8 +83,8 @@ func ReviewTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -94,21 +93,22 @@ func ReviewTaskPlan(c *gin.Context) {
 		return
 	}
 
-	db := config.GetDB()
 	var task Task
-	err := db.Where("plan_id = ? AND status = ? AND is_deleted = ?", id, TaskStatusActive, false).First(&task).Error
-	if err != nil {
+	foundTask, ok := FindActiveTaskForPlan(id)
+	if !ok {
 		// 没有进行中的任务：按需生成一条（等价于"现在就复习一次"）
 		if plan.Status != TaskPlanStatusStarted && plan.Status != TaskPlanStatusCreated {
 			renv.Error(c, http.StatusBadRequest, "当前状态无法发起复习")
 			return
 		}
-		generated, gerr := generateTask(&plan, time.Now(), nil)
+		generated, gerr := generateTask(plan, time.Now(), nil)
 		if gerr != nil {
 			renv.Error(c, http.StatusInternalServerError, "生成复习任务失败: " + gerr.Error())
 			return
 		}
 		task = *generated
+	} else {
+		task = *foundTask
 	}
 
 	// 持久化用户的回忆内容 + AI 评分结果（JSON 格式写入 tasks.remark）
@@ -132,7 +132,7 @@ func ReviewTaskPlan(c *gin.Context) {
 		rating = &r
 	}
 
-	nextTask, ferr := finishTask(&task, &plan, rating)
+	nextTask, ferr := finishTask(&task, plan, rating)
 	if ferr != nil {
 		renv.Error(c, http.StatusInternalServerError, "复习失败: " + ferr.Error())
 		return

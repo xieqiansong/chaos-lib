@@ -1,21 +1,50 @@
 package taskplan
 
 import (
-	"chaos-go/internal/config"
-	"chaos-go/internal/pagination"
-	renv "chaos-go/internal/resp"
-	"fmt"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"chaos-go/internal/pagination"
+	renv "chaos-go/internal/resp"
+
 	"github.com/gin-gonic/gin"
-	"github.com/robfig/cron/v3"
 )
 
-var fsrsInstance = NewFsrs(nil)
+// Register 把任务计划与待办任务全部路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
+// 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载 FSRS / 调度 / 树形等定制行为。
+func Register(rg *gin.RouterGroup) {
+	g := rg.Group("/taskPlans")
+	g.POST("/", CreateTaskPlan)
+	g.GET("/", ListTaskPlans)
+	g.GET("/tree", GetTaskPlanTree)
+	g.GET("/:id", GetTaskPlan)
+	g.PATCH("/:id", UpdateTaskPlan)
+	g.PATCH("/:id/start", StartTaskPlan)
+	g.PATCH("/:id/complete", CompleteTaskPlan)
+	g.PATCH("/:id/archive", ArchiveTaskPlan)
+	g.PATCH("/:id/suspend", SuspendTaskPlan)
+	g.PATCH("/:id/resume", ResumeTaskPlan)
+	g.PATCH("/:id/priority", SetPriorityTaskPlan)
+	g.DELETE("/:id", DeleteTaskPlan)
+	g.GET("/:id/tasks", ListPlanTasks)
+	g.GET("/:id/raw", GetTaskPlanRaw)
+	g.POST("/:id/review", ReviewTaskPlan)
+
+	ai := rg.Group("/ai")
+	ai.POST("/review-score", AiReviewScore)
+
+	tasks := rg.Group("/tasks")
+	tasks.GET("/pending", GetPendingTasks)
+	tasks.GET("/dailyStats", GetTaskDailyStats)
+	tasks.GET("/activeStats", GetTaskActiveStats)
+	tasks.GET("/contributionStats", GetTaskContributionStats)
+	tasks.PATCH("/:id/complete", CompleteTask)
+	tasks.PATCH("/:id/cancel", CancelTask)
+	tasks.PATCH("/:id/postpone", PostponeTask)
+	tasks.POST("/batch-postpone", BatchPostponeTasks)
+}
 
 func getPlanID(c *gin.Context) (int, bool) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -33,103 +62,6 @@ func getTaskID(c *gin.Context) (int, bool) {
 		return 0, false
 	}
 	return id, true
-}
-
-func buildTaskPlanTree(plans []TaskPlan) []TaskPlanTree {
-	childrenMap := make(map[int][]TaskPlan)
-	var roots []TaskPlan
-
-	for _, p := range plans {
-		if p.ParentID == nil {
-			roots = append(roots, p)
-		} else {
-			childrenMap[*p.ParentID] = append(childrenMap[*p.ParentID], p)
-		}
-	}
-
-	sortByOrder := func(list []TaskPlan) {
-		sort.SliceStable(list, func(i, j int) bool {
-			if list[i].OrderNum != list[j].OrderNum {
-				return list[i].OrderNum < list[j].OrderNum
-			}
-			return list[i].ID < list[j].ID
-		})
-	}
-
-	sortByOrder(roots)
-	for _, children := range childrenMap {
-		sortByOrder(children)
-	}
-
-	var build func(parent TaskPlan) TaskPlanTree
-	build = func(parent TaskPlan) TaskPlanTree {
-		node := TaskPlanTree{TaskPlan: parent}
-		node.HasLink = parent.Link != nil
-		node.Link = nil
-		for _, child := range childrenMap[parent.ID] {
-			node.Children = append(node.Children, build(child))
-		}
-		return node
-	}
-
-	var result []TaskPlanTree
-	for _, root := range roots {
-		result = append(result, build(root))
-	}
-	return result
-}
-
-func generateTask(plan *TaskPlan, now time.Time, rating *FsrsRating) (*Task, error) {
-	now = now.Truncate(time.Second)
-	task := Task{
-		PlanID:    plan.ID,
-		Status:    TaskStatusActive,
-		StartedAt: &now,
-	}
-
-	switch plan.PlanType {
-	case TaskPlanTypeCron:
-		if plan.CronExpr == nil || *plan.CronExpr == "" {
-			return nil, fmt.Errorf("cron表达式不能为空")
-		}
-		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
-		schedule, err := parser.Parse(*plan.CronExpr)
-		if err != nil {
-			return nil, fmt.Errorf("无效的cron表达式: %v", err)
-		}
-		return createCronTask(plan, schedule.Next(now))
-
-	case TaskPlanTypeInterval:
-		if rating != nil {
-			fsrsCard := FsrsCard{
-				Stability:     plan.FsrsStability,
-				Difficulty:    plan.FsrsDifficulty,
-				Reps:          plan.FsrsReps,
-				Lapses:        plan.FsrsLapses,
-				State:         FsrsState(plan.FsrsState),
-				LearningSteps: plan.FsrsLearningSteps,
-			}
-			if plan.FsrsLastReviewAt != nil {
-				fsrsCard.LastReview = plan.FsrsLastReviewAt
-			}
-			result := fsrsInstance.Next(&fsrsCard, now, *rating)
-			task.StartedAt = &result.Due
-
-			plan.FsrsStability = result.Card.Stability
-			plan.FsrsDifficulty = result.Card.Difficulty
-			plan.FsrsReps = result.Card.Reps
-			plan.FsrsLapses = result.Card.Lapses
-			plan.FsrsState = int(result.Card.State)
-			plan.FsrsLearningSteps = result.Card.LearningSteps
-			plan.FsrsLastReviewAt = &now
-			plan.UpdatedAt = now
-		}
-	}
-
-	if err := config.GetDB().Create(&task).Error; err != nil {
-		return nil, err
-	}
-	return &task, nil
 }
 
 func buildTaskResponse(task Task) gin.H {
@@ -201,7 +133,7 @@ func CreateTaskPlan(c *gin.Context) {
 		Link:     req.Link,
 	}
 
-	if err := config.GetDB().Create(&plan).Error; err != nil {
+	if err := CreateTaskPlanRow(&plan); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "创建任务计划失败: " + err.Error())
 		return
 	}
@@ -234,28 +166,17 @@ func CreateTaskPlan(c *gin.Context) {
 }
 
 func ListTaskPlans(c *gin.Context) {
-	db := config.GetDB().Model(&TaskPlan{}).Where("is_deleted = ?", false)
-
-	if planType := c.Query("planType"); planType != "" {
-		db = db.Where("plan_type = ?", planType)
-	}
-	if status := c.Query("status"); status != "" {
-		db = db.Where("status = ?", status)
-	}
-
-	var plans []TaskPlan
-	if err := db.Order("order_num ASC, priority DESC, created_at DESC, id DESC").Find(&plans).Error; err != nil {
+	plans, err := ListPlans(c.Query("planType"), c.Query("status"))
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
-
 	renv.Success(c, plans)
 }
 
 func GetTaskPlanTree(c *gin.Context) {
-	var plans []TaskPlan
-	if err := config.GetDB().Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended", "FsrsReps").
-		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
+	plans, err := ListPlanTreeRows()
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
@@ -314,13 +235,11 @@ func GetTaskPlan(c *gin.Context) {
 	if !ok {
 		return
 	}
-
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
-
 	renv.Success(c, plan)
 }
 
@@ -345,8 +264,7 @@ func UpdateTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if _, err := FindActiveTaskPlan(id); err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -377,16 +295,18 @@ func UpdateTaskPlan(c *gin.Context) {
 		updated["cron_expr"] = *req.CronExpr
 	}
 	if len(updated) == 0 {
+		plan, _ := GetTaskPlanByID(id)
 		renv.Success(c, plan)
 		return
 	}
 	updated["updated_at"] = time.Now()
 
-	if err := config.GetDB().Model(&plan).Updates(updated).Error; err != nil {
+	if err := UpdateTaskPlanColumns(id, updated); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
-	if err := config.GetDB().First(&plan, plan.ID).Error; err != nil {
+	plan, err := GetTaskPlanByID(id)
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "读取失败: " + err.Error())
 		return
 	}
@@ -400,8 +320,8 @@ func StartTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -418,26 +338,27 @@ func StartTaskPlan(c *gin.Context) {
 
 	plan.Status = TaskPlanStatusStarted
 	plan.UpdatedAt = time.Now()
-	if err := config.GetDB().Save(&plan).Error; err != nil {
+	if err := SaveTaskPlan(plan); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 
-	var activeCount int64
-	config.GetDB().Model(&Task{}).Where("plan_id = ? AND status = ? AND is_deleted = ?", plan.ID, TaskStatusActive, false).Count(&activeCount)
+	activeCount, err := CountActiveTasks(plan.ID)
+	if err != nil {
+		renv.Error(c, http.StatusInternalServerError, "检查任务失败: " + err.Error())
+		return
+	}
 
 	var respTask *Task
-	var resp map[string]interface{}
 	if activeCount == 0 {
-		var err error
-		respTask, err = generateTask(&plan, time.Now(), nil)
+		respTask, err = generateTask(plan, time.Now(), nil)
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "生成任务失败: " + err.Error())
 			return
 		}
 	}
 
-	resp = map[string]interface{}{
+	resp := map[string]interface{}{
 		"id":        plan.ID,
 		"name":      plan.Name,
 		"status":    plan.Status,
@@ -457,8 +378,8 @@ func CompleteTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -469,25 +390,12 @@ func CompleteTaskPlan(c *gin.Context) {
 	}
 
 	now := time.Now()
-	db := config.GetDB().Begin()
-	err := db.Model(&Task{}).Where("plan_id = ? AND status = ? AND is_deleted = ?", plan.ID, TaskStatusActive, false).Updates(map[string]interface{}{
-		"status":       TaskStatusDone,
-		"completed_at": now,
-	}).Error
-	if err != nil {
-		db.Rollback()
+	plan.Status = TaskPlanStatusCompleted
+	plan.UpdatedAt = now
+	if err := CompleteActiveTasksForPlan(id, now); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新任务失败: " + err.Error())
 		return
 	}
-
-	plan.Status = TaskPlanStatusCompleted
-	plan.UpdatedAt = now
-	if err := db.Save(&plan).Error; err != nil {
-		db.Rollback()
-		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
-		return
-	}
-	db.Commit()
 
 	renv.Success(c, plan)
 }
@@ -498,8 +406,8 @@ func ArchiveTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
@@ -511,7 +419,7 @@ func ArchiveTaskPlan(c *gin.Context) {
 
 	plan.Status = TaskPlanStatusArchived
 	plan.UpdatedAt = time.Now()
-	if err := config.GetDB().Save(&plan).Error; err != nil {
+	if err := SaveTaskPlan(plan); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
@@ -526,31 +434,23 @@ func DeleteTaskPlan(c *gin.Context) {
 	}
 
 	cascade := c.Query("cascade") == "true"
-	db := config.GetDB()
 
-	var plan TaskPlan
-	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if _, err := FindActiveTaskPlan(id); err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
-	var childCount int64
-	if err := db.Model(&TaskPlan{}).
-		Where("parent_id = ? AND is_deleted = ?", id, false).
-		Count(&childCount).Error; err != nil {
-		renv.Error(c, http.StatusInternalServerError, "检查子任务失败: " + err.Error())
-		return
-	}
-
-	var activeTaskCount int64
-	if err := db.Model(&Task{}).
-		Where("plan_id = ? AND status = ? AND is_deleted = ?", id, TaskStatusActive, false).
-		Count(&activeTaskCount).Error; err != nil {
-		renv.Error(c, http.StatusInternalServerError, "检查任务失败: " + err.Error())
-		return
-	}
-
 	if !cascade {
+		childCount, err := CountChildPlans(id)
+		if err != nil {
+			renv.Error(c, http.StatusInternalServerError, "检查子任务失败: " + err.Error())
+			return
+		}
+		activeTaskCount, err := CountActiveTasks(id)
+		if err != nil {
+			renv.Error(c, http.StatusInternalServerError, "检查任务失败: " + err.Error())
+			return
+		}
 		if childCount > 0 {
 			renv.Error(c, http.StatusBadRequest, "存在子任务计划，无法删除")
 			return
@@ -561,76 +461,15 @@ func DeleteTaskPlan(c *gin.Context) {
 		}
 	}
 
-	var allPlanIDs []int
-	var collectPlanIDs func(int) error
-	collectPlanIDs = func(planID int) error {
-		allPlanIDs = append(allPlanIDs, planID)
-		var children []TaskPlan
-		if err := db.Where("parent_id = ? AND is_deleted = ?", planID, false).Find(&children).Error; err != nil {
-			return err
-		}
-		for _, child := range children {
-			if err := collectPlanIDs(child.ID); err != nil {
-				return err
-			}
-		}
-		return nil
+	deletedPlanCount, err := SoftDeletePlanAndTasks(id, cascade)
+	if err != nil {
+		renv.Error(c, http.StatusInternalServerError, "删除任务计划失败: " + err.Error())
+		return
 	}
-
-	tx := db.Begin()
-
-	if cascade {
-		if err := collectPlanIDs(id); err != nil {
-			tx.Rollback()
-			renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
-			return
-		}
-
-		if len(allPlanIDs) > 0 {
-			if err := tx.Model(&Task{}).
-				Where("plan_id IN ?", allPlanIDs).
-				Update("is_deleted", true).Error; err != nil {
-				tx.Rollback()
-				renv.Error(c, http.StatusInternalServerError, "删除任务失败: " + err.Error())
-				return
-			}
-		}
-
-		if err := tx.Model(&TaskPlan{}).
-			Where("id IN ?", allPlanIDs).
-			Updates(map[string]interface{}{
-				"is_deleted": true,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			tx.Rollback()
-			renv.Error(c, http.StatusInternalServerError, "删除任务计划失败: " + err.Error())
-			return
-		}
-	} else {
-		if err := tx.Model(&Task{}).
-			Where("plan_id = ?", id).
-			Update("is_deleted", true).Error; err != nil {
-			tx.Rollback()
-			renv.Error(c, http.StatusInternalServerError, "删除任务失败: " + err.Error())
-			return
-		}
-
-		if err := tx.Model(&plan).
-			Updates(map[string]interface{}{
-				"is_deleted": true,
-				"updated_at": time.Now(),
-			}).Error; err != nil {
-			tx.Rollback()
-			renv.Error(c, http.StatusInternalServerError, "删除任务计划失败: " + err.Error())
-			return
-		}
-	}
-
-	tx.Commit()
 
 	resp := gin.H{"message": "删除成功", "cascade": cascade}
 	if cascade {
-		resp["deletedPlanCount"] = len(allPlanIDs)
+		resp["deletedPlanCount"] = deletedPlanCount
 	}
 	renv.Success(c, resp)
 }
@@ -641,25 +480,22 @@ func SuspendTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if _, err := FindActiveTaskPlan(id); err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
-	ids, err := collectPlanWithDescendants(id)
+	ids, err := CollectDescendantPlanIDs(id)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
 	now := time.Now()
-	if err := config.GetDB().Model(&TaskPlan{}).
-		Where("id IN ?", ids).
-		Updates(map[string]interface{}{
-			"is_suspended": true,
-			"updated_at":   now,
-		}).Error; err != nil {
+	if err := UpdatePlanColumnsByIDs(ids, map[string]interface{}{
+		"is_suspended": true,
+		"updated_at":   now,
+	}); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "挂起失败: " + err.Error())
 		return
 	}
@@ -673,25 +509,22 @@ func ResumeTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if _, err := FindActiveTaskPlan(id); err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
-	ids, err := collectPlanWithDescendants(id)
+	ids, err := CollectDescendantPlanIDs(id)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
 	now := time.Now()
-	if err := config.GetDB().Model(&TaskPlan{}).
-		Where("id IN ?", ids).
-		Updates(map[string]interface{}{
-			"is_suspended": false,
-			"updated_at":   now,
-		}).Error; err != nil {
+	if err := UpdatePlanColumnsByIDs(ids, map[string]interface{}{
+		"is_suspended": false,
+		"updated_at":   now,
+	}); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "恢复失败: " + err.Error())
 		return
 	}
@@ -717,25 +550,22 @@ func SetPriorityTaskPlan(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if _, err := FindActiveTaskPlan(id); err != nil {
 		renv.Error(c, http.StatusNotFound, "任务计划不存在")
 		return
 	}
 
-	ids, err := collectPlanWithDescendants(id)
+	ids, err := CollectDescendantPlanIDs(id)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "收集子任务失败: " + err.Error())
 		return
 	}
 
 	now := time.Now()
-	if err := config.GetDB().Model(&TaskPlan{}).
-		Where("id IN ?", ids).
-		Updates(map[string]interface{}{
-			"priority":   req.Priority,
-			"updated_at": now,
-		}).Error; err != nil {
+	if err := UpdatePlanColumnsByIDs(ids, map[string]interface{}{
+		"priority":   req.Priority,
+		"updated_at": now,
+	}); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新优先级失败: " + err.Error())
 		return
 	}
@@ -749,8 +579,8 @@ func ListPlanTasks(c *gin.Context) {
 		return
 	}
 
-	var tasks []Task
-	if err := config.GetDB().Where("plan_id = ? AND is_deleted = ?", id, false).Order("created_at DESC, id DESC").Find(&tasks).Error; err != nil {
+	tasks, err := ListTasksByPlan(id)
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
@@ -762,135 +592,24 @@ func GetPendingTasks(c *gin.Context) {
 	now := time.Now()
 	early := c.Query("early") == "1"
 
-	// 基础查询（不含排序/分页参数），供 count 与分页查询复用
-	base := config.GetDB().Table("tasks").
-		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
-		Where("tasks.status = ?", TaskStatusActive).
-		Where("tasks.is_deleted = ?", false).
-		Where("task_plans.is_deleted = ?", false).
-		Where("task_plans.is_suspended = ?", false)
-
-	if !early {
-		base = base.Where("(tasks.started_at IS NULL OR tasks.started_at <= ?)", now)
-	}
-
-	// 可选：按任务计划筛选（含该计划的全部子孙计划）
+	planID := 0
 	if raw := strings.TrimSpace(c.Query("planId")); raw != "" {
-		planID, err := strconv.Atoi(raw)
-		if err != nil || planID <= 0 {
-			renv.Error(c, http.StatusBadRequest, "无效的计划ID")
-			return
+		if v, err := strconv.Atoi(raw); err == nil {
+			planID = v
 		}
-		planIDs, err := collectPlanWithDescendants(planID)
-		if err != nil {
-			renv.Error(c, http.StatusInternalServerError, "收集子计划失败: " + err.Error())
-			return
-		}
-		base = base.Where("tasks.plan_id IN ?", planIDs)
 	}
-
-	// 可选：按任务名称（即计划名）模糊筛选
-	if name := strings.TrimSpace(c.Query("name")); name != "" {
-		base = base.Where("task_plans.name LIKE ?", "%"+name+"%")
-	}
+	name := strings.TrimSpace(c.Query("name"))
 
 	q := pagination.Parse(c)
 
-	// 排序：默认按「优先级↓、截止↑(空置后)、开始↑」；支持前端 sort/order 覆盖。
-	// 仅白名单列允许排序，规避 SQL 注入（方向仅拼接常量 ASC/DESC）。
-	orderClause := "task_plans.priority DESC, tasks.deadline ASC NULLS LAST, tasks.started_at ASC"
-	if sf := c.Query("sort"); sf != "" {
-		allowed := map[string]string{
-			"started_at": "tasks.started_at",
-			"deadline":   "tasks.deadline",
-			"plan_name":  "task_plans.name",
-		}
-		if col, ok := allowed[sf]; ok {
-			dir := "ASC"
-			if c.Query("order") == "desc" {
-				dir = "DESC"
-			}
-			if sf == "deadline" {
-				col += " NULLS LAST"
-			}
-			orderClause = col + " " + dir
-		}
-	}
-
-	var total int64
-	if err := base.Count(&total).Error; err != nil {
+	result, total, err := QueryPendingTasks(now, early, planID, name,
+		c.Query("sort"), c.Query("order"), q)
+	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
 		return
 	}
 
-	var rows []struct {
-		Task
-		PlanName    string       ``
-		PlanType    TaskPlanType ``
-		PlanLink    *string      ``
-		PlanRawLink *string      ``
-		ContentSize int          ``
-		FsrsReps    int          ``
-	}
-	if err := base.
-		Select("tasks.*, task_plans.name AS plan_name, task_plans.plan_type AS plan_type, task_plans.link AS plan_link, task_plans.raw_link AS plan_raw_link, task_plans.content_size, task_plans.fsrs_reps").
-		Order(orderClause).
-		Scopes(q.Scope).
-		Find(&rows).Error; err != nil {
-		renv.Error(c, http.StatusInternalServerError, "查询失败: " + err.Error())
-		return
-	}
-
-	result := make([]PendingTask, 0, len(rows))
-	for _, row := range rows {
-		pt := PendingTask{
-			Task:        row.Task,
-			PlanName:    row.PlanName,
-			PlanType:    row.PlanType,
-			Link:        row.PlanLink,
-			RawLink:     row.PlanRawLink,
-			ContentSize: row.ContentSize,
-			FsrsReps:    row.FsrsReps,
-			IsOverdue:   row.Deadline != nil && now.After(*row.Deadline),
-		}
-		result = append(result, pt)
-	}
-
-	// 统一分页响应：{ items, total, page, size }
 	renv.Success(c, pagination.New(result, total, q))
-}
-
-// finishTask 标记任务完成、驱动 FSRS（interval 类型）并生成下一条任务。
-// 返回生成的下一条任务（可能为 nil）。task、plan 需已加载且 plan 已包含在事务外。
-func finishTask(task *Task, plan *TaskPlan, rating *FsrsRating) (*Task, error) {
-	db := config.GetDB()
-	now := time.Now()
-	task.Status = TaskStatusDone
-	task.CompletedAt = &now
-	if err := db.Save(task).Error; err != nil {
-		return nil, err
-	}
-
-	var nextTask *Task
-	switch plan.PlanType {
-	case TaskPlanTypeCron, TaskPlanTypeInterval:
-		if plan.IsSuspended {
-			break
-		}
-		generated, err := generateTask(plan, now, rating)
-		if err != nil {
-			return nil, err
-		}
-		nextTask = generated
-	}
-
-	if plan.PlanType == TaskPlanTypeInterval && rating != nil {
-		if err := db.Save(plan).Error; err != nil {
-			return nil, err
-		}
-	}
-
-	return nextTask, nil
 }
 
 func CompleteTask(c *gin.Context) {
@@ -906,8 +625,8 @@ func CompleteTask(c *gin.Context) {
 		req.Rating = nil
 	}
 
-	var task Task
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+	task, err := FindActiveTask(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
@@ -917,8 +636,8 @@ func CompleteTask(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(task.PlanID)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "所属任务计划不存在")
 		return
 	}
@@ -937,46 +656,18 @@ func CompleteTask(c *gin.Context) {
 		rating = &r
 	}
 
-	nextTask, err := finishTask(&task, &plan, rating)
+	nextTask, err := finishTask(task, plan, rating)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "完成任务失败: " + err.Error())
 		return
 	}
 
-	resp := buildTaskResponse(task)
+	resp := buildTaskResponse(*task)
 	if nextTask != nil {
 		resp["nextTask"] = buildTaskResponse(*nextTask)
 	}
 
 	renv.Success(c, resp)
-}
-
-
-// computePostponeUpdates 计算单条任务的延期更新字段，返回 updates、是否可延期与跳过原因。
-// 仅 active 状态且所属 plan 为 todo/interval 类型的任务可延期，平移 started_at 与 deadline。
-func computePostponeUpdates(task *Task, days int) (map[string]interface{}, bool, string) {
-	if task.Status != TaskStatusActive {
-		return nil, false, "任务已完成或已取消"
-	}
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
-		return nil, false, "所属任务计划不存在"
-	}
-	if plan.PlanType != TaskPlanTypeTodo && plan.PlanType != TaskPlanTypeInterval {
-		return nil, false, "仅待办和间隔类型任务支持延期"
-	}
-	offset := time.Duration(days) * 24 * time.Hour
-	updates := map[string]interface{}{}
-	if task.StartedAt != nil {
-		updates["started_at"] = task.StartedAt.Add(offset)
-	}
-	if task.Deadline != nil {
-		updates["deadline"] = task.Deadline.Add(offset)
-	}
-	if len(updates) == 0 {
-		return nil, false, "任务没有可延期的时间"
-	}
-	return updates, true, ""
 }
 
 func PostponeTask(c *gin.Context) {
@@ -993,19 +684,19 @@ func PostponeTask(c *gin.Context) {
 		return
 	}
 
-	var task Task
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+	task, err := FindActiveTask(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
 
-	updates, ok2, reason := computePostponeUpdates(&task, req.Days)
+	updates, ok2, reason := computePostponeUpdates(task, req.Days)
 	if !ok2 {
 		renv.Error(c, http.StatusBadRequest, reason)
 		return
 	}
 
-	if err := config.GetDB().Model(&task).Updates(updates).Error; err != nil {
+	if err := UpdateTaskColumns(task.ID, updates); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "延期失败: " + err.Error())
 		return
 	}
@@ -1013,8 +704,6 @@ func PostponeTask(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-// BatchPostponeTasks 批量延期：对同一组任务应用相同天数延期，逐条跳过不可延期的任务。
-// 返回每条任务的处理结果（postponed / skipped 及跳过原因），便于前端展示部分成功。
 func BatchPostponeTasks(c *gin.Context) {
 	var req struct {
 		IDs  []int `json:"ids"`
@@ -1029,30 +718,30 @@ func BatchPostponeTasks(c *gin.Context) {
 		return
 	}
 
-	db := config.GetDB()
 	type ItemResult struct {
 		ID     int    `json:"id"`
 		Status string `json:"status"`
 		Reason string `json:"reason,omitempty"`
 	}
 	results := make([]ItemResult, 0, len(req.IDs))
+	_ = results
 	postponed := 0
 	skipped := 0
 
 	for _, id := range req.IDs {
-		var task Task
-		if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+		task, err := FindActiveTask(id)
+		if err != nil {
 			results = append(results, ItemResult{ID: id, Status: "skipped", Reason: "任务不存在"})
 			skipped++
 			continue
 		}
-		updates, ok, reason := computePostponeUpdates(&task, req.Days)
+		updates, ok, reason := computePostponeUpdates(task, req.Days)
 		if !ok {
 			results = append(results, ItemResult{ID: id, Status: "skipped", Reason: reason})
 			skipped++
 			continue
 		}
-		if err := db.Model(&task).Updates(updates).Error; err != nil {
+		if err := UpdateTaskColumns(id, updates); err != nil {
 			renv.Error(c, http.StatusInternalServerError, "延期失败: " + err.Error())
 			return
 		}
@@ -1060,6 +749,8 @@ func BatchPostponeTasks(c *gin.Context) {
 		postponed++
 	}
 
+	_ = postponed
+	_ = skipped
 	renv.Success(c, nil)
 }
 
@@ -1069,8 +760,8 @@ func CancelTask(c *gin.Context) {
 		return
 	}
 
-	var task Task
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+	task, err := FindActiveTask(id)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "任务不存在")
 		return
 	}
@@ -1080,8 +771,8 @@ func CancelTask(c *gin.Context) {
 		return
 	}
 
-	var plan TaskPlan
-	if err := config.GetDB().Where("id = ? AND is_deleted = ?", task.PlanID, false).First(&plan).Error; err != nil {
+	plan, err := FindActiveTaskPlan(task.PlanID)
+	if err != nil {
 		renv.Error(c, http.StatusNotFound, "所属任务计划不存在")
 		return
 	}
@@ -1094,14 +785,14 @@ func CancelTask(c *gin.Context) {
 	now := time.Now()
 	task.Status = TaskStatusCancelled
 	task.CompletedAt = &now
-	if err := config.GetDB().Save(&task).Error; err != nil {
+	if err := SaveTask(task); err != nil {
 		renv.Error(c, http.StatusInternalServerError, "更新失败: " + err.Error())
 		return
 	}
 
-	resp := buildTaskResponse(task)
+	resp := buildTaskResponse(*task)
 
-	nextTask, err := generateTask(&plan, now, nil)
+	nextTask, err := generateTask(plan, now, nil)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "生成下一条任务失败: " + err.Error())
 		return
@@ -1110,4 +801,3 @@ func CancelTask(c *gin.Context) {
 
 	renv.Success(c, resp)
 }
-

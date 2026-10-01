@@ -65,23 +65,16 @@ func Status(c *gin.Context) {
 // DeleteChannel 处理 DELETE /api/mqttSync/channel?name=xxx：
 // 将该主题下的全部消息软删除（IsDeleted = true），仍保留在库中以便审计。
 func DeleteChannel(c *gin.Context) {
-	db := config.GetDB()
-	if db == nil {
-		renv.Error(c, http.StatusInternalServerError, ErrDBUnavailable.Error())
-		return
-	}
 	name := c.Query("name")
 	if name == "" {
 		renv.Error(c, http.StatusBadRequest, "name is required")
 		return
 	}
-	res := db.Model(&MqttSyncMessage{}).
-		Where("channel = ? AND is_deleted = ?", name, false).
-		Update("is_deleted", true)
-	if res.Error != nil {
-		slog.Error("MQTT 主题消息删除失败", "channel", name, "err", res.Error)
-		renv.Error(c, http.StatusInternalServerError, res.Error.Error())
+	deleted, err := DeleteChannelByName(name)
+	if err != nil {
+		slog.Error("MQTT 主题消息删除失败", "channel", name, "err", err)
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	renv.Success(c, gin.H{"channel": name, "deleted": res.RowsAffected})
+	renv.Success(c, gin.H{"channel": name, "deleted": deleted})
 }

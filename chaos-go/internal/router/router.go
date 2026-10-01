@@ -1,6 +1,7 @@
 package router
 
 import (
+	"chaos-go/internal/apilog"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
 	"chaos-go/internal/dbmonitor"
@@ -12,8 +13,8 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
-	"chaos-go/internal/apilog"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/sdk"
 	"chaos-go/internal/standarddata"
 	"chaos-go/internal/stunpf"
 	stunsync "chaos-go/internal/stunsync"
@@ -46,14 +47,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		api.GET("/frequentBookmarks", proxy.GetFrequentBookmarks)
 		api.POST("/bookmarks", proxy.SaveBookmarks)
 
-		api.GET("/sdks", proxy.GetSdkVersions)
-		api.GET("/sdks/:type", proxy.GetSdkVersion)
-		api.PATCH("/sdks/:type/switch", proxy.UpdateSdkVersion)
-
-		api.GET("/sdks/defs", proxy.ListSdkSources)
-		api.POST("/sdks/defs", proxy.CreateSdkSource)
-		api.PATCH("/sdks/defs/:name", proxy.UpdateSdkSource)
-		api.DELETE("/sdks/defs/:name", proxy.DeleteSdkSource)
+		// SDK 版本与类型管理：资源接口自包含，本行仅做编排调用（路由实现在 internal/sdk）
+		sdk.Register(api)
 
 		// 文件连接：资源接口自包含，本行仅做编排调用（路由实现在 internal/filelink）
 		filelink.Register(api)
@@ -67,17 +62,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		// 数据缓存：资源接口自包含，本行仅做编排调用（路由实现在 internal/datacache）
 		datacache.Register(api)
 
-		quickEdits := api.Group("/quickEdits")
-		{
-			quickEdits.GET("/", quickedit.ListQuickEdits)
-			quickEdits.POST("/", quickedit.CreateQuickEdit)
-			quickEdits.DELETE("/:id", quickedit.DeleteQuickEdit)
-			quickEdits.GET("/:id/content", quickedit.GetQuickEditContent)
-			quickEdits.PUT("/:id/content", quickedit.UpdateQuickEditContent)
-			quickEdits.GET("/:id/snapshots", quickedit.ListQuickEditSnapshots)
-			quickEdits.GET("/:id/snapshots/:snapshotId", quickedit.GetQuickEditSnapshot)
-			quickEdits.POST("/:id/restore", quickedit.RestoreQuickEdit)
-		}
+		// 快捷编辑：资源接口自包含，本行仅做编排调用（路由实现在 internal/quickedit）
+		quickedit.Register(api)
 
 		envVars := api.Group("/envVariables")
 		{
@@ -91,41 +77,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 		// MQTT 多节点消息同步：资源接口自包含，本行仅做编排调用（路由实现在 internal/mqttsync）
 		mqttsync.Register(api)
 
-		taskPlans := api.Group("/taskPlans")
-		{
-			taskPlans.POST("/", taskplan.CreateTaskPlan)
-			taskPlans.GET("/", taskplan.ListTaskPlans)
-			taskPlans.GET("/tree", taskplan.GetTaskPlanTree)
-			taskPlans.GET("/:id", taskplan.GetTaskPlan)
-			taskPlans.PATCH("/:id", taskplan.UpdateTaskPlan)
-			taskPlans.PATCH("/:id/start", taskplan.StartTaskPlan)
-			taskPlans.PATCH("/:id/complete", taskplan.CompleteTaskPlan)
-			taskPlans.PATCH("/:id/archive", taskplan.ArchiveTaskPlan)
-			taskPlans.PATCH("/:id/suspend", taskplan.SuspendTaskPlan)
-			taskPlans.PATCH("/:id/resume", taskplan.ResumeTaskPlan)
-			taskPlans.PATCH("/:id/priority", taskplan.SetPriorityTaskPlan)
-			taskPlans.DELETE("/:id", taskplan.DeleteTaskPlan)
-			taskPlans.GET("/:id/tasks", taskplan.ListPlanTasks)
-			taskPlans.GET("/:id/raw", taskplan.GetTaskPlanRaw)
-			taskPlans.POST("/:id/review", taskplan.ReviewTaskPlan)
-		}
-
-		ai := api.Group("/ai")
-		{
-			ai.POST("/review-score", taskplan.AiReviewScore)
-		}
-
-		tasks := api.Group("/tasks")
-		{
-			tasks.GET("/pending", taskplan.GetPendingTasks)
-			tasks.GET("/dailyStats", taskplan.GetTaskDailyStats)
-			tasks.GET("/activeStats", taskplan.GetTaskActiveStats)
-			tasks.GET("/contributionStats", taskplan.GetTaskContributionStats)
-			tasks.PATCH("/:id/complete", taskplan.CompleteTask)
-			tasks.PATCH("/:id/cancel", taskplan.CancelTask)
-			tasks.PATCH("/:id/postpone", taskplan.PostponeTask)
-			tasks.POST("/batch-postpone", taskplan.BatchPostponeTasks)
-		}
+		// 任务计划与待办任务：资源接口自包含，本行仅做编排调用（路由实现在 internal/taskplan）
+		taskplan.Register(api)
 
 		// 定时任务（独立模块，与任务计划 / 待办任务无关）：资源接口自包含，
 		// 本行仅做编排调用（路由实现在 internal/cronjob）

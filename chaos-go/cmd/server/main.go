@@ -1,8 +1,8 @@
 package main
 
 import (
-	"chaos-go/internal/config"
 	"chaos-go/internal/apilog"
+	"chaos-go/internal/config"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
 	"chaos-go/internal/envvar"
@@ -12,10 +12,11 @@ import (
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
 	"chaos-go/internal/quickedit"
-	"chaos-go/internal/standarddata"
-	"chaos-go/internal/taskplan"
 	"chaos-go/internal/router"
 	"chaos-go/internal/scheduler"
+	"chaos-go/internal/sdk"
+	"chaos-go/internal/standarddata"
+	"chaos-go/internal/taskplan"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -126,7 +127,7 @@ func main() {
 		&filelink.FileLink{},
 		&quickedit.QuickEditFile{},
 		&quickedit.QuickEditSnapshot{},
-		&proxy.SdkSource{},
+		&sdk.SdkSource{},
 		&mqttsync.MqttSyncMessage{},
 		&mqttsync.MqttSyncNode{},
 		&cronjob.CronJob{},
