@@ -5,12 +5,13 @@
 // 故仅复用 DataTable 的展示层（columns + #toolbar/#actions/#field 插槽），
 // 业务动作、计划树筛选、提前查询、评分/延期弹窗、轮询刷新、逾期高亮等定制能力全部保留在此页。
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
-import {batchPostponeTasks, sendMessage} from '@/utils/api'
+import {batchPostponeTasks} from '@/utils/api'
+import {get, patch} from '@/utils/request'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {format as formatDate, parseISO} from 'date-fns'
 import {CircleClose} from '@element-plus/icons-vue'
 import DataTable from '@/components/DataTable.vue'
-import type {DataTableColumn, DataTableApiParams, DataTableApiResult} from '@/components/dataTable/types'
+import type {DataTableApiParams, DataTableApiResult, DataTableColumn} from '@/components/dataTable/types'
 import {pendingTasksVersion, refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {openCenterPanel} from '@/utils/centerPanel'
 import RatingDialog from '@/components/RatingDialog.vue'
@@ -60,14 +61,15 @@ function toPlanTreeOptions(nodes: any[]): PlanTreeNode[] {
       label: child.Name,
     }))
     return children.length > 0
-      ? {value: node.ID, label: node.Name, children}
-      : {value: node.ID, label: node.Name}
+        ? {value: node.ID, label: node.Name, children}
+        : {value: node.ID, label: node.Name}
   })
 }
 
 async function loadPlanTree() {
   try {
-    const result = await sendMessage('taskPlans/tree', 'GET')
+
+    const result = await get('taskPlans/tree')
     if (Array.isArray(result)) {
       planTree.value = toPlanTreeOptions(result)
     }
@@ -118,7 +120,7 @@ async function fetchPending(params: DataTableApiParams): Promise<DataTableApiRes
       query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'
     }
   }
-  const result = await sendMessage('tasks/pending', 'GET', query)
+  const result = await get('tasks/pending', query)
   return {rows: (result?.list ?? []) as PendingTask[], total: result?.pagination?.total ?? 0}
 }
 
@@ -181,7 +183,7 @@ async function completeTask(task: PendingTask) {
       cancelButtonText: '取消',
       type: 'info',
     })
-    await sendMessage(`tasks/${task.ID}/complete`, 'PATCH', {})
+    await patch(`tasks/${task.ID}/complete`, {})
     refreshPendingTasks()
     ElMessage.success('任务已完成')
   } catch (e: any) {
@@ -197,7 +199,7 @@ async function cancelTask(task: PendingTask) {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    await sendMessage(`tasks/${task.ID}/cancel`, 'PATCH', {})
+    await patch(`tasks/${task.ID}/cancel`, {})
     refreshPendingTasks()
     ElMessage.success('任务已取消')
   } catch (e: any) {
@@ -210,7 +212,7 @@ async function submitRatingDialog(rating: number) {
   submittingRating.value = true
   try {
     if (ratingTargetTask.value) {
-      await sendMessage(`tasks/${ratingTargetTask.value.ID}/complete`, 'PATCH', {rating})
+      await patch(`tasks/${ratingTargetTask.value.ID}/complete`, {rating})
       ElMessage.success('任务已完成')
     }
     showRatingDialog.value = false
@@ -261,7 +263,7 @@ async function submitPostponeDialog() {
   }
   try {
     if (postponeTargetTask.value) {
-      await sendMessage(`tasks/${postponeTargetTask.value.ID}/postpone`, 'PATCH', {days: postponeDays.value})
+      await patch(`tasks/${postponeTargetTask.value.ID}/postpone`, {days: postponeDays.value})
       ElMessage.success(`已延期 ${postponeDays.value} 天`)
     } else if (selectedTasks.value.length > 0) {
       const ids = selectedTasks.value.map(t => t.ID)
@@ -305,44 +307,44 @@ defineExpose({refresh: reload})
 <template>
   <div class="pending-tasks-wrapper">
     <DataTable
-      ref="dataTableRef"
-      :columns="columns"
-      :api="fetchPending"
-      :selection="true"
-      :selectable="isPostponable"
-      :reserve-selection="true"
-      :row-class-name="rowClassName"
-      row-key="ID"
-      title="待办任务"
-      @selection-change="onSelectionChange"
-      @reset="onSearchReset"
+        ref="dataTableRef"
+        :columns="columns"
+        :api="fetchPending"
+        :selection="true"
+        :selectable="isPostponable"
+        :reserve-selection="true"
+        :row-class-name="rowClassName"
+        row-key="ID"
+        title="待办任务"
+        @selection-change="onSelectionChange"
+        @reset="onSearchReset"
     >
       <!-- 搜索栏（第一行）：提前查询开关 + 任务计划筛选 + 任务名称（DataTable 自动生成输入框与 查询/重置） -->
       <template #search-extra>
         <el-form-item label="提前查询">
-          <el-switch v-model="earlyMode" />
+          <el-switch v-model="earlyMode"/>
         </el-form-item>
         <el-form-item label="任务计划">
           <el-popover
-            v-model:visible="planPopoverVisible"
-            placement="bottom-start"
-            :width="260"
-            trigger="click"
+              v-model:visible="planPopoverVisible"
+              placement="bottom-start"
+              :width="260"
+              trigger="click"
           >
             <template #reference>
               <el-input
-                :model-value="filterPlanLabel"
-                readonly
-                size="small"
-                class="plan-filter"
-                placeholder="按任务计划筛选"
+                  :model-value="filterPlanLabel"
+                  readonly
+                  size="small"
+                  class="plan-filter"
+                  placeholder="按任务计划筛选"
               >
                 <template #suffix>
                   <el-icon
-                    v-if="filterPlanId"
-                    class="plan-filter-clear"
-                    title="清除筛选"
-                    @click.stop.prevent="clearPlanFilter"
+                      v-if="filterPlanId"
+                      class="plan-filter-clear"
+                      title="清除筛选"
+                      @click.stop.prevent="clearPlanFilter"
                   >
                     <CircleClose/>
                   </el-icon>
@@ -350,12 +352,12 @@ defineExpose({refresh: reload})
               </el-input>
             </template>
             <el-tree
-              :data="planTree"
-              node-key="value"
-              :current-node-key="filterPlanId ?? undefined"
-              :expand-on-click-node="false"
-              highlight-current
-              @node-click="onPlanNodeClick"
+                :data="planTree"
+                node-key="value"
+                :current-node-key="filterPlanId ?? undefined"
+                :expand-on-click-node="false"
+                highlight-current
+                @node-click="onPlanNodeClick"
             />
           </el-popover>
         </el-form-item>
@@ -364,10 +366,10 @@ defineExpose({refresh: reload})
       <!-- 工具栏（第二行，靠左）：批量延期 -->
       <template #toolbar>
         <el-button
-          type="primary"
-          size="small"
-          :disabled="selectedTasks.length === 0"
-          @click="batchPostpone"
+            type="primary"
+            size="small"
+            :disabled="selectedTasks.length === 0"
+            @click="batchPostpone"
         >批量延期
         </el-button>
         <span v-if="selectedTasks.length" class="selected-count">已选 {{ selectedTasks.length }} 项</span>
@@ -417,12 +419,12 @@ defineExpose({refresh: reload})
     </DataTable>
 
     <RatingDialog
-      v-model="showRatingDialog"
-      v-model:rating="ratingValue"
-      title="完成间隔任务"
-      :target-name="ratingTargetTask?.PlanName || ''"
-      :loading="submittingRating"
-      @submit="submitRatingDialog"
+        v-model="showRatingDialog"
+        v-model:rating="ratingValue"
+        title="完成间隔任务"
+        :target-name="ratingTargetTask?.PlanName || ''"
+        :loading="submittingRating"
+        @submit="submitRatingDialog"
     />
 
     <el-dialog v-model="showPostponeDialog" :title="postponeDialogTitle" width="26.25rem">
@@ -430,19 +432,19 @@ defineExpose({refresh: reload})
         <p class="text-secondary mb-sm">选择延期天数，任务开始时间将向后顺延。</p>
         <div class="postpone-presets">
           <el-button
-            v-for="d in postponePresets"
-            :key="d"
-            :type="postponeDays === d ? 'primary' : 'default'"
-            @click="postponeDays = d"
+              v-for="d in postponePresets"
+              :key="d"
+              :type="postponeDays === d ? 'primary' : 'default'"
+              @click="postponeDays = d"
           >
             {{ d }} 天
           </el-button>
           <el-input-number
-            v-model="postponeDays"
-            :min="1"
-            :max="365"
-            placeholder="自定义"
-            style="width: 7.5rem"
+              v-model="postponeDays"
+              :min="1"
+              :max="365"
+              placeholder="自定义"
+              style="width: 7.5rem"
           />
         </div>
       </div>
