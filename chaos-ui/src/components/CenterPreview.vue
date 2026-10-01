@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
-import {sendMessage} from '@/utils/api'
+import {get, patch, post} from '@/utils/request'
 import {ElMessage} from 'element-plus'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 
@@ -16,7 +16,7 @@ const content = ref('')
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await sendMessage(`taskPlans/${props.planId}/raw`, 'GET')
+    const res = await get(`taskPlans/${props.planId}/raw`)
     rawLink.value = res?.rawLink ?? ''
     content.value = res?.content ?? ''
   } catch (e: any) {

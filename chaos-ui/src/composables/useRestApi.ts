@@ -4,57 +4,57 @@
 // POST 创建、PATCH 部分更新、DELETE 软删。
 // 状态切换等扩展接口不属于标准基线，由各业务 api 文件（如 api/standardData.ts）自行追加。
 // 视图层只需 `const api = useRestApi<Xxx>('xxx')`，无需再写 fetchApi 样板。
-import {sendMessage} from '@/utils/api'
+import {del, get, patch, post} from '@/utils/request'
 import type {DataTableApiParams} from '@/components/dataTable/types'
 
 // 驼峰字段名 → snake_case 列名，用于把前端列字段名翻译成后端查询参数。
 function toSnake(s: string): string {
-  return s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+    return s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
 }
 
 export interface RestApi<T extends { ID: number }> {
-  /** DataTable 的 api 函数：翻译分页/搜索/排序参数并调用 GET */
-  fetch: (params: DataTableApiParams) => Promise<{ rows: T[]; total: number }>
-  create: (data: Partial<T>) => Promise<any>
-  update: (id: number, data: Partial<T>) => Promise<any>
-  remove: (id: number) => Promise<any>
+    /** DataTable 的 api 函数：翻译分页/搜索/排序参数并调用 GET */
+    fetch: (params: DataTableApiParams) => Promise<{ rows: T[]; total: number }>
+    create: (data: Partial<T>) => Promise<any>
+    update: (id: number, data: Partial<T>) => Promise<any>
+    remove: (id: number) => Promise<any>
 }
 
 export function useRestApi<T extends { ID: number }>(prefix: string): RestApi<T> {
-  async function fetch(params: DataTableApiParams) {
-    const query: Record<string, any> = {
-      page: params.page,
-      page_size: params.pageSize,
+    async function fetch(params: DataTableApiParams) {
+        const query: Record<string, any> = {
+            page: params.page,
+            page_size: params.pageSize,
+        }
+        if (params.sort?.field) {
+            query.sort = toSnake(params.sort.field)
+            query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'
+        }
+        for (const [k, v] of Object.entries(params.search || {})) {
+            if (v !== '' && v !== null && v !== undefined) {
+                query[toSnake(k)] = v
+            }
+        }
+        const res = await get(prefix, query)
+        // 统一信封解包后 res 即 data：分页时为 { list, pagination }；
+        // 同时兼容尚未迁移的旧形态（items/rows/total）以平滑过渡。
+        const raw = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
+        const rows = raw.map((it: any) => ({...it, ID: it.ID ?? it.Id})) as T[]
+        const total = res?.pagination?.total ?? res?.total ?? rows.length
+        return {rows, total}
     }
-    if (params.sort?.field) {
-      query.sort = toSnake(params.sort.field)
-      query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'
+
+    function create(data: Partial<T>) {
+        return post(prefix, data)
     }
-    for (const [k, v] of Object.entries(params.search || {})) {
-      if (v !== '' && v !== null && v !== undefined) {
-        query[toSnake(k)] = v
-      }
+
+    function update(id: number, data: Partial<T>) {
+        return patch(`${prefix}/${id}`, data)
     }
-    const res = await sendMessage(prefix, 'GET', query)
-    // 统一信封解包后 res 即 data：分页时为 { list, pagination }；
-    // 同时兼容尚未迁移的旧形态（items/rows/total）以平滑过渡。
-    const raw = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
-    const rows = raw.map((it: any) => ({...it, ID: it.ID ?? it.Id})) as T[]
-    const total = res?.pagination?.total ?? res?.total ?? rows.length
-    return {rows, total}
-  }
 
-  function create(data: Partial<T>) {
-    return sendMessage(prefix, 'POST', data)
-  }
+    function remove(id: number) {
+        return del(`${prefix}/${id}`)
+    }
 
-  function update(id: number, data: Partial<T>) {
-    return sendMessage(`${prefix}/${id}`, 'PATCH', data)
-  }
-
-  function remove(id: number) {
-    return sendMessage(`${prefix}/${id}`, 'DELETE')
-  }
-
-  return {fetch, create, update, remove}
+    return {fetch, create, update, remove}
 }

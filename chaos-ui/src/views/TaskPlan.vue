@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
-import {sendMessage} from '@/utils/api'
+import {del, get, patch, post} from '@/utils/request'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {openCenterPanel} from '@/utils/centerPanel'
 import {refreshPendingTasks} from '@/utils/pendingTasksStore'
@@ -57,7 +57,7 @@ const priorityTargetPlan = ref<TaskPlan | null>(null)
 const priorityValue = ref<number>(5)
 
 const ratingDialogTitle = computed(() =>
-  ratingAction.value === 'start-plan' ? '开启间隔任务' : '完成间隔任务',
+    ratingAction.value === 'start-plan' ? '开启间隔任务' : '完成间隔任务',
 )
 
 function openRatingDialog(action: 'start-plan' | 'complete-plan', target: TaskPlan) {
@@ -71,10 +71,10 @@ async function submitRatingDialog(rating: number) {
   submittingRating.value = true
   try {
     if (ratingAction.value === 'start-plan' && ratingTargetPlan.value) {
-      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/start`, 'PATCH', {rating})
+      await patch(`taskPlans/${ratingTargetPlan.value.ID}/start`, {rating})
       ElMessage.success('已开启')
     } else if (ratingAction.value === 'complete-plan' && ratingTargetPlan.value) {
-      await sendMessage(`taskPlans/${ratingTargetPlan.value.ID}/complete`, 'PATCH', {rating})
+      await patch(`taskPlans/${ratingTargetPlan.value.ID}/complete`, {rating})
       ElMessage.success('已完成')
     }
     showRatingDialog.value = false
@@ -102,7 +102,7 @@ async function submitPriorityDialog() {
     return
   }
   try {
-    await sendMessage(`taskPlans/${priorityTargetPlan.value.ID}/priority`, 'PATCH', {
+    await patch(`taskPlans/${priorityTargetPlan.value.ID}/priority`, {
       priority: priorityValue.value,
     })
     showPriorityDialog.value = false
@@ -325,7 +325,7 @@ async function fetchAllPlans() {
   const isSearch = !!searchParam
 
   try {
-    const result = await sendMessage('taskPlans/tree', 'GET', searchParam ? {search: searchParam} : undefined)
+    const result = await get('taskPlans/tree', searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
     }
@@ -394,7 +394,7 @@ function resetForm() {
 }
 
 function openLink(ID: string) {
-  sendMessage(`taskPlans/${ID}`, 'GET').then(res => {
+  get(`taskPlans/${ID}`).then(res => {
     if (res.Link) {
       window.open(res.Link, '_blank')
     }
@@ -444,7 +444,7 @@ async function createPlan() {
       payload.Priority = formData.value.Priority
     }
 
-    await sendMessage('taskPlans/', 'POST', payload)
+    await post('taskPlans/', payload)
     showCreateDialog.value = false
     showAddChildDialog.value = false
     resetForm()
@@ -466,7 +466,7 @@ async function updatePlan() {
   }
 
   try {
-    await sendMessage(`taskPlans/${editingPlan.value.ID}`, 'PATCH', {
+    await patch(`taskPlans/${editingPlan.value.ID}`, {
       Name: formData.value.Name.trim(),
       PlanType: formData.value.PlanType,
       CronExpr: formData.value.CronExpr.trim() || undefined,
@@ -495,7 +495,7 @@ async function startPlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'info',
     })
-    await sendMessage(`taskPlans/${plan.ID}/start`, 'PATCH', {})
+    await patch(`taskPlans/${plan.ID}/start`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已开启')
@@ -517,7 +517,7 @@ async function completePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'info',
     })
-    await sendMessage(`taskPlans/${plan.ID}/complete`, 'PATCH', {})
+    await patch(`taskPlans/${plan.ID}/complete`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已完成')
@@ -535,7 +535,7 @@ async function archivePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await sendMessage(`taskPlans/${plan.ID}/archive`, 'PATCH', {})
+    await patch(`taskPlans/${plan.ID}/archive`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已归档')
@@ -554,7 +554,7 @@ async function deletePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'error'
     })
-    await sendMessage(`taskPlans/${plan.ID}`, 'DELETE')
+    await del(`taskPlans/${plan.ID}`)
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已删除')
@@ -573,7 +573,7 @@ async function suspendPlan(plan: TaskPlan) {
         '提示',
         {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
     )
-    await sendMessage(`taskPlans/${plan.ID}/suspend`, 'PATCH', {})
+    await patch(`taskPlans/${plan.ID}/suspend`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已挂起')
@@ -591,7 +591,7 @@ async function resumePlan(plan: TaskPlan) {
         '提示',
         {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
     )
-    await sendMessage(`taskPlans/${plan.ID}/resume`, 'PATCH', {})
+    await patch(`taskPlans/${plan.ID}/resume`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已恢复')
@@ -603,7 +603,7 @@ async function resumePlan(plan: TaskPlan) {
 }
 
 async function openEditDialog(ID: string) {
-  let res = await sendMessage(`taskPlans/${ID}`, 'GET')
+  let res = await get(`taskPlans/${ID}`)
 
   editingPlan.value = res
   formData.value = {

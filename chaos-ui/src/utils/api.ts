@@ -1,87 +1,7 @@
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
-const RETRY_DELAY = 1000
-const MAX_RETRIES = 2
+import {del, get, patch, post} from '@/utils/request'
 
-function delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-function buildUrl(base: string, path: string, query?: Record<string, any>): string {
-    let url = base + '/' + path
-    if (query && Object.keys(query).length > 0) {
-        const params = new URLSearchParams()
-        for (const key of Object.keys(query)) {
-            if (query[key] !== undefined && query[key] !== null) {
-                params.append(key, String(query[key]))
-            }
-        }
-        const queryString = params.toString()
-        if (queryString) {
-            url += (url.includes('?') ? '&' : '?') + queryString
-        }
-    }
-    return url
-}
-
-async function fetchWithRetry(url: string, options: RequestInit, retries: number = 0): Promise<Response> {
-    try {
-        const response = await fetch(url, options)
-        if (response.ok) {
-            return response
-        }
-        if (retries < MAX_RETRIES && (response.status >= 500 || response.status === 0)) {
-            await delay(RETRY_DELAY)
-            return fetchWithRetry(url, options, retries + 1)
-        }
-        return response
-    } catch (error) {
-        if (retries < MAX_RETRIES) {
-            await delay(RETRY_DELAY)
-            return fetchWithRetry(url, options, retries + 1)
-        }
-        throw error
-    }
-}
-
-export async function sendMessage(path: string, method: string, payload?: any): Promise<any> {
-    const options: RequestInit = {
-        method,
-        cache: 'no-store',
-    }
-    let url: string
-    if (payload && method === 'GET') {
-        url = buildUrl(API_BASE, path, payload)
-    } else {
-        url = API_BASE + '/' + path
-        if (payload) {
-            options.headers = {'Content-Type': 'application/json'}
-            options.body = JSON.stringify(payload)
-        }
-    }
-    const response = await fetchWithRetry(url, options)
-    const contentType = response.headers.get('content-type') || ''
-    if (!contentType.includes('application/json')) {
-        const text = await response.text().catch(() => '')
-        if (!response.ok) {
-            throw new Error(`Request failed: ${text}`)
-        }
-        throw new Error(`Request returned non-JSON response. URL: ${url}. Is the backend running? Response preview: ${text.substring(0, 200)}`)
-    }
-    const body = await response.json()
-    // 统一信封：{ code, message, data }。code 非 0 视为业务错误，抛出 message。
-    if (body && typeof body === 'object' && 'code' in body) {
-        if (body.code !== 0) {
-            throw new Error(body.message || '请求失败')
-        }
-        return body.data
-    }
-    // 旧接口兼容（尚未迁移到统一信封的端点）：无 code 字段则原样返回。
-    if (!response.ok) {
-        throw new Error(`Request failed: ${JSON.stringify(body)}`)
-    }
-    return body
-}
 
 // ---- SDK 版本切换 ----
 
@@ -91,11 +11,11 @@ export interface SdkInfo {
 }
 
 export function getSdkVersions(): Promise<Record<string, SdkInfo>> {
-    return sendMessage('sdks', 'GET')
+    return get('sdks')
 }
 
 export function updateSdkVersion(type: string, version: string): Promise<any> {
-    return sendMessage(`sdks/${type}/switch`, 'PATCH', {version})
+    return patch(`sdks/${type}/switch`, {version})
 }
 
 // ---- SDK 类型 / 来源管理 (defs) ----
@@ -116,7 +36,7 @@ export interface SdkSource {
 }
 
 export function getSdkDefs(): Promise<SdkSource[]> {
-    return sendMessage('sdks/defs', 'GET')
+    return get('sdks/defs')
 }
 
 export function createSdkDef(payload: {
@@ -125,7 +45,7 @@ export function createSdkDef(payload: {
     Enabled?: boolean
     Note?: string
 }): Promise<SdkSource> {
-    return sendMessage('sdks/defs', 'POST', payload)
+    return post('sdks/defs', payload)
 }
 
 export function updateSdkDef(
@@ -137,17 +57,17 @@ export function updateSdkDef(
         Note?: string
     }
 ): Promise<SdkSource> {
-    return sendMessage(`sdks/defs/${name}`, 'PATCH', payload)
+    return patch(`sdks/defs/${name}`, payload)
 }
 
 export function deleteSdkDef(name: string): Promise<any> {
-    return sendMessage(`sdks/defs/${name}`, 'DELETE')
+    return del(`sdks/defs/${name}`)
 }
 
 // ---- 待办任务 ----
 
 export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
-    return sendMessage('tasks/batch-postpone', 'POST', {ids, days})
+    return post('tasks/batch-postpone', {ids, days})
 }
 
 // ---- 浏览器历史（由扩展周期性备份到 DB）----
@@ -166,12 +86,12 @@ export interface BrowserHistoryItem {
  *  无 page_size 时取 MaxPageSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
 export function getBrowserHistories(page_size?: number): Promise<BrowserHistoryItem[]> {
     const query: Record<string, any> = {page_size: page_size && page_size > 0 ? page_size : 200}
-    return sendMessage('browserHistories', 'GET', query).then((res: any) => res?.list ?? [])
+    return get('browserHistories', query).then((res: any) => res?.list ?? [])
 }
 
 /** 按关键词全文搜索浏览器历史（标题 / URL）。取较大分页近似「全部命中」，避免前端搜索态截断。 */
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
-    return sendMessage('browserHistories', 'GET', {search: q, page_size: 200}).then((res: any) => res?.list ?? [])
+    return get('browserHistories', {search: q, page_size: 200}).then((res: any) => res?.list ?? [])
 }
 
 // ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
@@ -203,7 +123,7 @@ export function getFrequentBookmarks(page = 1, page_size = 20, search?: any): Pr
     if (search && typeof search === "string") {
         query.search = search
     }
-    return sendMessage('frequentBookmarks', 'GET', query)
+    return get('frequentBookmarks', query)
 }
 
 // ---- 主机名（用作浏览器标签标题） ----
@@ -214,7 +134,7 @@ export interface HostnameInfo {
 }
 
 export function getHostname(): Promise<HostnameInfo> {
-    return sendMessage('hostname', 'GET')
+    return get('hostname')
 }
 
 // ---- 浏览器扩展直连通道（externally_connectable）----

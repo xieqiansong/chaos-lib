@@ -31,7 +31,7 @@ const fields: FormField[] = [
   {field: 'Remark', title: '备注', type: 'textarea', rows: 2, placeholder: '可选'},
 ]
 
-// 从 sendMessage 抛出的错误体中提取可读信息
+// 从 post 抛出的错误体中提取可读信息
 function pickError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e)
   const idx = raw.indexOf('{')

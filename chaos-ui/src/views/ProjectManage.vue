@@ -9,9 +9,9 @@ import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import DataFormDialog from '@/components/DataFormDialog.vue'
 import type {DataTableApiParams, DataTableColumn, FormField} from '@/components/dataTable/types'
-import {projectGroupApi, type ProjectGroup} from '@/api/projectGroup'
-import {projectApi, type Project} from '@/api/project'
-import {sendMessage} from '@/utils/api'
+import {type ProjectGroup, projectGroupApi} from '@/api/projectGroup'
+import {type Project, projectApi} from '@/api/project'
+import {get} from '@/utils/request'
 
 const selectedGroupId = ref<number | null>(null)
 const projectsTable = ref<InstanceType<typeof DataTable> | null>(null)
@@ -88,7 +88,7 @@ async function projectsFetch(params: DataTableApiParams) {
   for (const [k, v] of Object.entries(params.search ?? {})) {
     if (v !== '' && v != null) query[toSnake(k)] = v
   }
-  const res = await sendMessage('projects', 'GET', query)
+  const res = await get('projects', query)
   const rows = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
   const total = res?.pagination?.total ?? res?.total ?? rows.length
   return {rows, total}
@@ -212,9 +212,9 @@ async function accessProject(row: Project) {
 async function deleteProject(row: Project) {
   try {
     await ElMessageBox.confirm(
-      `将永久删除项目「${row.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
-      '删除项目',
-      {confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'el-button--danger'},
+        `将永久删除项目「${row.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
+        '删除项目',
+        {confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'el-button--danger'},
     )
   } catch {
     return

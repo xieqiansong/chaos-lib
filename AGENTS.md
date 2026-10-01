@@ -38,7 +38,7 @@
 - 路由 history 模式（`createWebHistory`）。
 - 主题 `src/theme.ts`（`dark` 默认 / `paper` 浅黄护眼），持久化 key `chaos-ui:theme`。
 - 编辑器统一 Monaco。
-- 资源接口门户：`src/api/<resource>.ts` 独占该资源类型与 api 函数（只借 `@/utils/api` 的 `sendMessage`），**禁止聚合进 `utils/api.ts`**。
+- 资源接口门户：`src/api/<resource>.ts` 独占该资源类型与 api 函数，**禁止聚合进 `utils/api.ts`**。
 
 ## 业务模块脚手架基线
 

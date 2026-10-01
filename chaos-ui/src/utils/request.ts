@@ -63,24 +63,24 @@ request.interceptors.response.use(
 )
 
 /** 泛型封装：直接返回 data 业务字段（已剥离 AxiosResponse 与统一结构外层） */
-export function get<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+export function get<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
     let fullUrl = buildUrl(url, data);
     return request.get<ApiResponse<T>>(fullUrl, config).then((r) => r.data.data)
 }
 
-export function post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+export function post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
     return request.post<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
 }
 
-export function put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+export function put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
     return request.put<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
 }
 
-export function del<T = unknown>(url: string, config?: AxiosRequestConfig) {
+export function del<T = any>(url: string, config?: AxiosRequestConfig) {
     return request.delete<ApiResponse<T>>(url, config).then((r) => r.data.data)
 }
 
-export function patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig) {
+export function patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
     return request.patch<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
 }
 

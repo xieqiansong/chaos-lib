@@ -143,7 +143,7 @@ function toSnake(s: string): string {
 
 // DataTable(fetch-only) 的取数函数：翻译分页 / 搜索 / 排序参数 → 后端分页接口。
 async function fetchTables(params: DataTableApiParams): Promise<DataTableApiResult> {
-  const query: Record<string, any> = {page: params.page, size: params.pageSize}
+  const query: Record<string, any> = {page: params.page, page_size: params.pageSize}
   if (params.sort?.field) {
     query.sort = toSnake(params.sort.field)
     query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'

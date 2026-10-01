@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, defineAsyncComponent, onMounted, ref, watch} from 'vue'
-import {sendMessage} from '@/utils/api'
+import {del, get, patch, post} from '@/utils/request'
 const MonacoDiffEditor = defineAsyncComponent(() => import('../components/MonacoDiffEditor.vue'))
 
 const props = defineProps<{
@@ -56,7 +56,7 @@ async function fetchFiles() {
   loading.value = true
   error.value = ''
   try {
-    const result = await sendMessage('quickEdits', 'GET')
+    const result = await get('quickEdits')
     if (Array.isArray(result)) {
       files.value = result
     } else if (result && Array.isArray(result.data)) {
@@ -91,7 +91,7 @@ async function createFile() {
     return
   }
   try {
-    const result = await sendMessage('quickEdits', 'POST', {
+    const result = await post('quickEdits', {
       Name: newFile.value.Name,
       FilePath: newFile.value.FilePath,
       Remark: newFile.value.Remark
@@ -111,7 +111,7 @@ async function createFile() {
 
 async function deleteFile(id: number) {
   try {
-    const result = await sendMessage(`quickEdits/${id}`, 'DELETE')
+    const result = await del(`quickEdits/${id}`)
     if (result && result.error) {
       error.value = result.error || '删除失败'
       return
@@ -135,7 +135,7 @@ async function openFile(file: QuickEditFile) {
   contentLoading.value = true
   error.value = ''
   try {
-    const result = await sendMessage(`quickEdits/${file.ID}/content`, 'GET')
+    const result = await get(`quickEdits/${file.ID}/content`)
     if (result && result.content !== undefined) {
       content.value = result.content
       originalContent.value = result.content
@@ -169,7 +169,7 @@ async function saveContent() {
   saving.value = true
   error.value = ''
   try {
-    const result = await sendMessage(`quickEdits/${activeFileId.value}/content`, 'PUT', {
+    const result = await put(`quickEdits/${activeFileId.value}/content`, {
       content: content.value
     })
     if (result && !result.error) {
@@ -199,9 +199,8 @@ async function fetchSnapshots() {
   if (activeFileId.value === null) return
   snapshotLoading.value = true
   try {
-    const result = await sendMessage(
+    const result = await get(
         `quickEdits/${activeFileId.value}/snapshots`,
-        'GET',
         {page: snapshotPage.value, page_size: 20}
     )
     if (result && Array.isArray(result.list)) {
@@ -226,10 +225,7 @@ async function viewSnapshot(snap: QuickEditSnapshot) {
   selectedSnapshotId.value = snap.ID
   snapshotContentLoading.value = true
   try {
-    const result = await sendMessage(
-        `quickEdits/${activeFileId.value}/snapshots/${snap.ID}`,
-        'GET'
-    )
+    const result = await get(`quickEdits/${activeFileId.value}/snapshots/${snap.ID}`)
     if (result && result.content !== undefined) {
       snapshotContent.value = result.content
     } else {
@@ -253,9 +249,8 @@ function onSnapshotSelect(snapshotId: number) {
 async function restoreSnapshot() {
   if (activeFileId.value === null || selectedSnapshotId.value === null) return
   try {
-    const result = await sendMessage(
+    const result = await post(
         `quickEdits/${activeFileId.value}/restore`,
-        'POST',
         {SnapshotID: selectedSnapshotId.value}
     )
     if (result && !result.error) {

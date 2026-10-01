@@ -2,7 +2,7 @@
 import {onMounted, onUnmounted, ref, watch} from 'vue'
 import {useRouter} from 'vue-router'
 import {Clock} from '@element-plus/icons-vue'
-import {sendMessage} from '@/utils/api'
+import {get} from '@/utils/request'
 import {pendingTasksVersion} from '@/utils/pendingTasksStore'
 
 // 页头「待办任务」入口：红色数量角标（同消息未读样式），点击进入待办任务页。
@@ -19,7 +19,7 @@ let stopVersionWatch: () => void
 
 async function loadCount() {
   try {
-    const result = await sendMessage('tasks/pending', 'GET')
+    const result = await get('tasks/pending')
     count.value = result?.pagination?.total || 0
   } catch (e) {
     console.error(e)

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {ref, computed, watch, onMounted} from 'vue'
-import {sendMessage} from '@/utils/api'
+import {computed, onMounted, ref, watch} from 'vue'
+import {get, post} from '@/utils/request'
 import {ElMessage} from 'element-plus'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import {FSRS_RATING_OPTIONS} from '@/constants'
@@ -72,10 +72,7 @@ async function aiScore() {
   aiError.value = ''
   aiResult.value = null
   try {
-    const res = await sendMessage('ai/review-score', 'POST', {
-      original: content.value,
-      answer: answer.value,
-    })
+    const res = await post('ai/review-score', {original: content.value, answer: answer.value,})
     aiResult.value = {
       points: res.points || [],
       coverage: res.coverage ?? 0,
@@ -95,7 +92,7 @@ function ratingLabel(v: number): string {
 async function loadRaw() {
   loading.value = true
   try {
-    const res = await sendMessage(`taskPlans/${props.planId}/raw`, 'GET')
+    const res = await get(`taskPlans/${props.planId}/raw`)
     rawLink.value = res?.rawLink ?? ''
     content.value = res.content || ''
   } catch (e: any) {
@@ -117,10 +114,9 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await sendMessage(`taskPlans/${props.planId}/review`, 'POST', {
+    await post(`taskPlans/${props.planId}/review`, {
       rating: selectedRating.value,
-      answer: answer.value,
-      ai: aiResult.value,
+      answer: answer.value, ai: aiResult.value,
     })
     ElMessage.success('复习完成')
     visible.value = false
@@ -144,10 +140,10 @@ async function submit() {
         </div>
         <div class="pane-body">
           <MarkdownPreview
-            :raw-link="rawLink"
-            :content="content"
-            :blurred="!revealed"
-            class="review-markdown"
+              :raw-link="rawLink"
+              :content="content"
+              :blurred="!revealed"
+              class="review-markdown"
           />
           <div v-if="!revealed" class="mask" @click="reveal">
             <el-button type="primary" size="large" @click.stop="reveal">点击显示答案</el-button>
@@ -163,7 +159,8 @@ async function submit() {
               size="small"
               :loading="aiLoading"
               @click="aiScore"
-          >AI 评分</el-button>
+          >AI 评分
+          </el-button>
         </div>
         <div class="pane-body review-answer-body">
           <div class="answer-half">
@@ -183,9 +180,10 @@ async function submit() {
                     size="small"
                     :loading="aiLoading"
                     @click="aiScore"
-                >重新评分</el-button>
+                >重新评分
+                </el-button>
               </div>
-              <el-alert v-if="aiError" :title="aiError" type="error" show-icon :closable="false" />
+              <el-alert v-if="aiError" :title="aiError" type="error" show-icon :closable="false"/>
               <template v-else-if="aiResult">
                 <div class="ai-summary">
                   <span>覆盖度：<b>{{ aiResult.coverage }}%</b></span>
