@@ -1,25 +1,9 @@
 package main
 
 import (
-	"chaos-go/internal/apilog"
-	"chaos-go/internal/config"
-	"chaos-go/internal/cronjob"
-	"chaos-go/internal/datacache"
-	"chaos-go/internal/envvar"
-	"chaos-go/internal/filelink"
-	"chaos-go/internal/mqttsync"
-	"chaos-go/internal/portfwd"
-	"chaos-go/internal/project"
-	"chaos-go/internal/proxy"
-	"chaos-go/internal/quickedit"
-	"chaos-go/internal/router"
-	"chaos-go/internal/scheduler"
-	"chaos-go/internal/sdk"
-	"chaos-go/internal/standarddata"
-	"chaos-go/internal/taskplan"
+	"chaos-go/internal/app"
 	"io/fs"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -72,21 +56,6 @@ func initEarlyLog() {
 	slog.SetDefault(slog.New(handler))
 }
 
-func setupPprof(cfg *config.PprofConfig) {
-	if !cfg.Enabled {
-		slog.Info("Pprof 已禁用")
-		return
-	}
-
-	go func() {
-		slog.Info("Pprof 启动", "addr", cfg.GetAddress())
-		err := http.ListenAndServe(cfg.GetAddress(), nil)
-		if err != nil {
-			slog.Error("Pprof 启动失败", "err", err)
-		}
-	}()
-}
-
 func main() {
 	initEarlyLog()
 	slog.Info("程序启动", "time", time.Now().Format("2006-01-02 15:04:05"))
@@ -105,67 +74,7 @@ func main() {
 		}
 	}()
 
-	cfg := config.LoadConfig()
-	slog.Info("配置加载成功")
-
-	config.InitLog()
-	slog.Info("日志初始化完成")
-
-	// 数据库连接 & 自动迁移
-	db := config.GetDB()
-	slog.Info("数据库连接成功，执行自动迁移")
-	if err := config.AutoMigrate(db,
-		&taskplan.TaskPlan{},
-		&taskplan.Task{},
-		&project.ProjectGroup{},
-		&project.Project{},
-		&proxy.BrowserHistory{},
-		&proxy.BrowserHistoryVisit{},
-		&proxy.Bookmark{},
-		&portfwd.PortForwarding{},
-		&portfwd.SshConnection{},
-		&filelink.FileLink{},
-		&quickedit.QuickEditFile{},
-		&quickedit.QuickEditSnapshot{},
-		&sdk.SdkSource{},
-		&mqttsync.MqttSyncMessage{},
-		&mqttsync.MqttSyncNode{},
-		&cronjob.CronJob{},
-		&cronjob.CronJobRun{},
-		&standarddata.StandardData{},
-		&datacache.DataCache{},
-		&apilog.ApiLog{},
-	); err != nil {
-		slog.Error("数据库迁移失败", "err", err)
+	if err := app.Run(resolveUIFS()); err != nil {
+		slog.Error("HTTP 服务退出", "err", err)
 	}
-
-	setupPprof(&cfg.Pprof)
-	slog.Info("Pprof 设置完成")
-
-	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
-	mqttsync.Start()
-
-	// 进程重启后内存中没有任何隧道：按库里"期望运行"（status=true）的规则重建转发，
-	// 实现断线/重启自动重连，而非旧逻辑那样把所有状态清零。
-	portfwd.RecoverForwardsOnBoot()
-
-	// 注入 quickedit env 回调（避免循环依赖）
-	quickedit.EnvReadContent = envvar.ReadVirtualContent
-	quickedit.EnvWriteContent = envvar.WriteVirtualContent
-
-	scheduler.Start()
-	slog.Info("后台任务启动完成")
-
-	// 定时任务模块：首次运行时写入由原内置周期任务转换而来的默认任务，
-	// 随后启动基于 robfig/cron 的调度器，按 cron 表达式触发各类动作。
-	cronjob.SeedDefaults()
-	cronjob.Start()
-
-	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
-	r := router.SetupRouter(resolveUIFS())
-	go r.Run(cfg.Server.GetAddress())
-
-	slog.Info("HTTP 服务启动完成")
-
-	select {}
 }

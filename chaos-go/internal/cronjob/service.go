@@ -244,8 +244,8 @@ func ExecuteJob(job *CronJob) {
 func runAction(job *CronJob) (output, errMsg string, success bool) {
 	switch job.ActionType {
 	case ActionTypeShell:
-		if !config.GetConfig().FeatureCronShell {
-			return "", "命令执行功能未启用（FEATURE_CRON_SHELL=false）", false
+		if !config.GetConfig().Feature.CronShell {
+			return "", "命令执行功能未启用（feature.cron_shell=false）", false
 		}
 		return runShell(job)
 	case ActionTypeHTTP:

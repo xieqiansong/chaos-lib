@@ -70,7 +70,7 @@ func RunSync() {
 
 // interval 返回同步间隔：读取配置，非法值时回退到 30 秒。
 func interval() time.Duration {
-	sec := config.GetConfig().StunPortForwardSyncIntervalSec
+	sec := config.GetConfig().Stun.PortForwardSyncIntervalSec
 	if sec <= 0 {
 		sec = 30
 	}

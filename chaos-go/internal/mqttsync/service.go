@@ -65,7 +65,7 @@ type envelope struct {
 	Data string `json:"data"` // base64(nonce || ciphertext+tag)
 }
 
-// loadKey 将 .env 中的 MQTT_ENCRYPT_KEY 解析为 32 字节密钥。
+// loadKey 将 configs/config.yaml 中的 mqtt.encrypt_key 解析为 32 字节密钥。
 // 支持 hex（64 字符）或 base64（解出 32 字节）两种编码；无效返回 nil。
 func loadKey(raw string) []byte {
 	s := strings.TrimSpace(raw)

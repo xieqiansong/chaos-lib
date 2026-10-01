@@ -1,12 +1,82 @@
 # chaos-go 配置示例（不提交敏感配置）
-# 真实配置通过环境变量 / 本地 config.yaml 注入，切勿将密钥、Token、内网地址提交进仓库。
-# 本文件仅作为字段示例，具体字段以 internal/config 中结构体为准。
+# 复制本文件为 configs/config.yaml 并填入实际值即可，程序默认读取 configs/config.yaml。
+# 真实配置（含密码 / Token / 内网地址）只写 configs/config.yaml（已被 .gitignore 忽略），切勿提交进仓库。
+# 可用环境变量 CONFIG_FILE 指定其它配置路径；文件缺失或解析失败时回退到下方默认值。
+
+# HTTP 服务
 server:
-  addr: ":30030"
+  host: "0.0.0.0"
+  port: 8080
+
+# 数据库：type 切换 postgres / sqlite（改 type 即可）
+db:
+  type: "postgres"        # postgres / sqlite
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "your_password_here"
+  name: "chaos"
+  sslmode: "disable"
+  # sqlite 模式下的数据库文件路径（相对程序运行目录，目录会自动创建）
+  path: "data/chaos.db"
+
+# pprof 性能分析
 pprof:
   enabled: false
-  addr: ":6060"
-db:
-  dsn: "替换为实际数据库连接串"
+  host: "localhost"
+  port: 6060
+
+# 日志
 log:
-  level: "info"
+  level: "info"           # debug / info / warn / error
+  file_path: "logs/app.log"
+  to_file: true           # 写入日志文件
+  to_console: true        # 写入控制台
+
+# 功能开关
+feature:
+  file_link: true         # 文件连接功能
+  cron_shell: false       # 定时任务「执行命令/脚本」动作总开关（危险能力，按需开启）
+
+# DeepSeek API（可选，用于余额查询 / AI 评分）
+deepseek:
+  api_key: ""
+
+# 百度地图 API（可选，用于手机小看板天气）
+baidu:
+  ak: ""
+
+# Lucky STUN 规则同步（仅当 mqtt.enabled 且配置 open_token 时生效）
+lucky:
+  open_token: ""
+  sync_interval_sec: 60   # 同步间隔（秒）
+
+# STUN 公网地址同步到端口转发（仅当 mqtt.enabled 时生效）
+stun:
+  port_forward_sync_interval_sec: 30
+
+# MQTT 多节点消息同步（公共 broker）
+mqtt:
+  enabled: false
+  broker: "tcp://broker.emqx.io:1883"   # 公共 broker：broker.emqx.io / test.mosquitto.org
+  prefix: "test/"                        # 集群公共主题前缀
+  client_id: ""                          # 留空则缺省 chaos-<nodeID>
+  username: ""                           # 公共 broker 多为匿名，留空
+  password: ""
+  encrypt: false                         # 启用 AES-256-GCM 载荷加密
+  # 32 字节共享密钥（hex 或 base64），所有节点须相同。生成：openssl rand -hex 32
+  # 仅放 configs/config.yaml（已被 .gitignore 忽略），禁止提交；泄露等同全集群失效
+  encrypt_key: ""
+
+# Supabase 云端数据通道（Data API / PostgREST）
+# 凭据只通过 apikey 请求头传递；新式 key 不是 JWT，放进 Authorization 会被判 Invalid JWT。
+supabase:
+  url: "https://your-project-ref.supabase.co"
+  # 后端专用：绕过 RLS，只放本文件，禁止提交
+  secret_key: ""
+  # 受 RLS 约束，保留给将来的前端只读场景，后端不使用
+  publishable_key: ""
+  schema: "public"
+  timeout_sec: 15
+  # 允许访问的表名清单（逗号分隔字符串或 YAML 列表均可）；留空表示该通道不可用
+  tables: []

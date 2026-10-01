@@ -4,20 +4,74 @@
 
 ## 目录结构
 
-目标布局见 [`Go Web项目结构.md`](./Go%20Web项目结构.md)；当前主要目录：
+目标布局见 [`Go Web项目结构.md`](./Go%20Web项目结构.md)。
 
-- `cmd/server`：HTTP 服务入口（`main.go`）
-- `cmd/tcp_over_websockets`、`cmd/test`：辅助命令行工具
-- `internal/`：私有业务代码（按功能分包，如 `taskplan`、`filelink`、`portfwd`、`proxy` 等；配置在 `internal/config`，路由在 `internal/router`）
-- `pkg/tools`：可被外部复用的工具库
-- `migrations/`：数据库 schema（原 `sql/`）
-- `configs/`：配置示例（不提交敏感信息）
-- `deployments/`：Docker 部署
-- `api/`：OpenAPI 定义
+```
+chaos-go/
+├── api/
+│   └── openapi.yaml          # OpenAPI 定义
+├── cmd/
+│   ├── server/
+│   │   └── main.go           # HTTP 服务入口
+│   ├── tcp_over_websockets/  # 辅助工具：TCP over WebSocket
+│   └── test/                 # 辅助命令行工具
+├── configs/
+│   ├── config.example.yaml   # 配置模板（入库）
+│   └── config.yaml           # 真实配置（含密钥，被 .gitignore 忽略）
+├── deployments/
+│   ├── Dockerfile
+│   └── docker-compose.yml    # Docker 部署
+├── internal/                 # 私有业务代码（按功能分包）
+│   ├── apilog/               # 接口访问日志
+│   ├── app/                  # 应用装配
+│   ├── config/               # 配置加载（config.go / loader.go / testing_hook.go）
+│   ├── cronjob/              # 定时任务
+│   ├── crud/                 # 通用 CRUD
+│   ├── datacache/            # 数据缓存
+│   ├── dbmonitor/            # 数据库监控
+│   ├── deepseek/             # DeepSeek 集成
+│   ├── envvar/               # 环境变量管理
+│   ├── filelink/             # 文件连接
+│   ├── memcache/             # 内存缓存
+│   ├── mqttsync/             # MQTT 多节点同步
+│   ├── notify/               # 通知
+│   ├── pagination/           # 分页
+│   ├── portfwd/              # SSH 端口转发
+│   ├── project/              # 项目管理
+│   ├── proxy/                # 代理
+│   ├── quickedit/            # 快速编辑
+│   ├── resp/                 # 统一响应
+│   ├── router/               # 路由（router.go）
+│   ├── scheduler/            # 调度器
+│   ├── sdk/                  # 内部 SDK
+│   ├── standarddata/         # 标准数据
+│   ├── stunpf/               # STUN 端口转发
+│   ├── stunsync/             # STUN 同步
+│   ├── supabase/             # Supabase 集成
+│   ├── taskplan/             # 任务计划
+│   └── testkit/              # 测试套件
+├── migrations/               # 数据库 schema（原 sql/）
+│   ├── chaos_postgres_schema.sql
+│   ├── chaos_postgres_update.sql
+│   └── supabase_schema.sql
+├── pkg/
+│   └── tools/                # 可被外部复用的工具库
+├── scripts/                  # 脚本
+├── test/
+│   └── integration/          # 集成测试
+├── web/
+│   ├── static/               # 静态资源
+│   └── templates/            # 模板
+├── CONFIG.md
+├── go.mod
+├── go.sum
+├── Makefile
+└── README.md
+```
 
 ## 配置
 
-配置加载与字段说明见 [`CONFIG.md`](./CONFIG.md)。敏感配置通过环境变量 / 本地 `config.yaml` 注入，勿入库。
+配置加载与字段说明见 [`CONFIG.md`](./CONFIG.md)。敏感配置写入本地 `configs/config.yaml`（已被 `.gitignore` 忽略），勿入库。
 
 ## 构建与运行
 

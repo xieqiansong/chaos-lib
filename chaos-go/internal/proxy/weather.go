@@ -15,9 +15,9 @@ import (
 const baiduWeatherURL = "https://api.map.baidu.com/weather/v1/"
 
 func GetWeather(c *gin.Context) {
-	ak := config.GetConfig().BaiduAK
+	ak := config.GetConfig().Baidu.AK
 	if ak == "" {
-		renv.Error(c, http.StatusServiceUnavailable, "未配置 BAIDU_AK，请在服务端 .env 中设置")
+		renv.Error(c, http.StatusServiceUnavailable, "未配置百度地图 AK，请在服务端 configs/config.yaml 中设置")
 		return
 	}
 	lat, err := strconv.ParseFloat(c.Query("lat"), 64)

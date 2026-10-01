@@ -49,8 +49,8 @@ func QueryRows(query string, args ...any) ([]map[string]any, error) {
 	return result, rows.Err()
 }
 
-// GetDb 从 .env 加载数据库配置并打开连接，返回 *sql.DB。
-// 配置项（含密码）一律来自 .env，源码中不硬编码任何密钥，满足脱敏要求。
+// GetDb 从 configs/config.yaml 加载数据库配置并打开连接，返回 *sql.DB。
+// 配置项（含密码）一律来自配置文件，源码中不硬编码任何密钥，满足脱敏要求。
 // 当前使用 postgres 驱动（database/sql + lib/pq）。
 func GetDb() *sql.DB {
 	cfg := config.GetConfig().Database

@@ -65,7 +65,7 @@ func RunSync() {
 
 // interval 返回同步间隔：读取配置，非法值时回退到 60 秒。
 func interval() time.Duration {
-	sec := config.GetConfig().LuckySyncIntervalSec
+	sec := config.GetConfig().Lucky.SyncIntervalSec
 	if sec <= 0 {
 		sec = 60
 	}
@@ -75,14 +75,14 @@ func interval() time.Duration {
 // enabled 控制任务是否启动：仅当 MQTT 已启用且已配置 LUCKY_OPEN_TOKEN 时生效。
 func enabled() bool {
 	cfg := config.GetConfig()
-	return cfg.Mqtt.Enabled && cfg.LuckyOpenToken != ""
+	return cfg.Mqtt.Enabled && cfg.Lucky.OpenToken != ""
 }
 
 // run 执行一次同步：拉取 stun 规则列表并发布到 MQTT。
 func run() {
 	cfg := config.GetConfig()
 
-	url := fmt.Sprintf("%s?openToken=%s", stunAPIBase, cfg.LuckyOpenToken)
+	url := fmt.Sprintf("%s?openToken=%s", stunAPIBase, cfg.Lucky.OpenToken)
 	status, body, err := tools.HTTPDo(http.MethodGet, url, nil, nil)
 	if err != nil {
 		slog.Error("获取 stun 规则列表失败", "err", err)

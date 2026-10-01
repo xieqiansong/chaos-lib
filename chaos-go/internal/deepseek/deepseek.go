@@ -48,9 +48,9 @@ type chatResponse struct {
 // system 为固定的角色/评分标准提示（每次调用相同，省 token），user 为本次具体输入。
 // 密钥取自服务端配置 DeepSeek.APIKey，绝不暴露到前端。
 func Chat(system, user string) (string, error) {
-	apiKey := config.GetConfig().DeepSeekAPIKey
+	apiKey := config.GetConfig().DeepSeek.APIKey
 	if apiKey == "" {
-		return "", fmt.Errorf("未配置 DEEPSEEK_API_KEY，请在服务端 .env 中设置后使用 AI 评分")
+		return "", fmt.Errorf("未配置 DeepSeek API Key，请在服务端 configs/config.yaml 中设置后使用 AI 评分")
 	}
 
 	reqBody := chatRequest{
