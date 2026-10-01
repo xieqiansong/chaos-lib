@@ -2,25 +2,10 @@ package router
 
 import (
 	"chaos-go/internal/apilog"
-	"chaos-go/internal/cronjob"
-	"chaos-go/internal/datacache"
-	"chaos-go/internal/dbmonitor"
-	"chaos-go/internal/envvar"
-	"chaos-go/internal/filelink"
-	mqttsync "chaos-go/internal/mqttsync"
-	notifysvc "chaos-go/internal/notify"
-	"chaos-go/internal/portfwd"
-	"chaos-go/internal/project"
-	"chaos-go/internal/proxy"
-	"chaos-go/internal/quickedit"
-	renv "chaos-go/internal/resp"
-	"chaos-go/internal/sdk"
-	"chaos-go/internal/standarddata"
-	"chaos-go/internal/stunpf"
-	stunsync "chaos-go/internal/stunsync"
-	"chaos-go/internal/taskplan"
+	"chaos-go/internal/routehub"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -29,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SetupRouter 装配 HTTP 路由：全局中间件在此编排，业务模块路由由 internal/routehub
+// 统一挂载（各模块在自己的包内实现 Register 并登记），静态资源与 SPA 回退在此兜底。
 func SetupRouter(webFS fs.FS) *gin.Engine {
 	r := gin.Default()
 
@@ -38,92 +25,15 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 	r.Use(apilog.Middleware())
 
 	api := r.Group("/api")
-	{
-		api.GET("/browserHistories", proxy.GetBrowserHistories)
-		api.POST("/browserHistories", proxy.SaveBrowserHistory)
-		api.POST("/browserHistoryVisits", proxy.SaveBrowserHistoryVisits)
 
-		// 常用书签：独立接口（书签 ∪ 历史访问次数，按访问频率排序，分页）
-		api.GET("/frequentBookmarks", proxy.GetFrequentBookmarks)
-		api.POST("/bookmarks", proxy.SaveBookmarks)
-
-		// SDK 版本与类型管理：资源接口自包含，本行仅做编排调用（路由实现在 internal/sdk）
-		sdk.Register(api)
-
-		// 文件连接：资源接口自包含，本行仅做编排调用（路由实现在 internal/filelink）
-		filelink.Register(api)
-
-		// 标准参考表：资源接口自包含，本行仅做编排调用（路由实现在 internal/standarddata）
-		standarddata.Register(api)
-
-		// 接口访问日志（标准数据范式）：资源接口自包含，本行仅做编排调用（路由实现在 internal/apilog）
-		apilog.Register(api)
-
-		// 数据缓存：资源接口自包含，本行仅做编排调用（路由实现在 internal/datacache）
-		datacache.Register(api)
-
-		// 快捷编辑：资源接口自包含，本行仅做编排调用（路由实现在 internal/quickedit）
-		quickedit.Register(api)
-
-		envVars := api.Group("/envVariables")
-		{
-			envVars.GET("/", envvar.GetEnvVariables)
-			envVars.PATCH("/", envvar.PatchEnvVariables)
-			envVars.PUT("/", envvar.PutEnvVariables)
-			envVars.POST("/sync", envvar.SyncEnvVariables)
-			envVars.GET("/snapshots/:snapshotId", envvar.GetEnvSnapshotDetail)
-		}
-
-		// MQTT 多节点消息同步：资源接口自包含，本行仅做编排调用（路由实现在 internal/mqttsync）
-		mqttsync.Register(api)
-
-		// 任务计划与待办任务：资源接口自包含，本行仅做编排调用（路由实现在 internal/taskplan）
-		taskplan.Register(api)
-
-		// 定时任务（独立模块，与任务计划 / 待办任务无关）：资源接口自包含，
-		// 本行仅做编排调用（路由实现在 internal/cronjob）
-		cronjob.Register(api)
-
-		// 由原系统内置周期任务改造而来的内部动作接口，供定时任务模块通过 HTTP 触发
-		sysJobs := api.Group("/systemJobs")
-		{
-			sysJobs.POST("/sweep", func(c *gin.Context) {
-				taskplan.SweepScheduledTaskPlans()
-				renv.Success(c, nil)
-			})
-			sysJobs.POST("/portForwardSelfHeal", func(c *gin.Context) {
-				portfwd.SelfHealForwards()
-				renv.Success(c, nil)
-			})
-			sysJobs.POST("/stunRuleSync", func(c *gin.Context) {
-				stunsync.RunSync()
-				renv.Success(c, nil)
-			})
-			sysJobs.POST("/stunPortForwardSync", func(c *gin.Context) {
-				stunpf.RunSync()
-				renv.Success(c, nil)
-			})
-		}
-
-		notify := api.Group("/notify")
-		{
-			notify.POST("/", notifysvc.ShowNotify)
-		}
-
-		// 项目管理：资源接口自包含，本行仅做编排调用（路由实现在 internal/project）
-		project.Register(api)
-
-		api.GET("/balance/deepseek", proxy.GetDeepSeekBalance)
-		api.GET("/weather", proxy.GetWeather)
-		api.GET("/hostname", proxy.GetHostname)
-		api.GET("/favicon/:host", proxy.GetFavicon)
-
-		// SSH 端口转发：连接与转发规则两个资源接口自包含，本行仅做编排调用（路由实现在 internal/portfwd）
-		portfwd.Register(api)
+	// 业务模块路由：各模块在自身包内实现 Register(rg *gin.RouterGroup)，并在 init 中
+	// 登记到 internal/routehub；启用的模块清单集中在 internal/modules。
+	// 于是新增模块只需建包并进清单，本文件不必再改动。
+	// 将来若出现跨模块的路由前缀冲突（如 /xx/:id 与 /xx/new 重叠），
+	// 可把冲突模块退回此处显式调用其 Register，以确定挂载顺序。
+	if mounted := routehub.MountAll(api); len(mounted) > 0 {
+		slog.Info("路由模块挂载完成", "modules", strings.Join(mounted, ", "))
 	}
-
-	// 数据库监控（只读自省：表名 / 大小 / 行数 / 索引等统计）；路由由本业务包自包含挂载
-	dbmonitor.Register(api)
 
 	r.GET("/", func(c *gin.Context) {
 		f, err := webFS.Open("index.html")

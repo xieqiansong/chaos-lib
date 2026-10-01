@@ -7,6 +7,7 @@ import (
 
 	"chaos-go/internal/crud"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 
 	"github.com/gin-gonic/gin"
 )
@@ -141,6 +142,12 @@ func afterDeletePortForward(row *PortForwarding) error {
 		}
 	}
 	return nil
+}
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("portFwd", Register)
 }
 
 // Register 把 SSH 端口转发两个资源挂载到给定路由组：纯 CRUD 交给 crud，扩展接口自实现。

@@ -9,8 +9,15 @@ import (
 	"chaos-go/internal/config"
 	"chaos-go/internal/crud"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 	"github.com/gin-gonic/gin"
 )
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("mqttSync", Register)
+}
 
 // Register 在路由组 rg 下挂载 MQTT 同步的全部接口：
 //   - 标准 CRUD（list/get/create/update/delete）交给通用 crud，驱动前端 DataTable；

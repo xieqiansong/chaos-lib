@@ -7,6 +7,7 @@ import (
 
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 
 	"github.com/gin-gonic/gin"
 )
@@ -82,6 +83,12 @@ func GetTableDetail(c *gin.Context) {
 		return
 	}
 	renv.Success(c, detail)
+}
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("dbMonitor", Register)
 }
 
 // Register 把数据库监控（只读自省）的路由挂载到给定路由组（通常来自 routes.go 的 api 组），

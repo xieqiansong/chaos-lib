@@ -13,9 +13,16 @@ import (
 	"chaos-go/internal/crud"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 
 	"github.com/gin-gonic/gin"
 )
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("cronJob", Register)
+}
 
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 标准 CRUD 由通用 crud 反射生成，扩展能力挂在同一前缀下，routes.go 只写一行 cronjob.Register(api)。

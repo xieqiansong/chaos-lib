@@ -5,9 +5,16 @@ import (
 
 	"chaos-go/internal/crud"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 
 	"github.com/gin-gonic/gin"
 )
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("standardData", Register)
+}
 
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 纯 CRUD 交给通用 crud；状态切换在基线之外由本包自实现并挂载，避免污染标准实现。

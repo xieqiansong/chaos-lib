@@ -12,6 +12,7 @@ import (
 	"chaos-go/internal/crud"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 	"chaos-go/pkg/tools"
 
 	"github.com/gin-gonic/gin"
@@ -288,6 +289,12 @@ func AccessProject(c *gin.Context) {
 }
 
 // ── 路由注册（自包含）────────────────────────────────────────────
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("project", Register)
+}
 
 // Register 把项目管理两套资源的路由挂载到给定路由组。
 // 标准 CRUD 交给通用 crud；项目列表（合并未认领目录）与移动/访问为扩展能力，自定义挂载。

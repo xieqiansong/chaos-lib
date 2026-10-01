@@ -4,6 +4,7 @@ import (
 	"chaos-go/internal/config"
 	"chaos-go/internal/quickedit"
 	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,6 +12,22 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// init 把本模块的路由挂载函数登记到 routehub，
+// 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
+func init() {
+	routehub.Register("envVariables", Register)
+}
+
+// Register 挂载环境变量相关路由（资源接口自包含，router.go 仅做编排调用）。
+func Register(rg *gin.RouterGroup) {
+	g := rg.Group("/envVariables")
+	g.GET("/", GetEnvVariables)
+	g.PATCH("/", PatchEnvVariables)
+	g.PUT("/", PutEnvVariables)
+	g.POST("/sync", SyncEnvVariables)
+	g.GET("/snapshots/:snapshotId", GetEnvSnapshotDetail)
+}
 
 // ensureEnvFileID 确保环境变量虚拟文件存在于 quickedit 表中
 func ensureEnvFileID() (int, error) {
