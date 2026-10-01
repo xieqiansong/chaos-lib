@@ -13,6 +13,34 @@ const (
 // ErrDBUnavailable 表示数据库单例不可用。
 var ErrDBUnavailable = errors.New("sdk: database unavailable")
 
+// 领域错误哨兵：调用方据此映射 HTTP 状态码。
+var (
+	// ErrSdkNotFound 指定 SDK 类型不存在（或已软删）。
+	ErrSdkNotFound = errors.New("sdk: SDK type not found")
+	// ErrNameRequired 创建时缺少类型名。
+	ErrNameRequired = errors.New("sdk: Name is required")
+	// ErrInvalidInput 入参不合法（来源 kind / root 等），错误文本可直接呈现给用户。
+	ErrInvalidInput = errors.New("sdk: 入参不合法")
+)
+
+// InvalidInputError 入参不合法：Msg 面向用户可直接呈现，
+// 同时 errors.Is(err, ErrInvalidInput) 为 true，便于调用方统一映射 400。
+type InvalidInputError struct{ Msg string }
+
+func (e *InvalidInputError) Error() string { return e.Msg }
+
+func (e *InvalidInputError) Is(target error) bool { return target == ErrInvalidInput }
+
+// SourceExistsError 同名 SDK 类型已存在（映射 409）。
+type SourceExistsError struct{ Name string }
+
+func (e *SourceExistsError) Error() string { return "SDK type already exists: " + e.Name }
+
+func (e *SourceExistsError) Is(target error) bool { return target == ErrSourceExists }
+
+// ErrSourceExists 同名冲突的判定哨兵。
+var ErrSourceExists = errors.New("sdk: SDK type already exists")
+
 // SdkSourceItem 是 Sources JSON 数组中的一个来源元素。
 type SdkSourceItem struct {
 	Kind string // "repo" | "single"
@@ -36,17 +64,6 @@ type SdkSource struct {
 type SdkInfo struct {
 	CurrentVersion string
 	VersionList    []string
-}
-
-// 默认种子：每个 SDK 类型含一个 repo 来源（兼容旧 D:\opt\xxx 布局）。
-var defaultSdkSeeds = []struct {
-	Name string
-	Root string
-}{
-	{"jdk", `D:\opt\jdk`},
-	{"maven", `D:\opt\maven`},
-	{"python", `D:\opt\python`},
-	{"llama", `D:\opt\llama`},
 }
 
 // parseSources 解析 Sources JSON 数组。

@@ -1,14 +1,13 @@
 package envvar
 
 import (
-	"chaos-go/internal/config"
-	"chaos-go/internal/quickedit"
-	renv "chaos-go/internal/resp"
-	"chaos-go/internal/routehub"
-	"fmt"
+	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
-	"time"
+
+	renv "chaos-go/internal/resp"
+	"chaos-go/internal/routehub"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,91 +28,29 @@ func Register(rg *gin.RouterGroup) {
 	g.GET("/snapshots/:snapshotId", GetEnvSnapshotDetail)
 }
 
-// ensureEnvFileID 确保环境变量虚拟文件存在于 quickedit 表中
-func ensureEnvFileID() (int, error) {
-	var file quickedit.QuickEditFile
-	err := config.GetDB().Where("file_path = ?", quickedit.EnvVirtualFilePath).First(&file).Error
-	if err == nil {
-		return file.ID, nil
-	}
-	snap, _ := ReadAllEnvFromSystem()
-	tomlStr, tomlErr := MarshalEnvToTOML(snap)
-	if tomlErr != nil {
-		return 0, tomlErr
-	}
-	file = quickedit.QuickEditFile{
-		Name:      quickedit.EnvVirtualFileName,
-		FilePath:  quickedit.EnvVirtualFilePath,
-		Remark:    quickedit.EnvVirtualRemark,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	if err := config.GetDB().Create(&file).Error; err != nil {
-		return 0, fmt.Errorf("创建虚拟文件失败: %w", err)
-	}
-	_, snapErr := quickedit.TakeSnapshot(file.ID, tomlStr)
-	if snapErr != nil {
-		return 0, snapErr
-	}
-	return file.ID, nil
-}
-
+// GetEnvVariables 返回当前系统 / 用户环境变量与最近一次快照信息。
 func GetEnvVariables(c *gin.Context) {
-	fileID, err := ensureEnvFileID()
+	resp, err := Load()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
-	}
-	snap, readErr := ReadAllEnvFromSystem()
-	warnings := []string{}
-	if readErr != nil {
-		warnings = append(warnings, fmt.Sprintf("读取环境变量部分失败: %v", readErr))
-	}
-	var latest quickedit.QuickEditSnapshot
-	config.GetDB().Where("file_id = ?", fileID).Order("created_at DESC, id DESC").First(&latest)
-	resp := EnvGetResponse{
-		Meta:         snap.Meta,
-		System:       snap.System,
-		User:         snap.User,
-		SnapshotID:   latest.ID,
-		SnapshotTime: "",
-		Warnings:     warnings,
-	}
-	if latest.ID > 0 {
-		resp.SnapshotTime = latest.CreatedAt.Format(time.RFC3339)
 	}
 	renv.Success(c, resp)
 }
 
+// SyncEnvVariables 以当前系统变量为准重落一条快照。
 func SyncEnvVariables(c *gin.Context) {
-	fileID, err := ensureEnvFileID()
+	warnings, err := Sync()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	snap, readErr := ReadAllEnvFromSystem()
-	tomlStr, tomlErr := MarshalEnvToTOML(snap)
-	if tomlErr != nil {
-		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
-		return
-	}
-	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
-		renv.Error(c, http.StatusInternalServerError, fmt.Sprintf("快照失败: %v", snapErr))
-		return
-	}
-	warnings := []string{}
-	if readErr != nil {
-		warnings = append(warnings, fmt.Sprintf("读取部分失败: %v", readErr))
-	}
+	logWarnings("同步环境变量", warnings)
 	renv.Success(c, nil)
 }
 
+// PatchEnvVariables 按增量补丁（Set / Unset / Path 增删改）局部改写环境变量。
 func PatchEnvVariables(c *gin.Context) {
-	fileID, err := ensureEnvFileID()
-	if err != nil {
-		renv.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	}
 	var req EnvPatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -123,126 +60,54 @@ func PatchEnvVariables(c *gin.Context) {
 		renv.Error(c, http.StatusBadRequest, "请求体不能为空（至少需要 system 或 user 之一）")
 		return
 	}
-	snap, readErr := ReadAllEnvFromSystem()
-	if snap == nil {
-		renv.Error(c, http.StatusInternalServerError, fmt.Sprintf("读取环境变量失败: %v", readErr))
-		return
-	}
-	ApplySectionPatch(&snap.System, req.System)
-	ApplySectionPatch(&snap.User, req.User)
-	writeWarnings, writeErr := WriteAllEnvToSystem(snap)
-	if writeErr != nil {
-		writeWarnings = append(writeWarnings, fmt.Sprintf("写入异常: %v", writeErr))
-	}
-	tomlStr, tomlErr := MarshalEnvToTOML(snap)
-	if tomlErr != nil {
-		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
-		return
-	}
-	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
-		writeWarnings = append(writeWarnings, fmt.Sprintf("快照失败: %v", snapErr))
-	}
-	renv.Success(c, nil)
-}
-
-func PutEnvVariables(c *gin.Context) {
-	fileID, err := ensureEnvFileID()
+	warnings, err := ApplyPatch(&req)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+	logWarnings("局部更新环境变量", warnings)
+	renv.Success(c, nil)
+}
+
+// PutEnvVariables 整体替换 system / 用户两段环境变量。
+func PutEnvVariables(c *gin.Context) {
 	var req EnvPutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	current, _ := ReadAllEnvFromSystem()
-	if req.System != nil {
-		current.System = *req.System
-		if current.System == nil {
-			current.System = map[string]string{}
-		}
-	}
-	if req.User != nil {
-		current.User = *req.User
-		if current.User == nil {
-			current.User = map[string]string{}
-		}
-	}
-	writeWarnings, writeErr := WriteAllEnvToSystem(current)
-	if writeErr != nil {
-		writeWarnings = append(writeWarnings, fmt.Sprintf("写入异常: %v", writeErr))
-	}
-	tomlStr, tomlErr := MarshalEnvToTOML(current)
-	if tomlErr != nil {
-		renv.Error(c, http.StatusInternalServerError, tomlErr.Error())
-		return
-	}
-	if _, snapErr := quickedit.TakeSnapshot(fileID, tomlStr); snapErr != nil {
-		writeWarnings = append(writeWarnings, fmt.Sprintf("快照失败: %v", snapErr))
-	}
-	renv.Success(c, nil)
-}
-
-func GetEnvSnapshotDetail(c *gin.Context) {
-	fileID, err := ensureEnvFileID()
+	warnings, err := ReplaceAll(&req)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	snapIDStr := c.Param("snapshotId")
-	snapID, err := strconv.Atoi(snapIDStr)
+	logWarnings("整体替换环境变量", warnings)
+	renv.Success(c, nil)
+}
+
+// GetEnvSnapshotDetail 返回指定快照的内容与解析结果。
+func GetEnvSnapshotDetail(c *gin.Context) {
+	snapID, err := strconv.Atoi(c.Param("snapshotId"))
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, "无效的 snapshot id")
 		return
 	}
-	var snap quickedit.QuickEditSnapshot
-	if err := config.GetDB().Where("id = ? AND file_id = ?", snapID, fileID).First(&snap).Error; err != nil {
-		renv.Error(c, http.StatusNotFound, "快照不存在")
+	detail, err := GetSnapshotDetail(snapID)
+	if err != nil {
+		if errors.Is(err, ErrSnapshotNotFound) {
+			renv.Error(c, http.StatusNotFound, "快照不存在")
+			return
+		}
+		renv.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	parsed, parseErr := ParseEnvFromTOML(snap.Content)
-	if parseErr != nil {
-		renv.Success(c, gin.H{
-			"id":         snap.ID,
-			"fileId":     snap.FileID,
-			"rawContent": snap.Content,
-			"parseError": parseErr.Error(),
-			"createdAt":  snap.CreatedAt.Format(time.RFC3339),
-			"sizeBytes":  snap.SizeBytes,
-		})
-		return
-	}
-	renv.Success(c, gin.H{
-		"id":         snap.ID,
-		"fileId":     snap.FileID,
-		"meta":       parsed.Meta,
-		"system":     parsed.System,
-		"user":       parsed.User,
-		"rawContent": snap.Content,
-		"createdAt":  snap.CreatedAt.Format(time.RFC3339),
-		"sizeBytes":  snap.SizeBytes,
-	})
+	renv.Success(c, detail)
 }
 
-// ReadVirtualContent 供 quickedit 回调使用：读系统环境变量并序列化为 TOML
-func ReadVirtualContent() (content string, sizeBytes int, err error) {
-	snap, err := ReadAllEnvFromSystem()
-	if err != nil {
-		return "", 0, err
+// logWarnings 记录写入 / 快照过程中的非致命告警。
+// 响应体保持既有形状（data 为 null），告警只进日志，避免改动对外契约。
+func logWarnings(scope string, warnings []string) {
+	for _, w := range warnings {
+		slog.Warn("环境变量操作告警", "scope", scope, "warn", w)
 	}
-	content, tomlErr := MarshalEnvToTOML(snap)
-	if tomlErr != nil {
-		return "", 0, tomlErr
-	}
-	return content, len([]byte(content)), nil
-}
-
-// WriteVirtualContent 供 quickedit 回调使用：解析 TOML 并写入系统环境变量
-func WriteVirtualContent(content string) (warnings []string, err error) {
-	snap, err := ParseEnvFromTOML(content)
-	if err != nil {
-		return nil, err
-	}
-	return WriteAllEnvToSystem(snap)
 }

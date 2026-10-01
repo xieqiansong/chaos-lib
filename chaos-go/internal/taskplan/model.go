@@ -1,8 +1,26 @@
 package taskplan
 
 import (
+	"errors"
 	"time"
 )
+
+// 领域错误哨兵：repository 与 service 据此表达「不存在」或「前置条件不满足」。
+var (
+	ErrPlanNotFound = errors.New("taskplan: 任务计划不存在")
+	ErrTaskNotFound = errors.New("taskplan: 任务不存在")
+	ErrNoRawLink    = errors.New("taskplan: 该计划没有 raw_link，无法获取原文")
+	// ErrInvalidState 业务前置条件不满足（状态不对、缺少必填等），调用方映射 400。
+	ErrInvalidState = errors.New("taskplan: 业务前置条件不满足")
+)
+
+// InvalidStateError 前置条件不满足：Msg 面向用户可直接呈现，
+// 同时 errors.Is(err, ErrInvalidState) 为 true，便于调用方统一映射 400。
+type InvalidStateError struct{ Msg string }
+
+func (e *InvalidStateError) Error() string { return e.Msg }
+
+func (e *InvalidStateError) Is(target error) bool { return target == ErrInvalidState }
 
 // ── 任务（Task）─────────────────────────────────────────────────
 

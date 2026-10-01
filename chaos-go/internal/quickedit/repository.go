@@ -1,10 +1,12 @@
 package quickedit
 
 import (
+	"errors"
 	"time"
 
 	"chaos-go/internal/config"
 	"chaos-go/internal/pagination"
+	"gorm.io/gorm"
 )
 
 // TakeSnapshot 写入一条内容快照（供本包与 envvar 共用）。
@@ -25,7 +27,7 @@ func TakeSnapshot(fileID int, content string) (*QuickEditSnapshot, error) {
 	return &snapshot, nil
 }
 
-// FindFileByID 按 ID 加载文件记录。
+// FindFileByID 按 ID 加载文件记录；不存在返回 ErrFileNotFound。
 func FindFileByID(id int) (*QuickEditFile, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -33,6 +35,9 @@ func FindFileByID(id int) (*QuickEditFile, error) {
 	}
 	var file QuickEditFile
 	if err := db.First(&file, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFileNotFound
+		}
 		return nil, err
 	}
 	return &file, nil
@@ -123,7 +128,7 @@ func ListSnapshots(fileID int, q pagination.Query) ([]QuickEditSnapshot, int64, 
 	return snaps, total, nil
 }
 
-// FindSnapshot 按 (fileID, snapID) 加载单条快照。
+// FindSnapshot 按 (fileID, snapID) 加载单条快照；不存在返回 ErrSnapshotNotFound。
 func FindSnapshot(fileID, snapID int) (*QuickEditSnapshot, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -131,6 +136,9 @@ func FindSnapshot(fileID, snapID int) (*QuickEditSnapshot, error) {
 	}
 	var snap QuickEditSnapshot
 	if err := db.Where("id = ? AND file_id = ?", snapID, fileID).First(&snap).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSnapshotNotFound
+		}
 		return nil, err
 	}
 	return &snap, nil

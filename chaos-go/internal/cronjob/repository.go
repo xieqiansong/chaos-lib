@@ -1,16 +1,21 @@
 package cronjob
 
 import (
+	"errors"
 	"time"
 
 	"chaos-go/internal/config"
 	"chaos-go/internal/pagination"
+	"gorm.io/gorm"
 )
 
-// FindJobByID 读取未删除的指定任务。
+// FindJobByID 读取未删除的指定任务；不存在返回 ErrJobNotFound。
 func FindJobByID(id int) (CronJob, error) {
 	var job CronJob
 	if err := config.GetDB().Where("is_deleted = ?", false).First(&job, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return CronJob{}, ErrJobNotFound
+		}
 		return CronJob{}, err
 	}
 	return job, nil

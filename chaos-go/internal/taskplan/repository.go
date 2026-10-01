@@ -6,6 +6,7 @@ import (
 
 	"chaos-go/internal/config"
 	"chaos-go/internal/pagination"
+	"gorm.io/gorm"
 )
 
 // ErrDBUnavailable 表示数据库单例不可用。
@@ -39,7 +40,7 @@ func CollectDescendantPlanIDs(rootID int) ([]int, error) {
 
 // ── 计划查询 ──
 
-// FindActiveTaskPlan 按 ID 加载未删除的计划。
+// FindActiveTaskPlan 按 ID 加载未删除的计划；不存在返回 ErrPlanNotFound。
 func FindActiveTaskPlan(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -47,12 +48,15 @@ func FindActiveTaskPlan(id int) (*TaskPlan, error) {
 	}
 	var plan TaskPlan
 	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPlanNotFound
+		}
 		return nil, err
 	}
 	return &plan, nil
 }
 
-// GetTaskPlanByID 按 ID 加载计划（忽略逻辑删除，用于更新后回读）。
+// GetTaskPlanByID 按 ID 加载计划（忽略逻辑删除，用于更新后回读）；不存在返回 ErrPlanNotFound。
 func GetTaskPlanByID(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -60,6 +64,9 @@ func GetTaskPlanByID(id int) (*TaskPlan, error) {
 	}
 	var plan TaskPlan
 	if err := db.First(&plan, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPlanNotFound
+		}
 		return nil, err
 	}
 	return &plan, nil
@@ -163,7 +170,7 @@ func ListPlanTreeRows() ([]TaskPlan, error) {
 
 // ── 任务查询 ──
 
-// FindActiveTask 按 ID 加载未删除的任务。
+// FindActiveTask 按 ID 加载未删除的任务；不存在返回 ErrTaskNotFound。
 func FindActiveTask(id int) (*Task, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -171,6 +178,9 @@ func FindActiveTask(id int) (*Task, error) {
 	}
 	var task Task
 	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrTaskNotFound
+		}
 		return nil, err
 	}
 	return &task, nil
@@ -516,7 +526,7 @@ func ContributionRows(planIDs []int, start time.Time) ([]ContributionRow, error)
 	return rows, nil
 }
 
-// FindActiveUnsuspendedPlanByID 按 ID 加载未删除且未挂起的计划。
+// FindActiveUnsuspendedPlanByID 按 ID 加载未删除且未挂起的计划；不存在返回 ErrPlanNotFound。
 func FindActiveUnsuspendedPlanByID(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -524,6 +534,9 @@ func FindActiveUnsuspendedPlanByID(id int) (*TaskPlan, error) {
 	}
 	var plan TaskPlan
 	if err := db.Where("id = ? AND is_deleted = ? AND is_suspended = ?", id, false, false).First(&plan).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPlanNotFound
+		}
 		return nil, err
 	}
 	return &plan, nil

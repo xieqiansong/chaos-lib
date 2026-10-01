@@ -1,36 +1,11 @@
 package sdk
 
 import (
-	"encoding/json"
+	"errors"
 
 	"chaos-go/internal/config"
+	"gorm.io/gorm"
 )
-
-func init() {
-	seedSdkSources()
-}
-
-// seedSdkSources 在 DB 为空时插入默认 SDK 类型，已存在则跳过。
-func seedSdkSources() {
-	db := config.GetDB()
-	if db == nil {
-		return
-	}
-	for _, s := range defaultSdkSeeds {
-		var count int64
-		db.Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", s.Name, false).Count(&count)
-		if count > 0 {
-			continue
-		}
-		items := []SdkSourceItem{{Kind: "repo", Root: s.Root}}
-		b, _ := json.Marshal(items)
-		db.Create(&SdkSource{
-			Name:    s.Name,
-			Sources: b,
-			Enabled: true,
-		})
-	}
-}
 
 // ListActiveSdkSources 返回所有未删除的 SDK 类型。
 func ListActiveSdkSources() ([]SdkSource, error) {
@@ -45,7 +20,7 @@ func ListActiveSdkSources() ([]SdkSource, error) {
 	return srcs, nil
 }
 
-// FindSdkSource 按类型名加载未删除的 SDK 来源定义。
+// FindSdkSource 按类型名加载未删除的 SDK 来源定义；不存在返回 ErrSdkNotFound。
 func FindSdkSource(typ string) (*SdkSource, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -53,6 +28,9 @@ func FindSdkSource(typ string) (*SdkSource, error) {
 	}
 	var s SdkSource
 	if err := db.Where("name = ? AND is_deleted = ?", typ, false).First(&s).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSdkNotFound
+		}
 		return nil, err
 	}
 	return &s, nil

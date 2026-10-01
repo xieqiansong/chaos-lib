@@ -8,9 +8,13 @@ import (
 	toml "github.com/pelletier/go-toml/v2"
 )
 
-// ── TOML 序列化 ──────────────────────────────────────────────────
+// ── 编解码（领域层，纯函数）─────────────────────────────────────
 
+// MarshalEnvToTOML 把快照序列化为 TOML 文本（缺字段在此兜底，保证可解析）。
 func MarshalEnvToTOML(snapshot *EnvSnapshot) (string, error) {
+	if snapshot == nil {
+		return "", fmt.Errorf("快照为空")
+	}
 	if snapshot.Meta.SavedAt == "" {
 		snapshot.Meta.SavedAt = time.Now().Format(time.RFC3339)
 	}
@@ -27,6 +31,7 @@ func MarshalEnvToTOML(snapshot *EnvSnapshot) (string, error) {
 	return string(data), nil
 }
 
+// ParseEnvFromTOML 把 TOML 文本解析为快照。
 func ParseEnvFromTOML(content string) (*EnvSnapshot, error) {
 	var snap EnvSnapshot
 	if err := toml.Unmarshal([]byte(content), &snap); err != nil {
@@ -41,6 +46,7 @@ func ParseEnvFromTOML(content string) (*EnvSnapshot, error) {
 	return &snap, nil
 }
 
+// ApplySectionPatch 把一段增量补丁（Set / Unset / Path 增删改）应用到指定段落。
 func ApplySectionPatch(section *EnvSection, patch *EnvSectionPatch) {
 	if patch == nil {
 		return
@@ -75,87 +81,204 @@ func ApplySectionPatch(section *EnvSection, patch *EnvSectionPatch) {
 	}
 }
 
-// ── 字符串工具 ──────────────────────────────────────────────────
+// ── 用例 ───────────────────────────────────────────────────────
 
-func splitAndTrim(s, sep string) []string {
-	if s == "" {
-		return []string{}
+// EnsureVirtualFile 确保环境变量虚拟文件已登记；首次登记时用当前系统变量落一条初始快照。
+func EnsureVirtualFile() (int, error) {
+	file, err := findVirtualFile()
+	if err != nil {
+		return 0, err
 	}
-	parts := []string{}
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if len(sep) > 0 && i+len(sep) <= len(s) && s[i:i+len(sep)] == sep {
-			part := trimSpaces(s[start:i])
-			if part != "" {
-				parts = append(parts, part)
-			}
-			i += len(sep) - 1
-			start = i + 1
+	if file != nil {
+		return file.ID, nil
+	}
+	// 读取失败不阻断登记：先建文件，快照内容为空快照由调用方后续同步补齐。
+	snap, _ := ReadAllEnvFromSystem()
+	content, err := MarshalEnvToTOML(snap)
+	if err != nil {
+		return 0, err
+	}
+	created, err := createVirtualFile()
+	if err != nil {
+		return 0, fmt.Errorf("创建虚拟文件失败: %w", err)
+	}
+	if _, err := takeSnapshot(created.ID, content); err != nil {
+		return 0, fmt.Errorf("写入初始快照失败: %w", err)
+	}
+	return created.ID, nil
+}
+
+// Load 读取当前系统环境变量，并附最近一次快照的 id 与时间。
+func Load() (*EnvGetResponse, error) {
+	fileID, err := EnsureVirtualFile()
+	if err != nil {
+		return nil, err
+	}
+	snap, readErr := ReadAllEnvFromSystem()
+	if snap == nil {
+		snap = &EnvSnapshot{}
+	}
+	resp := &EnvGetResponse{
+		Meta:     snap.Meta,
+		System:   snap.System,
+		User:     snap.User,
+		Warnings: []string{},
+	}
+	if readErr != nil {
+		resp.Warnings = append(resp.Warnings, fmt.Sprintf("读取环境变量部分失败: %v", readErr))
+	}
+	if latest, err := latestSnapshot(fileID); err == nil && latest != nil {
+		resp.SnapshotID = latest.ID
+		resp.SnapshotTime = latest.CreatedAt.Format(time.RFC3339)
+	}
+	return resp, nil
+}
+
+// Sync 以当前系统变量为准重落一条快照（不改写系统环境变量）。
+func Sync() ([]string, error) {
+	fileID, err := EnsureVirtualFile()
+	if err != nil {
+		return nil, err
+	}
+	snap, readErr := ReadAllEnvFromSystem()
+	if snap == nil {
+		snap = &EnvSnapshot{}
+	}
+	content, err := MarshalEnvToTOML(snap)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := takeSnapshot(fileID, content); err != nil {
+		return nil, fmt.Errorf("快照失败: %w", err)
+	}
+	warnings := []string{}
+	if readErr != nil {
+		warnings = append(warnings, fmt.Sprintf("读取部分失败: %v", readErr))
+	}
+	return warnings, nil
+}
+
+// ApplyPatch 按增量补丁改写系统 / 用户两段变量，并落一条快照。
+// 返回的 warnings 为写入与快照过程中的非致命告警（系统写入已生效）。
+func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
+	fileID, err := EnsureVirtualFile()
+	if err != nil {
+		return nil, err
+	}
+	snap, readErr := ReadAllEnvFromSystem()
+	if snap == nil {
+		if readErr != nil {
+			return nil, fmt.Errorf("读取环境变量失败: %w", readErr)
+		}
+		return nil, fmt.Errorf("读取环境变量失败")
+	}
+	ApplySectionPatch(&snap.System, req.System)
+	ApplySectionPatch(&snap.User, req.User)
+
+	warnings, writeErr := WriteAllEnvToSystem(snap)
+	if writeErr != nil {
+		warnings = append(warnings, fmt.Sprintf("写入异常: %v", writeErr))
+	}
+	content, err := MarshalEnvToTOML(snap)
+	if err != nil {
+		return warnings, err
+	}
+	if _, snapErr := takeSnapshot(fileID, content); snapErr != nil {
+		warnings = append(warnings, fmt.Sprintf("快照失败: %v", snapErr))
+	}
+	return warnings, nil
+}
+
+// ReplaceAll 整体替换 system / user 两段变量（nil 表示该段不变），并落一条快照。
+func ReplaceAll(req *EnvPutRequest) ([]string, error) {
+	fileID, err := EnsureVirtualFile()
+	if err != nil {
+		return nil, err
+	}
+	current, _ := ReadAllEnvFromSystem()
+	if current == nil {
+		current = &EnvSnapshot{}
+	}
+	if req.System != nil {
+		current.System = *req.System
+		if current.System == nil {
+			current.System = map[string]string{}
 		}
 	}
-	if start < len(s) {
-		part := trimSpaces(s[start:])
-		if part != "" {
-			parts = append(parts, part)
+	if req.User != nil {
+		current.User = *req.User
+		if current.User == nil {
+			current.User = map[string]string{}
 		}
 	}
-	return parts
+
+	warnings, writeErr := WriteAllEnvToSystem(current)
+	if writeErr != nil {
+		warnings = append(warnings, fmt.Sprintf("写入异常: %v", writeErr))
+	}
+	content, err := MarshalEnvToTOML(current)
+	if err != nil {
+		return warnings, err
+	}
+	if _, snapErr := takeSnapshot(fileID, content); snapErr != nil {
+		warnings = append(warnings, fmt.Sprintf("快照失败: %v", snapErr))
+	}
+	return warnings, nil
 }
 
-func trimSpaces(s string) string {
-	left := 0
-	right := len(s)
-	for left < right && (s[left] == ' ' || s[left] == '\t' || s[left] == '\r' || s[left] == '\n') {
-		left++
+// GetSnapshotDetail 返回指定快照的内容与解析后的结构化视图；解析失败时退化为原文 + 错误信息。
+func GetSnapshotDetail(snapID int) (*SnapshotDetail, error) {
+	fileID, err := EnsureVirtualFile()
+	if err != nil {
+		return nil, err
 	}
-	for right > left && (s[right-1] == ' ' || s[right-1] == '\t' || s[right-1] == '\r' || s[right-1] == '\n') {
-		right--
+	snap, err := findSnapshot(fileID, snapID)
+	if err != nil {
+		return nil, err
 	}
-	return s[left:right]
+	detail := &SnapshotDetail{
+		ID:         snap.ID,
+		FileID:     snap.FileID,
+		RawContent: snap.Content,
+		CreatedAt:  snap.CreatedAt.Format(time.RFC3339),
+		SizeBytes:  snap.SizeBytes,
+	}
+	parsed, parseErr := ParseEnvFromTOML(snap.Content)
+	if parseErr != nil {
+		detail.ParseError = parseErr.Error()
+		return detail, nil
+	}
+	detail.Meta = &parsed.Meta
+	detail.System = parsed.System
+	detail.User = parsed.User
+	return detail, nil
 }
 
-func joinNonEmpty(items []string, sep string) string {
-	nonEmpty := make([]string, 0, len(items))
-	for _, item := range items {
-		if item != "" {
-			nonEmpty = append(nonEmpty, item)
-		}
+// ── 供 quickedit 虚拟文件读写回调使用 ───────────────────────────
+
+// ReadVirtualContent 读系统环境变量并序列化为 TOML（quickedit 读取虚拟文件内容）。
+func ReadVirtualContent() (content string, sizeBytes int, err error) {
+	snap, err := ReadAllEnvFromSystem()
+	if err != nil {
+		return "", 0, err
 	}
-	if len(nonEmpty) == 0 {
-		return ""
+	content, tomlErr := MarshalEnvToTOML(snap)
+	if tomlErr != nil {
+		return "", 0, tomlErr
 	}
-	result := nonEmpty[0]
-	for i := 1; i < len(nonEmpty); i++ {
-		result += sep + nonEmpty[i]
-	}
-	return result
+	return content, len([]byte(content)), nil
 }
 
-func dedupedCopy(items []string) []string {
-	if items == nil {
-		return []string{}
+// WriteVirtualContent 解析 TOML 并写入系统环境变量（quickedit 保存虚拟文件内容）。
+func WriteVirtualContent(content string) (warnings []string, err error) {
+	snap, err := ParseEnvFromTOML(content)
+	if err != nil {
+		return nil, err
 	}
-	seen := make(map[string]bool, len(items))
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		if item == "" || seen[item] {
-			continue
-		}
-		seen[item] = true
-		result = append(result, item)
-	}
-	return result
+	return WriteAllEnvToSystem(snap)
 }
 
-func cloneMap(m map[string]string) map[string]string {
-	result := make(map[string]string, len(m))
-	for k, v := range m {
-		result[k] = v
-	}
-	return result
-}
-
-// ── JSON 辅助（避免循环引用 reflect） ─────────────────────────────
+// ── JSON 辅助（避免循环引用 reflect）───────────────────────────
 
 func EnvSnapshotToJSON(snap *EnvSnapshot) ([]byte, error) {
 	return json.Marshal(snap)

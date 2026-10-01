@@ -1,3 +1,12 @@
+// Package mqttsync 基于 MQTT Broker 的多节点消息广播：消息落库 + 集群同步（可选 AES 加密）。
+//
+// 分层（见 chaos-lib/AGENTS.md「分层契约」）：
+//   - model.go：实体与线上报文结构
+//   - repository.go：数据访问（只进出模型）
+//   - client.go：MQTT 连接 / 加解密 / 发布订阅（基础设施）
+//   - service.go：用例（发送、状态、按主题删除、列表视图）
+//   - dto.go：响应契约与组装
+//   - handler.go：参数解析 + 状态码映射 + 路由注册
 package mqttsync
 
 import (
@@ -5,7 +14,6 @@ import (
 	"time"
 
 	"chaos-go/internal/crud"
-	"gorm.io/gorm"
 )
 
 // 包级错误哨兵。
@@ -25,8 +33,8 @@ const defaultChannel = "broadcast"
 type MqttSyncMessage struct {
 	crud.BaseModel
 	MsgID   string `gorm:"uniqueIndex;size:64" json:"MsgID"` // 线上报文 id（uuid），全局唯一，用于去重
-	NodeID  string `gorm:"size:64" json:"NodeID"`           // 发送方节点标识
-	Channel string `gorm:"size:64" json:"Channel"`          // topic（不含前缀），如 broadcast
+	NodeID  string `gorm:"size:64" json:"NodeID"`            // 发送方节点标识
+	Channel string `gorm:"size:64" json:"Channel"`           // topic（不含前缀），如 broadcast
 	Payload string `gorm:"type:text" json:"Payload"`
 }
 
@@ -40,57 +48,7 @@ type MqttSyncNode struct {
 // TableName 显式指定表名（与 CRUD 前缀 mqttSync 对应）。
 func (MqttSyncMessage) TableName() string { return "mqtt_sync_messages" }
 
-// MessageDTO 是返回给前端的消息视图，附带 IsSelf 便于界面区分本机消息。
-type MessageDTO struct {
-	ID        int       `json:"ID"`
-	MsgID     string    `json:"MsgID"`
-	NodeID    string    `json:"NodeID"`
-	Channel   string    `json:"Channel"`
-	Payload   string    `json:"Payload"`
-	IsSelf    bool      `json:"IsSelf"`
-	CreatedAt time.Time `json:"CreatedAt"`
-	UpdatedAt time.Time `json:"UpdatedAt"`
-}
-
-// BeforeCreate 在落库前补齐 MsgID / NodeID / Channel：
-// 与广播报文保持一致，使对端按 MsgID 去重、本机回声按 NodeID 丢弃。
-func (m *MqttSyncMessage) BeforeCreate(_ *gorm.DB) error {
-	if m.MsgID == "" {
-		m.MsgID = newID()
-	}
-	if m.NodeID == "" {
-		m.NodeID = NodeID()
-	}
-	if m.Channel == "" {
-		m.Channel = defaultChannel
-	}
-	return nil
-}
-
-// toDTO 转换为前端视图；IsSelf 依据本机节点标识计算。
-func toDTO(m MqttSyncMessage) MessageDTO {
-	return MessageDTO{
-		ID:        m.ID,
-		MsgID:     m.MsgID,
-		NodeID:    m.NodeID,
-		Channel:   m.Channel,
-		Payload:   m.Payload,
-		IsSelf:    m.NodeID != "" && m.NodeID == NodeID(),
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
-	}
-}
-
-// toMessageDTOs 是 crud 的 ToResponse 回调：把 []*MqttSyncMessage 整批转为 []MessageDTO。
-func toMessageDTOs(rows []*MqttSyncMessage) any {
-	out := make([]MessageDTO, 0, len(rows))
-	for _, m := range rows {
-		out = append(out, toDTO(*m))
-	}
-	return out
-}
-
-// wireMessage 是走 MQTT 的业务报文（明文 JSON）。传输层由 service 的 seal/open
+// wireMessage 是走 MQTT 的业务报文（明文 JSON）。传输层由 client 的 seal/open
 // 在 MQTT_ENCRYPT=true 时加密为 AES-256-GCM 信封；本地数据库仍存明文业务 JSON。
 type wireMessage struct {
 	ID      string `json:"id"`

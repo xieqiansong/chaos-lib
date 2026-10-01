@@ -12,6 +12,21 @@ import (
 // ErrDBUnavailable 表示数据库单例不可用（极端情况下）。
 var ErrDBUnavailable = errors.New("project: database unavailable")
 
+// 领域错误哨兵：调用方据此映射 HTTP 状态码（NotFound → 404，InvalidPath → 400）。
+var (
+	ErrProjectNotFound = errors.New("project: 项目不存在")
+	ErrGroupNotFound   = errors.New("project: 项目组不存在")
+	// ErrInvalidPath 路径推导失败：未提供绝对路径 / 相对路径，或相对路径无法计算。
+	ErrInvalidPath = errors.New("project: 无效的项目路径")
+)
+
+// MoveProjectRequest 移动项目的请求体。
+type MoveProjectRequest struct {
+	TargetGroupID      int    `json:"TargetGroupID"`
+	TargetRelativePath string `json:"TargetRelativePath"`
+	TargetAbsPath      string `json:"TargetAbsPath"`
+}
+
 // ProjectGroup 项目组：拥有一个根目录（AbsolutePath），其下项目通过 RelativePath 相对该根目录定位。
 type ProjectGroup struct {
 	crud.BaseModel

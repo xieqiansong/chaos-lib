@@ -1,12 +1,14 @@
 package project
 
 import (
+	"errors"
 	"time"
 
 	"chaos-go/internal/config"
+	"gorm.io/gorm"
 )
 
-// FindGroupByID 按 ID 加载未软删的项目组。
+// FindGroupByID 按 ID 加载未软删的项目组；不存在返回 ErrGroupNotFound。
 func FindGroupByID(id int) (*ProjectGroup, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -14,12 +16,15 @@ func FindGroupByID(id int) (*ProjectGroup, error) {
 	}
 	var g ProjectGroup
 	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&g).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrGroupNotFound
+		}
 		return nil, err
 	}
 	return &g, nil
 }
 
-// FindProjectByID 按 ID 加载未软删的项目。
+// FindProjectByID 按 ID 加载未软删的项目；不存在返回 ErrProjectNotFound。
 func FindProjectByID(id int) (*Project, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -27,6 +32,9 @@ func FindProjectByID(id int) (*Project, error) {
 	}
 	var p Project
 	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&p).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrProjectNotFound
+		}
 		return nil, err
 	}
 	return &p, nil

@@ -92,7 +92,7 @@ func run() {
 		return
 	}
 
-	msgs, err := mqttsync.ListLatestPerChannelLike(stunTopicPrefix)
+	msgs, err := mqttsync.ListLatest(stunTopicPrefix)
 	if err != nil {
 		slog.Error("读取 STUN 消息失败", "err", err)
 		return

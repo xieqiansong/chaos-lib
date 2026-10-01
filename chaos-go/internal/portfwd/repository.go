@@ -27,14 +27,17 @@ func SshConnExists(id int) (bool, error) {
 	return true, nil
 }
 
-// FindSshConnByID 按 ID 加载未软删的 SSH 连接。
-func FindSshConnByID(id string) (*SshConnection, error) {
+// FindSshConnByID 按 ID 加载未软删的 SSH 连接；不存在返回 ErrConnNotFound。
+func FindSshConnByID(id int) (*SshConnection, error) {
 	db := config.GetDB()
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
 	var conn SshConnection
 	if err := db.Where("is_deleted = ?", false).First(&conn, "id = ?", id).Error; err != nil {
+		if isNotFound(err) {
+			return nil, ErrConnNotFound
+		}
 		return nil, err
 	}
 	return &conn, nil
@@ -55,14 +58,17 @@ func CountPortForwardingsByConn(connID int) (int64, error) {
 	return count, nil
 }
 
-// FindPortForwardingByID 按 ID 加载未软删的端口转发规则。
-func FindPortForwardingByID(id string) (*PortForwarding, error) {
+// FindPortForwardingByID 按 ID 加载未软删的端口转发规则；不存在返回 ErrRuleNotFound。
+func FindPortForwardingByID(id int) (*PortForwarding, error) {
 	db := config.GetDB()
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
 	var rule PortForwarding
 	if err := db.Where("is_deleted = ?", false).First(&rule, "id = ?", id).Error; err != nil {
+		if isNotFound(err) {
+			return nil, ErrRuleNotFound
+		}
 		return nil, err
 	}
 	return &rule, nil

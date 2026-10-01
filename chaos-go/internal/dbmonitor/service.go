@@ -1,10 +1,12 @@
 package dbmonitor
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
 	"chaos-go/internal/config"
+	"chaos-go/internal/pagination"
 )
 
 func isSQLite() bool {
@@ -66,8 +68,74 @@ func getTableDetail(name string) (*TableDetail, error) {
 	return detail, nil
 }
 
-// ── 排序 ──
+// ── 用例 ────────────────────────────────────────────────────────
 
+// Overview 返回库级总览（类型 / 版本 / 总大小 / 表数 / 总行数）。
+func Overview() (*DbOverview, error) {
+	return getOverview()
+}
+
+// TableDetailOf 返回单表详情（统计 + 列 + 索引）。
+func TableDetailOf(name string) (*TableDetail, error) {
+	if !validTableName(name) {
+		return nil, ErrInvalidTableName
+	}
+	detail, err := getTableDetail(name)
+	if err != nil {
+		if errors.Is(err, errTableNotFound) {
+			return nil, ErrTableNotFound
+		}
+		return nil, err
+	}
+	return detail, nil
+}
+
+// ListTableStats 返回表统计的分页列表（行数为精确 COUNT(*)）：
+// 按表名过滤（在排序与分页前生效，并计入 total），再按 sort / order 排序后分页。
+func ListTableStats(name, sortKey, order string, q pagination.Query) ([]TableStat, int64, error) {
+	all, err := collectTables()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	filtered := filterTables(all, name)
+	sortTables(filtered, sortKey, order)
+
+	total := int64(len(filtered))
+	start := q.Offset()
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+	end := start + q.PageSize
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	items := filtered[start:end]
+	if items == nil {
+		items = []TableStat{}
+	}
+	return items, total, nil
+}
+
+// ── 过滤与排序 ──────────────────────────────────────────────────
+
+// filterTables 按表名子串过滤（大小写不敏感）；name 为空时原样返回。
+func filterTables(tables []TableStat, name string) []TableStat {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return tables
+	}
+	lower := strings.ToLower(name)
+	filtered := make([]TableStat, 0, len(tables))
+	for _, t := range tables {
+		if strings.Contains(strings.ToLower(t.Name), lower) {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
+// sortTables 按给定键与方向排序；未识别的键按表名排。
 func sortTables(tables []TableStat, sortKey, order string) {
 	desc := strings.EqualFold(order, "desc")
 	less := func(i, j int) bool {

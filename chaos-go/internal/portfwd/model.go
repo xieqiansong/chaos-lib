@@ -1,3 +1,13 @@
+// Package portfwd 管理 SSH 连接与端口转发规则（local `ssh -L` / remote `ssh -R` / 直连 direct）。
+//
+// 分层（见 chaos-lib/AGENTS.md「分层契约」）：
+//   - model.go：实体 + 常量 + 纯领域逻辑（规范化、地址推导、不依赖 IO 的字段校验）
+//   - repository.go：数据访问
+//   - client.go：SSH 建连（基础设施）
+//   - forwarder.go：隧道长驻运行时（PortForwarder）
+//   - service.go：用例编排（校验、启停、测试连接）
+//   - dto.go：响应契约与组装
+//   - handler.go：参数解析 + 状态码映射 + 路由注册
 package portfwd
 
 import (
@@ -6,14 +16,18 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"time"
 
 	"chaos-go/internal/crud"
-	"golang.org/x/crypto/ssh"
 )
 
 // ErrDBUnavailable 表示数据库单例不可用（极端情况下）。
 var ErrDBUnavailable = errors.New("portfwd: database unavailable")
+
+// 领域错误哨兵：repository 与 service 据此表达「不存在」，调用方映射 404。
+var (
+	ErrRuleNotFound = errors.New("portfwd: 端口转发不存在")
+	ErrConnNotFound = errors.New("portfwd: SSH 连接不存在")
+)
 
 const (
 	// DirectionLocal 本地转发（等价 ssh -L）：本机监听 → SSH 服务器侧解析目标
@@ -46,7 +60,7 @@ func isLocalSideListen(direction string) bool {
 // PortForwarding 端口转发规则。
 // 嵌入 crud.BaseModel 以获得统一主键 / 时间戳 / 软删除。
 // Direction 决定「监听」发生在哪一侧：local 在本机监听，remote 在 SSH 服务器侧监听。
-// Status 为「期望运行」标记（供重启恢复 / 自愈使用）；实际运行状态以内存为准（见 toResponse）。
+// Status 为「期望运行」标记（供重启恢复 / 自愈使用）；实际运行状态以内存为准（见 dto）。
 type PortForwarding struct {
 	crud.BaseModel
 	Name            string
@@ -63,21 +77,6 @@ type PortForwarding struct {
 
 func (PortForwarding) TableName() string {
 	return "port_forwarding"
-}
-
-// PortForwardingResponse 对外 DTO；Status 以内存中实际运行状态为准。
-type PortForwardingResponse struct {
-	ID              int    `json:"ID"`
-	Name            string `json:"Name"`
-	Direction       string
-	Port            int
-	BindAddress     string
-	TargetHost      string
-	TargetPort      int
-	SshConnectionId int
-	Status          bool
-	LastError       string
-	Remark          string
 }
 
 // displayBindAddress 监听地址展示值：空值时按方向取默认（仅用于展示，运行期 normalize 另行兜底）。
@@ -139,39 +138,9 @@ func (pf *PortForwarding) directionLabel() string {
 	}
 }
 
-func (pf *PortForwarding) toResponse() PortForwardingResponse {
-	running, lastErr := GlobalPortForwarder.Status(pf.ID)
-	return PortForwardingResponse{
-		ID:              pf.ID,
-		Name:            pf.Name,
-		Direction:       pf.Direction,
-		Port:            pf.Port,
-		BindAddress:     pf.displayBindAddress(),
-		TargetHost:      pf.TargetHost,
-		TargetPort:      pf.TargetPort,
-		SshConnectionId: pf.SshConnectionId,
-		Status:          running,
-		LastError:       lastErr,
-		Remark:          pf.Remark,
-	}
-}
-
-// portForwardingsToResponse 整批把 []*PortForwarding 转成响应 DTO（供 crud.ToResponse 调用）。
-func portForwardingsToResponse(rows []*PortForwarding) any {
-	out := make([]PortForwardingResponse, 0, len(rows))
-	for _, r := range rows {
-		// 存量行可能没有 direction，读路径同样按 local 兜底
-		_ = r.normalize()
-		out = append(out, r.toResponse())
-	}
-	return out
-}
-
-// validate 校验规则字段；需关联已存在的 SSH 连接（direct 除外）。空名称自动生成。
-func (pf *PortForwarding) validate() error {
-	if err := pf.normalize(); err != nil {
-		return err
-	}
+// validateFields 校验端口 / 监听地址 / 目标（纯校验，不查库）。
+// 关联 SSH 连接的存在性校验见 service.ValidatePortForward。
+func (pf *PortForwarding) validateFields() error {
 	if err := validatePort(pf.Port); err != nil {
 		return fmt.Errorf("%s监听端口不合法: %v", pf.directionLabel(), err)
 	}
@@ -183,27 +152,6 @@ func (pf *PortForwarding) validate() error {
 	}
 	if err := validatePort(pf.TargetPort); err != nil {
 		return fmt.Errorf("目标端口不合法: %v", err)
-	}
-	// 直接转发不经 SSH 隧道，无需关联 SSH 连接；其余方向必须关联一条已存在的连接。
-	if pf.Direction != DirectionDirect {
-		if pf.SshConnectionId <= 0 {
-			return fmt.Errorf("请选择 SSH 连接")
-		}
-		if exists, err := SshConnExists(pf.SshConnectionId); err != nil {
-			return fmt.Errorf("校验 SSH 连接失败: %v", err)
-		} else if !exists {
-			return fmt.Errorf("SSH 连接不存在")
-		}
-	}
-	if strings.TrimSpace(pf.Name) == "" {
-		switch pf.Direction {
-		case DirectionRemote:
-			pf.Name = fmt.Sprintf("[R] %s → %s", pf.listenAddr(), pf.targetAddr())
-		case DirectionDirect:
-			pf.Name = fmt.Sprintf("[D] %s → %s", pf.listenAddr(), pf.targetAddr())
-		default:
-			pf.Name = fmt.Sprintf("[L] %s → %s", pf.listenAddr(), pf.targetAddr())
-		}
 	}
 	return nil
 }
@@ -230,44 +178,6 @@ func (SshConnection) TableName() string {
 	return "ssh_connections"
 }
 
-// SshConnectionResponse 对外 DTO：只暴露「是否已配置凭据」，绝不返回凭据明文。
-type SshConnectionResponse struct {
-	ID            int    `json:"ID"`
-	Name          string `json:"Name"`
-	Host          string
-	Port          int
-	Username      string
-	AuthType      string
-	Remark        string
-	HasPassword   bool
-	HasPrivateKey bool
-	HasPassphrase bool
-}
-
-func (conn *SshConnection) toResponse() SshConnectionResponse {
-	return SshConnectionResponse{
-		ID:            conn.ID,
-		Name:          conn.Name,
-		Host:          conn.Host,
-		Port:          conn.normalizedPort(),
-		Username:      conn.Username,
-		AuthType:      conn.AuthType,
-		Remark:        conn.Remark,
-		HasPassword:   conn.Password != "",
-		HasPrivateKey: conn.PrivateKey != "",
-		HasPassphrase: conn.Passphrase != "",
-	}
-}
-
-// sshConnsToResponse 整批把 []*SshConnection 转成响应 DTO（供 crud.ToResponse 调用）。
-func sshConnsToResponse(rows []*SshConnection) any {
-	out := make([]SshConnectionResponse, 0, len(rows))
-	for _, c := range rows {
-		out = append(out, c.toResponse())
-	}
-	return out
-}
-
 func (conn *SshConnection) normalizedPort() int {
 	if conn.Port <= 0 {
 		return 22
@@ -277,51 +187,6 @@ func (conn *SshConnection) normalizedPort() int {
 
 func (conn *SshConnection) sshAddr() string {
 	return net.JoinHostPort(conn.Host, strconv.Itoa(conn.normalizedPort()))
-}
-
-// authMethods 按认证方式构造 SSH 认证方法。任何错误信息都不包含私钥或口令内容。
-func (conn *SshConnection) authMethods() ([]ssh.AuthMethod, error) {
-	switch conn.AuthType {
-	case AuthTypeKey:
-		if strings.TrimSpace(conn.PrivateKey) == "" {
-			return nil, fmt.Errorf("未配置私钥")
-		}
-		var (
-			signer ssh.Signer
-			err    error
-		)
-		if conn.Passphrase != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(conn.PrivateKey), []byte(conn.Passphrase))
-		} else {
-			signer, err = ssh.ParsePrivateKey([]byte(conn.PrivateKey))
-		}
-		if err != nil {
-			return nil, fmt.Errorf("解析私钥失败: %v", err)
-		}
-		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
-	default:
-		if conn.Password == "" {
-			return nil, fmt.Errorf("未配置密码")
-		}
-		return []ssh.AuthMethod{ssh.Password(conn.Password)}, nil
-	}
-}
-
-// dial 建立 SSH 连接。
-// Host Key 采用 InsecureIgnoreHostKey：本工具是自托管单用户场景，不校验服务器指纹以换取接入便利，
-// 由「测试连接」接口回传服务器标识供人工比对；后续如需严格校验再引入 known_hosts。
-func (conn *SshConnection) dial() (*ssh.Client, error) {
-	auths, err := conn.authMethods()
-	if err != nil {
-		return nil, err
-	}
-	clientConfig := &ssh.ClientConfig{
-		User:            conn.Username,
-		Auth:            auths,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-	return ssh.Dial("tcp", conn.sshAddr(), clientConfig)
 }
 
 func (conn *SshConnection) normalizeAuthType() {

@@ -27,14 +27,14 @@ func saveMessage(m wireMessage) (MqttSyncMessage, error) {
 }
 
 // ListLatestPerChannel 返回每个 channel 的最新一条消息（按 created_at 倒序），无分页。
-// 旧消息全部保留在数据库，仅界面展示最新一条。
-func ListLatestPerChannel() ([]MessageDTO, error) {
+// 旧消息全部保留在数据库，仅界面展示最新一条；DTO 转换见 service.ListLatest。
+func ListLatestPerChannel() ([]MqttSyncMessage, error) {
 	return ListLatestPerChannelLike("")
 }
 
 // ListLatestPerChannelLike 返回 channel 匹配指定前缀的每个 channel 最新一条消息。
 // prefix 为空时等价于 ListLatestPerChannel（全部 channel）。
-func ListLatestPerChannelLike(prefix string) ([]MessageDTO, error) {
+func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	db := config.GetDB()
 	if db == nil {
 		return nil, ErrDBUnavailable
@@ -54,11 +54,7 @@ func ListLatestPerChannelLike(prefix string) ([]MessageDTO, error) {
 		Find(&msgs).Error; err != nil {
 		return nil, err
 	}
-	dtos := make([]MessageDTO, 0, len(msgs))
-	for _, m := range msgs {
-		dtos = append(dtos, toDTO(m))
-	}
-	return dtos, nil
+	return msgs, nil
 }
 
 // DeleteChannelByName 将指定主题下的全部消息软删除（IsDeleted = true），返回受影响行数。

@@ -1,10 +1,15 @@
+// 本文件只放实体与动作配置结构；响应视图见 dto.go，校验与用例见 service.go。
 package cronjob
 
 import (
+	"errors"
 	"time"
 
 	"chaos-go/internal/crud"
 )
+
+// ErrJobNotFound 定时任务不存在（或已软删）。
+var ErrJobNotFound = errors.New("cronjob: 定时任务不存在")
 
 // ActionType 是定时任务到点后要执行的动作类型。
 type ActionType string
@@ -32,13 +37,6 @@ type CronJob struct {
 
 // TableName 显式指定表名（与前端资源名 cronJob 对应）。
 func (CronJob) TableName() string { return "cron_jobs" }
-
-// CronJobView 是本资源的响应形态：模型 + 派生字段。
-// NextRun（下次执行时间）由后端按 cron 表达式实时计算，不落库。
-type CronJobView struct {
-	CronJob
-	NextRun *time.Time `json:"NextRun"`
-}
 
 // CronJobRun 是单次执行的运行日志（只追加、不软删，故不套 CRUD 基字段）。
 type CronJobRun struct {

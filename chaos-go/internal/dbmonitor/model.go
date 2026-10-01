@@ -1,55 +1,21 @@
+// Package dbmonitor 只读自省当前数据库：库级总览、表清单（行数 / 大小 / 索引数）、单表列与索引详情。
+// 兼容 SQLite / PostgreSQL 双后端。
+//
+// 分层（见 chaos-lib/AGENTS.md「分层契约」）：
+//   - model.go：领域错误
+//   - repo_sqlite.go / repo_postgres.go：按方言拆分的数据访问（repository）
+//   - service.go：分派、过滤、排序与用例
+//   - dto.go：响应契约
+//   - handler.go：参数解析 + 状态码映射 + 路由注册
 package dbmonitor
 
 import "errors"
 
-// errTableNotFound 表不存在（detail 接口返回）。
+// errTableNotFound 方言实现内部使用的「表不存在」哨兵。
 var errTableNotFound = errors.New("table not found")
 
-// TableStat 单表统计（SQLite / PostgreSQL 字段并集）。
-type TableStat struct {
-	Name          string  `json:"name"`
-	Rows          int64   `json:"rows"`
-	RowsEstimated bool    `json:"rowsEstimated"` // true=统计估值, false=COUNT(*) 精确
-	TableBytes    int64   `json:"tableBytes"`
-	IndexBytes    int64   `json:"indexBytes"`
-	TotalBytes    int64   `json:"totalBytes"` // 表 + 索引（+ toast）
-	IndexCount    int     `json:"indexCount"`
-	SizeSupported bool    `json:"sizeSupported"`
-	SeqScan       *int64  `json:"seqScan,omitempty"`
-	IdxScan       *int64  `json:"idxScan,omitempty"`
-	LastVacuum    *string `json:"lastVacuum,omitempty"`
-	LastAnalyze   *string `json:"lastAnalyze,omitempty"`
-}
-
-// DbOverview 库级总览。
-type DbOverview struct {
-	DbType        string `json:"dbType"`
-	Version       string `json:"version"`
-	TotalBytes    int64  `json:"totalBytes"`
-	TableCount    int    `json:"tableCount"`
-	TotalRows     int64  `json:"totalRows"`
-	SizeSupported bool   `json:"sizeSupported"`
-}
-
-// ColumnInfo 列定义。
-type ColumnInfo struct {
-	Name     string  `json:"name"`
-	Type     string  `json:"type"`
-	Nullable bool    `json:"nullable"`
-	IsPK     bool    `json:"isPk"`
-	Default  *string `json:"default,omitempty"`
-}
-
-// IndexInfo 索引定义。
-type IndexInfo struct {
-	Name    string `json:"name"`
-	Unique  bool   `json:"unique"`
-	Columns string `json:"columns"` // 逗号分隔的列
-}
-
-// TableDetail 单表详情（统计 + 列 + 索引）。
-type TableDetail struct {
-	TableStat
-	Columns []ColumnInfo `json:"columns"`
-	Indexes []IndexInfo  `json:"indexes"`
-}
+// 领域错误哨兵：调用方据此映射 HTTP 状态码。
+var (
+	ErrTableNotFound     = errors.New("dbmonitor: 表不存在")
+	ErrInvalidTableName  = errors.New("dbmonitor: 非法的表名")
+)
