@@ -20,10 +20,7 @@ let stopVersionWatch: () => void
 async function loadCount() {
   try {
     const result = await sendMessage('tasks/pending', 'GET')
-    // 后端返回分页结构 { items, total, page, size }，角标取 total 作为待办总数
-    if (result && typeof result.total === 'number') {
-      count.value = result.total
-    }
+    count.value = result?.pagination?.total || 0
   } catch (e) {
     console.error(e)
   }
