@@ -34,7 +34,9 @@
 
 ## 前端通用
 
-- 请求统一走 `src/utils/api.ts`（原生 fetch，`API_BASE = VITE_API_BASE || '/api'`，带重试），**不引入 axios**。
+- 请求统一走 `src/utils/request.ts`，**不引入 axios**。
+- 提示 / 确认 / 输入弹窗统一走 `src/utils/message.ts`（`showSuccess` / `showError` / `showWarning` / `showInfo` / `confirm` / `prompt`），**页面不直接 import ElMessage/ElMessageBox**。
+- 写操作（二次确认 → 请求 → 提示 → 关弹窗 / 刷新）统一走 `src/composables/useCrudAction.ts` 的 `run(task, opts)`，**页面不重复 try/catch + toast + refresh 骨架**。
 - 路由 history 模式（`createWebHistory`）。
 - 主题 `src/theme.ts`（`dark` 默认 / `paper` 浅黄护眼），持久化 key `chaos-ui:theme`。
 - 编辑器统一 Monaco。

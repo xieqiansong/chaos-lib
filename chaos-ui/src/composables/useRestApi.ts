@@ -8,7 +8,8 @@ import {del, get, patch, post} from '@/utils/request'
 import type {DataTableApiParams} from '@/components/dataTable/types'
 
 // 驼峰字段名 → snake_case 列名，用于把前端列字段名翻译成后端查询参数。
-function toSnake(s: string): string {
+// 自定义取数的页面（如项目管理需追加 groupId）也复用它，避免各自复制一份。
+export function toSnake(s: string): string {
     return s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
 }
 

@@ -97,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import {showError} from '@/utils/message'
 import { Refresh, Warning } from '@element-plus/icons-vue'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, DataTableApiParams, DataTableApiResult} from '@/components/dataTable/types'
@@ -193,7 +193,7 @@ async function openDetail(row: TableStat) {
   try {
     detail.value = await getTableDetail(row.name)
   } catch (e) {
-    ElMessage.error('加载表详情失败：' + (e instanceof Error ? e.message : String(e)))
+    showError('加载表详情失败：' + (e instanceof Error ? e.message : String(e)))
     console.error(e)
   } finally {
     detailLoading.value = false

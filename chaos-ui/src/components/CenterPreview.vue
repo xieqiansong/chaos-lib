@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
 import {get, patch, post} from '@/utils/request'
-import {ElMessage} from 'element-plus'
+import {showError} from '@/utils/message'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 
 const props = defineProps<{
@@ -20,7 +20,7 @@ onMounted(async () => {
     rawLink.value = res?.rawLink ?? ''
     content.value = res?.content ?? ''
   } catch (e: any) {
-    ElMessage.error(e?.message || '获取原文失败')
+    showError(e?.message || '获取原文失败')
   } finally {
     loading.value = false
   }

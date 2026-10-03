@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
 import {get, post} from '@/utils/request'
-import {ElMessage} from 'element-plus'
+import {showSuccess, showError, showWarning} from '@/utils/message'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import {FSRS_RATING_OPTIONS} from '@/constants'
 
@@ -65,7 +65,7 @@ function reset() {
 
 async function aiScore() {
   if (!content.value.trim()) {
-    ElMessage.warning('尚无原文内容，无法评分')
+    showWarning('尚无原文内容，无法评分')
     return
   }
   aiLoading.value = true
@@ -96,7 +96,7 @@ async function loadRaw() {
     rawLink.value = res?.rawLink ?? ''
     content.value = res.content || ''
   } catch (e: any) {
-    ElMessage.warning(e?.message || '获取原文失败')
+    showWarning(e?.message || '获取原文失败')
     content.value = ''
   } finally {
     loading.value = false
@@ -109,7 +109,7 @@ function reveal() {
 
 async function submit() {
   if (selectedRating.value === null) {
-    ElMessage.error('请选择评分')
+    showError('请选择评分')
     return
   }
   submitting.value = true
@@ -118,11 +118,11 @@ async function submit() {
       rating: selectedRating.value,
       answer: answer.value, ai: aiResult.value,
     })
-    ElMessage.success('复习完成')
+    showSuccess('复习完成')
     visible.value = false
     emit('done')
   } catch (e: any) {
-    ElMessage.error(e?.message || '提交失败')
+    showError(e?.message || '提交失败')
   } finally {
     submitting.value = false
   }

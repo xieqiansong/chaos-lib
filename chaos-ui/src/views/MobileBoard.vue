@@ -2,7 +2,7 @@
 import {onMounted, onUnmounted, ref} from 'vue'
 import {format} from 'date-fns'
 import {zhCN} from 'date-fns/locale'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {showError, prompt} from '@/utils/message'
 import {useRouter} from 'vue-router'
 
 const router = useRouter()
@@ -188,10 +188,10 @@ async function refreshWeather() {
 // 手动设置位置：直接输入「纬度,经度」（如 30.57,104.07），也兼容输入城市名
 async function setCity() {
   try {
-    const {value} = await ElMessageBox.prompt(
+    const {value} = await prompt(
         '输入经纬度，例如：30.57,104.07\n（也可直接输入城市名，如：北京）',
-        '设置位置',
         {
+          title: '设置位置',
           inputValue: cachedPos ? `${cachedPos.lat}, ${cachedPos.lon}` : '',
           confirmButtonText: '确定',
           cancelButtonText: '取消',
@@ -214,7 +214,7 @@ async function setCity() {
       const data = await (await fetch(url)).json()
       const r = data.results && data.results[0]
       if (!r) {
-        ElMessage.error('未找到该城市，请换个名称或输入经纬度')
+        showError('未找到该城市，请换个名称或输入经纬度')
         return
       }
       pos = {

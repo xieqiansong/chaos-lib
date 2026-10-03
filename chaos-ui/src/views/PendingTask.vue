@@ -7,7 +7,8 @@
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {batchPostponeTasks} from '@/utils/api'
 import {get, patch} from '@/utils/request'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showSuccess, showError, showWarning} from '@/utils/message'
 import {format as formatDate, parseISO} from 'date-fns'
 import {CircleClose} from '@element-plus/icons-vue'
 import DataTable from '@/components/DataTable.vue'
@@ -177,53 +178,40 @@ async function completeTask(task: PendingTask) {
     showRatingDialog.value = true
     return
   }
-  try {
-    await ElMessageBox.confirm('确认完成此任务？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    })
-    await patch(`tasks/${task.ID}/complete`, {})
-    refreshPendingTasks()
-    ElMessage.success('任务已完成')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-  }
+  await run(() => patch(`tasks/${task.ID}/complete`, {}), {
+    confirm: '确认完成此任务？',
+    confirmButtonText: '确定',
+    type: 'info',
+    success: '任务已完成',
+    error: '操作失败',
+    onDone: refreshPendingTasks,
+  })
 }
 
 async function cancelTask(task: PendingTask) {
-  try {
-    await ElMessageBox.confirm('确认取消此周期任务？取消后本次任务将不再提醒。', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    await patch(`tasks/${task.ID}/cancel`, {})
-    refreshPendingTasks()
-    ElMessage.success('任务已取消')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-  }
+  await run(() => patch(`tasks/${task.ID}/cancel`, {}), {
+    confirm: '确认取消此周期任务？取消后本次任务将不再提醒。',
+    confirmButtonText: '确定',
+    type: 'warning',
+    success: '任务已取消',
+    error: '操作失败',
+    onDone: refreshPendingTasks,
+  })
 }
 
 async function submitRatingDialog(rating: number) {
-  submittingRating.value = true
-  try {
-    if (ratingTargetTask.value) {
-      await patch(`tasks/${ratingTargetTask.value.ID}/complete`, {rating})
-      ElMessage.success('任务已完成')
+  const target = ratingTargetTask.value
+  await runRating(async () => {
+    if (target) {
+      await patch(`tasks/${target.ID}/complete`, {rating})
     }
     showRatingDialog.value = false
     ratingTargetTask.value = null
-    refreshPendingTasks()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  } finally {
-    submittingRating.value = false
-  }
+  }, {
+    success: '任务已完成',
+    error: '操作失败',
+    onDone: refreshPendingTasks,
+  })
 }
 
 function postponeTask(task: PendingTask) {
@@ -239,8 +227,12 @@ function batchPostpone() {
   showPostponeDialog.value = true
 }
 
+// 完成 / 取消 / 延期统一走动作控制器：确认 → 请求 → 提示 → 刷新。
+// 评分弹窗单独一个控制器，其 running 只反映本弹窗的提交状态。
+const {running: submittingRating, run: runRating} = useCrudAction()
+const {run} = useCrudAction()
+
 const showRatingDialog = ref(false)
-const submittingRating = ref(false)
 const ratingTargetTask = ref<PendingTask | null>(null)
 const ratingValue = ref<number | null>(3)
 
@@ -258,31 +250,27 @@ const postponeDialogTitle = computed(() => {
 
 async function submitPostponeDialog() {
   if (postponeDays.value <= 0) {
-    ElMessage.error('延期天数必须大于0')
+    showError('延期天数必须大于0')
     return
   }
-  try {
+  await run(async () => {
     if (postponeTargetTask.value) {
       await patch(`tasks/${postponeTargetTask.value.ID}/postpone`, {days: postponeDays.value})
-      ElMessage.success(`已延期 ${postponeDays.value} 天`)
+      showSuccess(`已延期 ${postponeDays.value} 天`)
     } else if (selectedTasks.value.length > 0) {
       const ids = selectedTasks.value.map(t => t.ID)
       const res = await batchPostponeTasks(ids, postponeDays.value)
       const msg = res?.message || `已延期 ${postponeDays.value} 天`
-      if (res && res.skipped > 0) {
-        ElMessage.warning(msg)
-      } else {
-        ElMessage.success(msg)
-      }
+      if (res && res.skipped > 0) showWarning(msg)
+      else showSuccess(msg)
     }
     showPostponeDialog.value = false
     postponeTargetTask.value = null
     selectedTasks.value = []
-    refreshPendingTasks()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  }, {
+    error: '操作失败',
+    onDone: refreshPendingTasks,
+  })
 }
 
 function reload() {

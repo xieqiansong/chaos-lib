@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
 import {del, get, patch, post} from '@/utils/request'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showError} from '@/utils/message'
 import {openCenterPanel} from '@/utils/centerPanel'
 import {refreshPendingTasks} from '@/utils/pendingTasksStore'
 import {taskPlansVersion} from '@/utils/taskPlansStore'
@@ -47,7 +48,6 @@ const editingPlan = ref<TaskPlan | null>(null)
 const parentPlan = ref<TaskPlan | null>(null)
 
 const showRatingDialog = ref(false)
-const submittingRating = ref(false)
 const ratingAction = ref<'start-plan' | 'complete-plan'>('complete-plan')
 const ratingTargetPlan = ref<TaskPlan | null>(null)
 const ratingValue = ref<number | null>(3)
@@ -68,25 +68,20 @@ function openRatingDialog(action: 'start-plan' | 'complete-plan', target: TaskPl
 }
 
 async function submitRatingDialog(rating: number) {
-  submittingRating.value = true
-  try {
-    if (ratingAction.value === 'start-plan' && ratingTargetPlan.value) {
-      await patch(`task-plans/${ratingTargetPlan.value.ID}/start`, {rating})
-      ElMessage.success('已开启')
-    } else if (ratingAction.value === 'complete-plan' && ratingTargetPlan.value) {
-      await patch(`task-plans/${ratingTargetPlan.value.ID}/complete`, {rating})
-      ElMessage.success('已完成')
+  const target = ratingTargetPlan.value
+  await runRating(async () => {
+    if (ratingAction.value === 'start-plan' && target) {
+      await patch(`task-plans/${target.ID}/start`, {rating})
+    } else if (ratingAction.value === 'complete-plan' && target) {
+      await patch(`task-plans/${target.ID}/complete`, {rating})
     }
     showRatingDialog.value = false
     ratingTargetPlan.value = null
-    refreshAll()
-    await refreshAllPlans()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  } finally {
-    submittingRating.value = false
-  }
+  }, {
+    success: ratingAction.value === 'start-plan' ? '已开启' : '已完成',
+    error: '操作失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 function openPriorityDialog(plan: TaskPlan) {
@@ -98,21 +93,19 @@ function openPriorityDialog(plan: TaskPlan) {
 async function submitPriorityDialog() {
   if (!priorityTargetPlan.value) return
   if (priorityValue.value < 0) {
-    ElMessage.error('优先级不能为负数')
+    showError('优先级不能为负数')
     return
   }
-  try {
-    await patch(`task-plans/${priorityTargetPlan.value.ID}/priority`, {
-      priority: priorityValue.value,
-    })
+  const target = priorityTargetPlan.value
+  await run(async () => {
+    await patch(`task-plans/${target.ID}/priority`, {priority: priorityValue.value})
     showPriorityDialog.value = false
     priorityTargetPlan.value = null
-    await refreshAllPlans()
-    ElMessage.success('优先级已更新')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  }, {
+    success: '优先级已更新',
+    error: '操作失败',
+    onDone: refreshAllPlans,
+  })
 }
 
 function openReview(plan: TaskPlan) {
@@ -315,6 +308,17 @@ function refreshAll() {
   refreshPendingTasks()
 }
 
+// 写操作统一走动作控制器：确认 → 请求 → 提示 → 刷新，页面不再重复 try/catch 骨架。
+// 评分弹窗单独用一个控制器，其 running 只反映本弹窗的提交状态。
+const {running: submittingRating, run: runRating} = useCrudAction()
+const {run} = useCrudAction()
+
+// 任务计划的写操作会连带影响待办列表，故刷新信号与树一起刷新。
+async function refreshAfterWrite() {
+  refreshAll()
+  await refreshAllPlans()
+}
+
 async function fetchAllPlans() {
   treeLoading.value = true
   error.value = ''
@@ -403,21 +407,21 @@ function openLink(ID: string) {
 
 async function createPlan() {
   if (!formData.value.Name.trim()) {
-    ElMessage.error('请输入任务名称')
+    showError('请输入任务名称')
     return
   }
 
   if (formData.value.PlanType === 'cron' && !formData.value.CronExpr.trim()) {
-    ElMessage.error('周期任务必须填写 cron 表达式')
+    showError('周期任务必须填写 cron 表达式')
     return
   }
 
   if (formData.value.PlanType === 'todo' && !formData.value.StartedAt.trim()) {
-    ElMessage.error('待办任务必须填写开始时间')
+    showError('待办任务必须填写开始时间')
     return
   }
 
-  try {
+  await run(async () => {
     const payload: Record<string, any> = {
       Name: formData.value.Name.trim(),
       PlanType: formData.value.PlanType,
@@ -449,24 +453,22 @@ async function createPlan() {
     showAddChildDialog.value = false
     resetForm()
     parentPlan.value = null
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('创建成功')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '创建失败')
-    console.error(e)
-  }
+  }, {
+    success: '创建成功',
+    error: '创建失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function updatePlan() {
   if (!editingPlan.value) return
   if (!formData.value.Name.trim()) {
-    ElMessage.error('请输入任务名称')
+    showError('请输入任务名称')
     return
   }
 
-  try {
-    await patch(`task-plans/${editingPlan.value.ID}`, {
+  await run(async () => {
+    await patch(`task-plans/${editingPlan.value!.ID}`, {
       Name: formData.value.Name.trim(),
       PlanType: formData.value.PlanType,
       CronExpr: formData.value.CronExpr.trim() || undefined,
@@ -480,30 +482,21 @@ async function updatePlan() {
     showEditDialog.value = false
     editingPlan.value = null
     resetForm()
-    await refreshAllPlans()
-    ElMessage.success('修改成功')
-  } catch (e: any) {
-    ElMessage.error(e?.message || '修改失败')
-    console.error(e)
-  }
+  }, {
+    success: '修改成功',
+    error: '修改失败',
+    onDone: refreshAllPlans,
+  })
 }
 
 async function startPlan(plan: TaskPlan) {
-  try {
-    await ElMessageBox.confirm('确认开启此任务计划？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    })
-    await patch(`task-plans/${plan.ID}/start`, {})
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已开启')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  await run(() => patch(`task-plans/${plan.ID}/start`, {}), {
+    confirm: '确认开启此任务计划？',
+    type: 'info',
+    success: '已开启',
+    error: '操作失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function completePlan(plan: TaskPlan) {
@@ -511,95 +504,57 @@ async function completePlan(plan: TaskPlan) {
     openRatingDialog('complete-plan', plan)
     return
   }
-  try {
-    await ElMessageBox.confirm('确认完成此任务计划？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info',
-    })
-    await patch(`task-plans/${plan.ID}/complete`, {})
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已完成')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  await run(() => patch(`task-plans/${plan.ID}/complete`, {}), {
+    confirm: '确认完成此任务计划？',
+    type: 'info',
+    success: '已完成',
+    error: '操作失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function archivePlan(plan: TaskPlan) {
-  try {
-    await ElMessageBox.confirm('确认归档此任务计划？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await patch(`task-plans/${plan.ID}/archive`, {})
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已归档')
-  } catch (e) {
-    if (e !== 'cancel') {
-      console.error(e)
-      ElMessage.error('归档失败')
-    }
-  }
+  await run(() => patch(`task-plans/${plan.ID}/archive`, {}), {
+    confirm: '确认归档此任务计划？',
+    type: 'warning',
+    success: '已归档',
+    error: '归档失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function deletePlan(plan: TaskPlan) {
-  try {
-    await ElMessageBox.confirm('确认删除此任务计划？删除后无法恢复。', '警告', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'error'
-    })
-    await del(`task-plans/${plan.ID}`)
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已删除')
-  } catch (e) {
-    if (e !== 'cancel') {
-      console.error(e)
-      ElMessage.error('删除失败')
-    }
-  }
+  await run(() => del(`task-plans/${plan.ID}`), {
+    confirm: '确认删除此任务计划？删除后无法恢复。',
+    confirmTitle: '警告',
+    confirmButtonText: '删除',
+    type: 'error',
+    success: '已删除',
+    error: '删除失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function suspendPlan(plan: TaskPlan) {
-  try {
-    await ElMessageBox.confirm(
-        `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
-        '提示',
-        {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
-    )
-    await patch(`task-plans/${plan.ID}/suspend`, {})
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已挂起')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  await run(() => patch(`task-plans/${plan.ID}/suspend`, {}), {
+    confirm: `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
+    confirmButtonText: '挂起',
+    type: 'warning',
+    success: '已挂起',
+    error: '操作失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function resumePlan(plan: TaskPlan) {
-  try {
-    await ElMessageBox.confirm(
-        `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
-        '提示',
-        {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
-    )
-    await patch(`task-plans/${plan.ID}/resume`, {})
-    refreshAll()
-    await refreshAllPlans()
-    ElMessage.success('已恢复')
-  } catch (e: any) {
-    if (e === 'cancel') return
-    ElMessage.error(e?.message || '操作失败')
-    console.error(e)
-  }
+  await run(() => patch(`task-plans/${plan.ID}/resume`, {}), {
+    confirm: `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
+    confirmButtonText: '恢复',
+    type: 'info',
+    success: '已恢复',
+    error: '操作失败',
+    onDone: refreshAfterWrite,
+  })
 }
 
 async function openEditDialog(ID: string) {

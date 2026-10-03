@@ -5,10 +5,13 @@
 //      认领 / 移动 / 访问 / 复制路径 / 删除等动作经 #actions 插槽注入，保持基线纯净）。
 import {onMounted, ref, watch} from 'vue'
 import {format} from 'date-fns'
-import {ElMessage, ElMessageBox} from 'element-plus'
 import DataTable from '@/components/DataTable.vue'
 import DataFormDialog from '@/components/DataFormDialog.vue'
 import type {DataTableApiParams, DataTableColumn, FormField} from '@/components/dataTable/types'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {defaultForm} from '@/composables/useFormDefaults'
+import {toSnake} from '@/composables/useRestApi'
+import {showError, showSuccess, showWarning} from '@/utils/message'
 import {type ProjectGroup, projectGroupApi} from '@/api/projectGroup'
 import {type Project, projectApi} from '@/api/project'
 import {get} from '@/utils/request'
@@ -99,26 +102,17 @@ const showCreate = ref(false)
 const showEdit = ref(false)
 const showDetail = ref(false)
 const showMove = ref(false)
-const saving = ref(false)
+// 写操作统一走动作控制器：确认 → 请求 → 提示 → 刷新；saving 直接驱动弹窗按钮的 loading
+const {running: saving, run} = useCrudAction()
 const form = ref<Record<string, any>>({})
 const editId = ref(0)
 const detailItem = ref<Project | null>(null)
 const moveForm = ref({TargetGroupID: 0, TargetRelativePath: ''})
 const moveId = ref(0)
 
-function defaultForm(fields: FormField[]): Record<string, any> {
-  const f: Record<string, any> = {}
-  for (const field of fields) {
-    if (field.type === 'number') f[field.field] = field.defaultValue ?? 0
-    else if (field.type === 'switch') f[field.field] = field.defaultValue ?? false
-    else f[field.field] = field.defaultValue ?? ''
-  }
-  return f
-}
-
 function openCreateProject() {
   if (selectedGroupId.value == null) {
-    ElMessage.warning('请先选择左侧项目组')
+    showWarning('请先选择左侧项目组')
     return
   }
   form.value = defaultForm(projectCreateFields)
@@ -142,90 +136,79 @@ function openMove(row: Project) {
   showMove.value = true
 }
 
+// 右表为自定义取数，统一经 ref 触发刷新
+function refreshProjects() {
+  projectsTable.value?.refresh()
+}
+
 async function saveCreate() {
-  saving.value = true
-  try {
-    await projectApi.create({GroupID: selectedGroupId.value!, ...form.value})
-    ElMessage.success('创建成功')
-    showCreate.value = false
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '创建失败')
-  } finally {
-    saving.value = false
-  }
+  await run(() => projectApi.create({GroupID: selectedGroupId.value!, ...form.value}), {
+    success: '创建成功',
+    error: '创建失败',
+    onDone: () => {
+      showCreate.value = false
+      refreshProjects()
+    },
+  })
 }
 
 async function saveEdit() {
-  saving.value = true
-  try {
-    await projectApi.update(editId.value, {
-      Name: form.value.Name,
-      GitURL: form.value.GitURL || null,
-      Remark: form.value.Remark || null,
-    })
-    ElMessage.success('更新成功')
-    showEdit.value = false
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '更新失败')
-  } finally {
-    saving.value = false
-  }
+  await run(() => projectApi.update(editId.value, {
+    Name: form.value.Name,
+    GitURL: form.value.GitURL || null,
+    Remark: form.value.Remark || null,
+  }), {
+    success: '更新成功',
+    error: '更新失败',
+    onDone: () => {
+      showEdit.value = false
+      refreshProjects()
+    },
+  })
 }
 
 async function doMove() {
-  try {
-    await projectApi.move(moveId.value, moveForm.value.TargetGroupID, moveForm.value.TargetRelativePath || undefined)
-    ElMessage.success('移动成功')
-    showMove.value = false
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '移动失败')
-  }
+  await run(() => projectApi.move(moveId.value, moveForm.value.TargetGroupID, moveForm.value.TargetRelativePath || undefined), {
+    success: '移动成功',
+    error: '移动失败',
+    onDone: () => {
+      showMove.value = false
+      refreshProjects()
+    },
+  })
 }
 
 async function claimProject(row: Project) {
-  try {
-    await projectApi.claim({
-      GroupID: row.GroupID,
-      Name: row.Name,
-      AbsolutePath: row.AbsolutePath,
-      RelativePath: row.RelativePath,
-    })
-    ElMessage.success('认领成功')
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '认领失败')
-  }
+  await run(() => projectApi.claim({
+    GroupID: row.GroupID,
+    Name: row.Name,
+    AbsolutePath: row.AbsolutePath,
+    RelativePath: row.RelativePath,
+  }), {
+    success: '认领成功',
+    error: '认领失败',
+    onDone: refreshProjects,
+  })
 }
 
 async function accessProject(row: Project) {
-  try {
-    await projectApi.access(row.ID)
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '访问失败')
-  }
+  await run(() => projectApi.access(row.ID), {
+    error: '访问失败',
+    onDone: refreshProjects,
+  })
 }
 
 async function deleteProject(row: Project) {
-  try {
-    await ElMessageBox.confirm(
-        `将永久删除项目「${row.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
-        '删除项目',
-        {confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning', confirmButtonClass: 'el-button--danger'},
-    )
-  } catch {
-    return
-  }
-  try {
-    await projectApi.remove(row.ID)
-    ElMessage.success('删除成功')
-    projectsTable.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
+  await run(() => projectApi.remove(row.ID), {
+    confirm: `将永久删除项目「${row.Name}」及其磁盘目录，此操作不可恢复，确定继续？`,
+    confirmTitle: '删除项目',
+    confirmButtonText: '删除',
+    confirmButtonClass: 'el-button--danger',
+    type: 'warning',
+    success: '删除成功',
+    error: '删除失败',
+    onDone: refreshProjects,
+  })
 }
 
 // 复制项目绝对路径到剪贴板（后端以服务运行，无桌面会话，无法直接打开资源管理器）
@@ -244,9 +227,9 @@ async function copyPath(p: Project) {
       document.execCommand('copy')
       document.body.removeChild(ta)
     }
-    ElMessage.success('已复制路径：' + p.AbsolutePath)
+    showSuccess('已复制路径：' + p.AbsolutePath)
   } catch (e: any) {
-    ElMessage.error('复制失败，请手动复制：' + p.AbsolutePath)
+    showError('复制失败，请手动复制：' + p.AbsolutePath)
   }
 }
 
@@ -255,11 +238,6 @@ function formatTime(value: string | null | undefined): string {
   const d = new Date(value)
   if (isNaN(d.getTime())) return '—'
   return format(d, 'yyyy-MM-dd HH:mm:ss')
-}
-
-// 驼峰字段名 → snake_case，用于把前端列字段名翻译成后端查询参数
-function toSnake(s: string): string {
-  return s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
 }
 
 onMounted(async () => {

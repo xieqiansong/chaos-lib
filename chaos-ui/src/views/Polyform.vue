@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onBeforeUnmount, reactive, ref, watch} from 'vue'
-import {ElMessage} from 'element-plus'
+import {showSuccess, showError} from '@/utils/message'
 import {
   FORMAT_LIST,
   FORMAT_META,
@@ -154,9 +154,9 @@ async function copyOutput() {
   if (!text) return
   try {
     await navigator.clipboard.writeText(text)
-    ElMessage.success('已复制到剪贴板')
+    showSuccess('已复制到剪贴板')
   } catch {
-    ElMessage.error('复制失败，请手动选择文本')
+    showError('复制失败，请手动选择文本')
   }
 }
 

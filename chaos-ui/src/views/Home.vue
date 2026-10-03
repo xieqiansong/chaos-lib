@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
-import {ElMessage} from 'element-plus'
+import {showError} from '@/utils/message'
 import {Folder, Refresh, Setting} from '@element-plus/icons-vue'
 import BookmarkMenu from '@/components/BookmarkMenu.vue'
 import {favicon, hostnameOf} from '@/utils/url'
@@ -70,7 +70,7 @@ async function loadBookmarks() {
     bookmarksBarChildren.value = bar?.children || []
   } catch (e) {
     bookmarksBarChildren.value = []
-    ElMessage.error('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
+    showError('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     bookmarksLoading.value = false
   }

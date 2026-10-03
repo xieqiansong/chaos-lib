@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
-import {ElMessage} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showSuccess, showError, showWarning} from '@/utils/message'
 import {getEnvVariables, syncEnvVariables, patchEnvVariables, type EnvResponse} from '@/api/environment'
 
 const props = defineProps<{
   searchText: string
 }>()
 
+// 读与写统一走动作控制器：请求 → 提示 → 刷新。
+// 编辑 / 新增各用一个控制器，其 running 分别驱动各自弹窗按钮的 loading。
+const {running: loading, run} = useCrudAction()
+const {running: editSaving, run: runEdit} = useCrudAction()
+const {running: addSaving, run: runAdd} = useCrudAction()
+
 const data = ref<EnvResponse | null>(null)
-const loading = ref(false)
 
 const activeTab = ref<'system' | 'user'>('user')
 
@@ -33,32 +39,21 @@ const filteredVariables = computed(() => {
 })
 
 async function fetchEnv() {
-  loading.value = true
-  try {
+  await run(async () => {
     data.value = await getEnvVariables()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '获取环境变量失败')
-  } finally {
-    loading.value = false
-  }
+  }, {error: '获取环境变量失败'})
 }
 
 async function syncEnv() {
-  loading.value = true
-  try {
+  await run(async () => {
     await syncEnvVariables()
-    ElMessage.success('同步成功')
+    showSuccess('同步成功')
     await fetchEnv()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '同步失败')
-  } finally {
-    loading.value = false
-  }
+  }, {error: '同步失败'})
 }
 
 const editingKey = ref('')
 const editValue = ref('')
-const editSaving = ref(false)
 const editArrayItems = ref<string[]>([])
 
 function startEdit(key: string, value: string) {
@@ -129,58 +124,45 @@ function onEditModeChange(mode: 'text' | 'array') {
 
 async function saveEdit() {
   if (!data.value) return
-  editSaving.value = true
   const scope = activeTab.value
   const value = editMode.value === 'array' ? editArrayItems.value.join(';') : editValue.value
   const payload = {[scope]: {set: {[editingKey.value]: value}}}
-  try {
+  await runEdit(async () => {
     const result = await patchEnvVariables(payload)
-    if (result?.Warnings?.length) ElMessage.warning(result.Warnings.join('; '))
-    else ElMessage.success('保存成功')
+    if (result?.Warnings?.length) showWarning(result.Warnings.join('; '))
+    else showSuccess('保存成功')
     editingKey.value = ''
     await fetchEnv()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
-  } finally {
-    editSaving.value = false
-  }
+  }, {error: '保存失败'})
 }
 
 async function deleteVar(key: string) {
   if (!data.value) return
   const scope = activeTab.value
   const payload = {[scope]: {unset: [key]}}
-  try {
+  await run(async () => {
     await patchEnvVariables(payload)
-    ElMessage.success(`已删除 ${key}`)
+    showSuccess(`已删除 ${key}`)
     await fetchEnv()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
+  }, {error: '删除失败'})
 }
 
 const showAddDialog = ref(false)
 const newKey = ref('')
 const newValue = ref('')
-const addSaving = ref(false)
 
 async function addVariable() {
   if (!newKey.value.trim()) return
-  addSaving.value = true
   const scope = activeTab.value
   const payload = {[scope]: {set: {[newKey.value.trim()]: newValue.value}}}
-  try {
+  await runAdd(async () => {
     await patchEnvVariables(payload)
-    ElMessage.success(`已添加 ${newKey.value}`)
+    showSuccess(`已添加 ${newKey.value}`)
     showAddDialog.value = false
     newKey.value = ''
     newValue.value = ''
     await fetchEnv()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '添加失败')
-  } finally {
-    addSaving.value = false
-  }
+  }, {error: '添加失败'})
 }
 
 const editMode = ref<'text' | 'array'>('array')

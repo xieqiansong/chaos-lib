@@ -126,8 +126,12 @@
 <script setup lang="ts">
 import {onMounted, reactive, ref} from 'vue'
 import {Delete, Plus, Setting} from '@element-plus/icons-vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showSuccess, showError, showWarning, showInfo} from '@/utils/message'
 import {createSdkDef, deleteSdkDef, getSdkDefs, getSdkVersions, type SdkSource, type SdkSourceItem, updateSdkDef, updateSdkVersion,} from '@/utils/api'
+
+// 保存 / 删除来源统一走动作控制器：确认 → 请求 → 提示 → 刷新
+const {run} = useCrudAction()
 
 interface SdkListEntry {
   CurrentVersion: string
@@ -179,19 +183,19 @@ async function switchVersion(type: string, version: string) {
   try {
     await updateSdkVersion(type, version)
     await loadVersions()
-    ElMessage.success(`已切换到 ${type} ${version}`)
+    showSuccess(`已切换到 ${type} ${version}`)
   } catch (e: any) {
     const msg = e?.message || ''
     if (msg.includes('400') || msg.includes('不支持')) {
-      ElMessage.warning('该来源不支持切换')
+      showWarning('该来源不支持切换')
     } else {
-      ElMessage.error('切换失败: ' + msg)
+      showError('切换失败: ' + msg)
     }
   }
 }
 
 function onSingleClick(type: string) {
-  ElMessage.info(`${type} 为单版本来源，不支持切换`)
+  showInfo(`${type} 为单版本来源，不支持切换`)
 }
 
 async function loadVersions() {
@@ -245,14 +249,14 @@ function removeSource(i: number) {
 
 async function submitDef() {
   if (!form.Name) {
-    ElMessage.warning('请填写类型名')
+    showWarning('请填写类型名')
     return
   }
   if (form.Sources.some((s) => !s.root)) {
-    ElMessage.warning('每个来源都需要填写 root 路径')
+    showWarning('每个来源都需要填写 root 路径')
     return
   }
-  try {
+  await run(async () => {
     if (editingDef.value) {
       await updateSdkDef(editingDef.value.Name, {
         Sources: form.Sources,
@@ -267,31 +271,29 @@ async function submitDef() {
         Note: form.Note,
       })
     }
-    ElMessage.success('保存成功')
     formVisible.value = false
-    await loadDefs()
-    await loadVersions()
-  } catch (e: any) {
-    ElMessage.error('保存失败: ' + (e?.message || ''))
-  }
+  }, {
+    success: '保存成功',
+    error: (e: any) => '保存失败: ' + (e?.message || ''),
+    onDone: async () => {
+      await loadDefs()
+      await loadVersions()
+    },
+  })
 }
 
 async function removeDef(row: SdkSource) {
-  try {
-    await ElMessageBox.confirm(`确认删除 SDK 类型 "${row.Name}"？`, '删除确认', {
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await deleteSdkDef(row.Name)
-    ElMessage.success('已删除')
-    await loadDefs()
-    await loadVersions()
-  } catch (e: any) {
-    ElMessage.error('删除失败: ' + (e?.message || ''))
-  }
+  await run(() => deleteSdkDef(row.Name), {
+    confirm: `确认删除 SDK 类型 "${row.Name}"？`,
+    confirmTitle: '删除确认',
+    type: 'warning',
+    success: '已删除',
+    error: (e: any) => '删除失败: ' + (e?.message || ''),
+    onDone: async () => {
+      await loadDefs()
+      await loadVersions()
+    },
+  })
 }
 
 onMounted(() => {

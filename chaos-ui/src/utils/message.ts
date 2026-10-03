@@ -40,6 +40,8 @@ export interface ConfirmOptions {
   type?: 'success' | 'warning' | 'info' | 'error'
   confirmButtonText?: string
   cancelButtonText?: string
+  /** 确认按钮追加 class，危险操作传 'el-button--danger' */
+  confirmButtonClass?: string
 }
 
 /**
@@ -54,12 +56,43 @@ export function confirm(message: string, options?: ConfirmOptions): Promise<Mess
     type: options?.type ?? 'warning',
     confirmButtonText: options?.confirmButtonText ?? '确定',
     cancelButtonText: options?.cancelButtonText ?? '取消',
+    confirmButtonClass: options?.confirmButtonClass ?? '',
   })
 }
 
-/** 危险操作快捷确认（红色警告图标，确定按钮文案「确定」） */
-export function confirmDanger(message: string, title = '提示'): Promise<MessageBoxData> {
-  return confirm(message, { title, type: 'warning', confirmButtonText: '确定' })
+/** 危险操作快捷确认（警告图标 + 红色确认按钮） */
+export function confirmDanger(
+    message: string,
+    title = '提示',
+    confirmButtonText = '确定',
+): Promise<MessageBoxData> {
+  return confirm(message, {title, type: 'warning', confirmButtonText, confirmButtonClass: 'el-button--danger'})
+}
+
+// ---------- 输入弹窗（Promise 风格） ----------
+export interface PromptOptions extends ConfirmOptions {
+  inputValue?: string
+  inputPlaceholder?: string
+  inputPattern?: RegExp
+  inputValidator?: (value: string) => boolean | string
+}
+
+/**
+ * 带输入框的弹窗，返回 Promise。
+ * - 点击「确定」：resolve，其 value 为输入内容
+ * - 点击「取消」/ 关闭：reject
+ */
+export function prompt(message: string, options?: PromptOptions): Promise<MessageBoxData> {
+  return ElMessageBox.prompt(message, options?.title ?? '提示', {
+    type: options?.type ?? 'info',
+    confirmButtonText: options?.confirmButtonText ?? '确定',
+    cancelButtonText: options?.cancelButtonText ?? '取消',
+    confirmButtonClass: options?.confirmButtonClass ?? '',
+    inputValue: options?.inputValue,
+    inputPlaceholder: options?.inputPlaceholder,
+    inputPattern: options?.inputPattern,
+    inputValidator: options?.inputValidator,
+  })
 }
 
 // ---------- 通知 Notification ----------

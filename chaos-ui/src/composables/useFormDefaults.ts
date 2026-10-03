@@ -9,3 +9,12 @@ export function defaultFieldValue(field: FormField): any {
   if (field.type === 'datetime') return null
   return ''
 }
+
+/** 按字段配置生成一份新建表单的初始值集合（DataTable 内置弹窗与页面自定义弹窗共用） */
+export function defaultForm(fields: FormField[]): Record<string, any> {
+  const f: Record<string, any> = {}
+  for (const field of fields) {
+    f[field.field] = defaultFieldValue(field)
+  }
+  return f
+}

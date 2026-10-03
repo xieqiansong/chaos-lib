@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {showSuccess, showError, showWarning, confirm} from '@/utils/message'
 import {Refresh, Plus, Setting, Folder, Link, FolderAdd, TopRight, MoreFilled, EditPen, Delete} from '@element-plus/icons-vue'
 import {
   refreshExtStatus,
@@ -78,7 +78,7 @@ async function refreshStatus() {
 
 function ensureConnected(): boolean {
   if ((status.value?.connected ?? 0) <= 0) {
-    ElMessage.warning('未连接扩展：请填写正确的「扩展直连 ID」并确保插件已加载')
+    showWarning('未连接扩展：请填写正确的「扩展直连 ID」并确保插件已加载')
     return false
   }
   return true
@@ -91,12 +91,12 @@ async function runCmd(cmd: any): Promise<any | null> {
     const res = await pushExtCommand(cmd)
     const hit = res.response
     if (!hit || !hit.ok) {
-      ElMessage.error(hit?.error || '扩展未返回结果')
+      showError(hit?.error || '扩展未返回结果')
       return null
     }
     return hit
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : String(e))
+    showError(e instanceof Error ? e.message : String(e))
     return null
   }
 }
@@ -109,7 +109,7 @@ async function pullTree(silent = false) {
     const res = await pushExtCommand({type: 'bookmarks:getTree', id: `tree-${Date.now()}`})
     const hit = res.response
     if (!hit || !hit.ok) {
-      if (!silent) ElMessage.error('拉取书签失败：' + (hit?.error || '无响应'))
+      if (!silent) showError('拉取书签失败：' + (hit?.error || '无响应'))
       return
     }
     tree.value = hit.echo || []
@@ -117,7 +117,7 @@ async function pullTree(silent = false) {
     await nextTick()
     expandBookmarksBar()
   } catch (e) {
-    if (!silent) ElMessage.error('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
+    if (!silent) showError('拉取书签失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     loadingTree.value = false
   }
@@ -198,11 +198,11 @@ function openCreate(parentId?: string | null, mode: 'bookmark' | 'folder' = 'boo
 
 async function submitCreate() {
   if (!formTitle.value.trim()) {
-    ElMessage.warning('请输入标题')
+    showWarning('请输入标题')
     return
   }
   if (dialogMode.value === 'bookmark' && !formUrl.value.trim()) {
-    ElMessage.warning('书签需要填写 URL')
+    showWarning('书签需要填写 URL')
     return
   }
   const cmd: any = {
@@ -214,7 +214,7 @@ async function submitCreate() {
   if (dialogMode.value === 'bookmark') cmd.url = formUrl.value.trim()
   const hit = await runCmd(cmd)
   if (!hit) return
-  ElMessage.success('创建成功')
+  showSuccess('创建成功')
   dialogVisible.value = false
   await pullTree()
 }
@@ -230,11 +230,11 @@ function openEdit(data: any) {
 
 async function submitEdit() {
   if (!editTitle.value.trim()) {
-    ElMessage.warning('请输入标题')
+    showWarning('请输入标题')
     return
   }
   if (editIsBookmark.value && !editUrl.value.trim()) {
-    ElMessage.warning('书签需要填写 URL')
+    showWarning('书签需要填写 URL')
     return
   }
   const cmd: any = {
@@ -246,7 +246,7 @@ async function submitEdit() {
   if (editIsBookmark.value) cmd.url = editUrl.value.trim()
   const hit = await runCmd(cmd)
   if (!hit) return
-  ElMessage.success('已修改')
+  showSuccess('已修改')
   editVisible.value = false
   await pullTree()
 }
@@ -254,17 +254,16 @@ async function submitEdit() {
 // 删除（文件夹用 removeTree）
 async function deleteNode(id: string, title: string, url?: string) {
   try {
-    await ElMessageBox.confirm(
+    await confirm(
       `确认删除「${title || url || '该项'}」？文件夹将连带删除其子项。`,
-      '删除确认',
-      {type: 'warning'},
+      {title: '删除确认', type: 'warning'},
     )
   } catch {
     return
   }
   const hit = await runCmd({type: 'bookmarks:remove', id: `remove-${Date.now()}`, nodeId: id, isFolder: isFolder({url})})
   if (!hit) return
-  ElMessage.success('已删除')
+  showSuccess('已删除')
   await pullTree()
 }
 
@@ -294,7 +293,7 @@ async function onNodeDrop(dragging: any, drop: any, type: 'prev' | 'inner' | 'ne
     parentId,
     index: index >= 0 ? index : undefined,
   })
-  if (hit) ElMessage.success('已移动')
+  if (hit) showSuccess('已移动')
   // 无论成功与否都重新拉取，保证与浏览器书签一致
   await pullTree(true)
 }

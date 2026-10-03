@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // SSH 连接管理界面：配置驱动表格 + 内置 CRUD（参考 StandardData 基线）。
 // 仅声明 columns 与 fields，凭据字段经 showIf 按认证方式切换；测试连接经 #actions 槽自定义。
-import {ElMessage} from 'element-plus'
+import {showSuccess, showError} from '@/utils/message'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
 import {sshConnApi, type SshConnection} from '@/api/sshConn'
@@ -50,9 +50,9 @@ async function testConn(row: SshConnection) {
   try {
     const res = await sshConnApi.test(row.ID)
     const version = res?.data?.serverVersion ? ` (${res.data.serverVersion})` : ''
-    ElMessage.success(`连接成功${version}`)
+    showSuccess(`连接成功${version}`)
   } catch (e) {
-    ElMessage.error(pickError(e))
+    showError(pickError(e))
   }
 }
 </script>

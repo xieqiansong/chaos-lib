@@ -8,7 +8,7 @@
 //   3. 下次执行时间（NextRun）由后端按 cron 表达式实时计算，不落库 —— 前端只负责渲染。
 //   4. 工具栏的 cron 表达式校验沿用自定义 /preview 接口，避免填错表达式却要到点才发现。
 import {ref, watch} from 'vue'
-import {ElMessage} from 'element-plus'
+import {showSuccess, showError, showWarning} from '@/utils/message'
 import {format as formatDate, parseISO} from 'date-fns'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
@@ -78,11 +78,11 @@ function onEnabledChange(row: CronJob, next: boolean) {
 async function runJob(row: CronJob) {
   try {
     const run = await cronJobApi.run(row.ID)
-    if (run?.Success) ElMessage.success('执行成功')
-    else ElMessage.warning('执行失败，可查看运行历史')
+    if (run?.Success) showSuccess('执行成功')
+    else showWarning('执行失败，可查看运行历史')
     tableRef.value?.refresh()
   } catch (e: any) {
-    ElMessage.error(e?.message || '触发失败')
+    showError(e?.message || '触发失败')
   }
 }
 
@@ -100,7 +100,7 @@ async function openHistory(row: CronJob) {
     const res = await cronJobApi.runs(row.ID, {page: 1, page_size: 50})
     runs.value = res?.list ?? []
   } catch (e: any) {
-    ElMessage.error(e?.message || '加载历史失败')
+    showError(e?.message || '加载历史失败')
     runs.value = []
   } finally {
     runsLoading.value = false

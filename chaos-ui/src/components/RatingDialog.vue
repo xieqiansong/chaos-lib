@@ -2,7 +2,7 @@
 // 统一 FSRS 评分弹窗：替代 PendingTask / TaskPlan 中结构完全相同的评分对话框。
 // 评分选项、说明文案均来自 src/constants.ts，确保单一可信源。
 import {computed} from 'vue'
-import {ElMessage} from 'element-plus'
+import {showError} from '@/utils/message'
 import {FSRS_RATING_OPTIONS, FSRS_RATING_TIP} from '@/constants'
 
 const props = withDefaults(defineProps<{
@@ -40,7 +40,7 @@ const rating = computed({
 
 function onConfirm() {
   if (rating.value == null) {
-    ElMessage.error('请选择评分')
+    showError('请选择评分')
     return
   }
   emit('submit', rating.value)

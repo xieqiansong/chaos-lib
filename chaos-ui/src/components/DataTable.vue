@@ -6,7 +6,8 @@
 //         业务扩展动作经 #actions 插槽追加在同格（如定时任务的「运行 / 历史」），
 //         非 CRUD 场景可仅用 { type: 'actions' } + #actions 插槽自行定义全部按钮。
 import {computed, onMounted, reactive, ref} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showError} from '@/utils/message'
 
 // 选择变化事件：透传 el-table 的 selection-change，便于业务层做批量操作。
 const emit = defineEmits<{
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 }>()
 import {format, parseISO} from 'date-fns'
 import {useDataTable} from '@/composables/useDataTable'
-import {defaultFieldValue} from '@/composables/useFormDefaults'
+import {defaultForm} from '@/composables/useFormDefaults'
 import {type RestApi} from '@/composables/useRestApi'
 import type {DataTableApiParams, DataTableApiResult, DataTableColumn, CrudAction, FormField} from '@/components/dataTable/types'
 import {CRUD_ACTION} from '@/components/dataTable/types'
@@ -151,15 +152,12 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const showDialog = ref(false)
 const showView = ref(false)
 const editingId = ref<number | null>(null)
-const saving = ref(false)
+// 内置 查看/编辑/删除 统一走动作控制器：确认 → 请求 → 提示 → 刷新
+const {running: saving, run} = useCrudAction()
 const form = reactive<Record<string, any>>({})
 
 function emptyForm(): Record<string, any> {
-  const f: Record<string, any> = {}
-  for (const field of props.fields ?? []) {
-    f[field.field] = defaultFieldValue(field)
-  }
-  return f
+  return defaultForm(props.fields ?? [])
 }
 
 function fillForm(row: any) {
@@ -191,47 +189,36 @@ async function save() {
   if (!crudApi.value) return
   for (const field of props.fields ?? []) {
     if (field.required && !form[field.field]) {
-      ElMessage.error(`${field.title}不能为空`)
+      showError(`${field.title}不能为空`)
       return
     }
   }
-  saving.value = true
-  try {
+  await run(async () => {
     if (dialogMode.value === 'create') {
-      await crudApi.value.create({...form})
-      ElMessage.success('创建成功')
+      await crudApi.value!.create({...form})
     } else if (editingId.value != null) {
-      await crudApi.value.update(editingId.value, {...form})
-      ElMessage.success('更新成功')
+      await crudApi.value!.update(editingId.value, {...form})
     }
     showDialog.value = false
-    refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '保存失败')
-  } finally {
-    saving.value = false
-  }
+  }, {
+    success: dialogMode.value === 'create' ? '创建成功' : '更新成功',
+    error: '保存失败',
+    onDone: refresh,
+  })
 }
 
 async function remove(row: any) {
   if (!crudApi.value) return
   const name = row[props.nameField] ?? row[props.rowKey]
-  try {
-    await ElMessageBox.confirm(
-        `确认删除「${name}」？删除后可在库中恢复（逻辑删除）。`,
-        '警告',
-        {confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning'},
-    )
-  } catch {
-    return
-  }
-  try {
-    await crudApi.value.remove(row[props.rowKey])
-    ElMessage.success('删除成功')
-    refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
+  await run(() => crudApi.value!.remove(row[props.rowKey]), {
+    confirm: `确认删除「${name}」？删除后可在库中恢复（逻辑删除）。`,
+    confirmTitle: '警告',
+    confirmButtonText: '确认删除',
+    type: 'warning',
+    success: '删除成功',
+    error: '删除失败',
+    onDone: refresh,
+  })
 }
 
 // 行内开关（type=switch 列）：
@@ -240,19 +227,19 @@ async function remove(row: any) {
 //    无副作用的布尔字段零样板，无需各资源再写回调与后端专属路由。
 // 两者皆无（本地数据 / 纯取数函数）时开关禁用。
 async function onSwitchChange(row: any, field: string, next: boolean) {
-  try {
+  // 既无自定义 handler 也无完整 api（本地数据 / 纯取数函数）时开关禁用，不提示不刷新
+  if (!props.switchHandler && !crudApi.value) return
+  await run(async () => {
     if (props.switchHandler) {
       await props.switchHandler(row, next)
-    } else if (crudApi.value) {
-      await crudApi.value.update(row[props.rowKey], {[field]: next})
     } else {
-      return
+      await crudApi.value!.update(row[props.rowKey], {[field]: next})
     }
-    ElMessage.success('状态已更新')
-    refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '更新状态失败')
-  }
+  }, {
+    success: '状态已更新',
+    error: '更新状态失败',
+    onDone: refresh,
+  })
 }
 
 // 行内时间：type=datetime 的列按标准格式序列化显示（fmt 遵循 date-fns 的 token）

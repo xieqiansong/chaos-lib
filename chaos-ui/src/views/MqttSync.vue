@@ -3,7 +3,8 @@
 // 新建改为平铺广播表单（#toolbar 插槽 + hide-create），广播并记录到本地消息表；
 // 状态查询、主题级删除为扩展能力，由本页自行调用 mqttSyncApi 处理。
 import {onMounted, onUnmounted, ref} from 'vue'
-import {ElMessage, ElMessageBox} from 'element-plus'
+import {useCrudAction} from '@/composables/useCrudAction'
+import {showWarning} from '@/utils/message'
 import DataTable from '@/components/DataTable.vue'
 import {CRUD_ACTION, type DataTableColumn, type FormField} from '@/components/dataTable/types'
 import {mqttSyncApi, type MqttStatus} from '@/api/mqttSync'
@@ -12,7 +13,8 @@ const status = ref<MqttStatus | null>(null)
 // 平铺广播表单：主题同时作为「广播」与「删除该主题消息」的目标
 const channel = ref('broadcast')
 const payload = ref('')
-const sending = ref(false)
+// 广播 / 删除主题统一走动作控制器：确认 → 请求 → 提示 → 刷新
+const {running: sending, run} = useCrudAction()
 const tableRef = ref<InstanceType<typeof DataTable> | null>(null)
 let timer: number | undefined
 
@@ -54,45 +56,35 @@ onUnmounted(() => {
 async function broadcast() {
   const body = payload.value.trim()
   if (!body) {
-    ElMessage.warning('请输入内容')
+    showWarning('请输入内容')
     return
   }
-  sending.value = true
-  try {
-    await mqttSyncApi.create({Channel: channel.value.trim() || 'broadcast', Payload: body})
-    ElMessage.success('已广播并记录到本地消息表')
-    payload.value = ''
-    tableRef.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '广播失败')
-  } finally {
-    sending.value = false
-  }
+  await run(() => mqttSyncApi.create({Channel: channel.value.trim() || 'broadcast', Payload: body}), {
+    success: '已广播并记录到本地消息表',
+    error: '广播失败',
+    onDone: () => {
+      payload.value = ''
+      tableRef.value?.refresh()
+    },
+  })
 }
 
 // 按主题批量删除：目标主题取平铺表单的主题输入。
 async function removeChannel() {
   const name = channel.value.trim()
   if (!name) {
-    ElMessage.warning('请输入要删除的主题')
+    showWarning('请输入要删除的主题')
     return
   }
-  try {
-    await ElMessageBox.confirm(
-      `确认删除主题「${name}」下的全部消息？（仅标记删除，仍保留在库中）`,
-      '删除确认',
-      {type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'},
-    )
-  } catch {
-    return
-  }
-  try {
-    await mqttSyncApi.deleteChannel(name)
-    ElMessage.success(`已删除主题「${name}」的消息`)
-    tableRef.value?.refresh()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
-  }
+  await run(() => mqttSyncApi.deleteChannel(name), {
+    confirm: `确认删除主题「${name}」下的全部消息？（仅标记删除，仍保留在库中）`,
+    confirmTitle: '删除确认',
+    confirmButtonText: '确认删除',
+    type: 'warning',
+    success: `已删除主题「${name}」的消息`,
+    error: '删除失败',
+    onDone: () => tableRef.value?.refresh(),
+  })
 }
 </script>
 
