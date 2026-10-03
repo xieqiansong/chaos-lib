@@ -79,18 +79,3 @@ func GetDB() *gorm.DB {
 	}
 	return dbInstance
 }
-
-func TryConnectDB() (*gorm.DB, error) {
-	if dbInstance != nil {
-		return dbInstance, nil
-	}
-
-	db, err := privateConnectDB()
-	if err != nil {
-		return nil, err
-	}
-
-	dbInstance = db
-	slog.Info("Connected to database with GORM")
-	return db, nil
-}

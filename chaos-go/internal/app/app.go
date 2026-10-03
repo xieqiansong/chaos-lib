@@ -10,7 +10,6 @@ import (
 	"chaos-go/internal/datacache"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
-	_ "chaos-go/internal/modules"
 	"chaos-go/internal/mqttsync"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
