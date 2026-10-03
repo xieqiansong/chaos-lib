@@ -380,7 +380,7 @@ onMounted(() => {
   left: 0;
   z-index: 20;
   min-width: 14rem;
-  max-height: 20rem;
+  max-height: 40rem;
   overflow-y: auto;
   padding: var(--space-05);
   background: var(--el-bg-color-overlay);
@@ -400,7 +400,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 18rem;
+  max-height: 40rem;
   overflow-y: auto;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
