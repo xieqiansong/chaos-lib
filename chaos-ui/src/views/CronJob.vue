@@ -61,7 +61,7 @@ const fields: FormField[] = [
   },
   {
     field: 'ActionConfig', title: '动作配置(JSON)', type: 'json', rows: 4,
-    placeholder: 'http: {"method":"POST","url":"/api/systemJobs/sweep"}；shell: {"command":"echo hi"}',
+    placeholder: 'http: {"method":"POST","url":"/api/system-jobs/sweep"}；shell: {"command":"echo hi"}',
   },
   {field: 'TimeoutSec', title: '超时(秒)', type: 'number', span: 8, min: 1, defaultValue: 30},
   {field: 'Enabled', title: '启用', type: 'switch', span: 8, defaultValue: true},

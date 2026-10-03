@@ -22,7 +22,7 @@ func init() {
 // Status 标记为受保护字段：仅经专用启停路由改写，通用 PATCH 无法绕过。
 func Register(rg *gin.RouterGroup) {
 	// SSH 连接信息：凭据仅后端使用，响应一律脱敏；测试接口自实现。
-	crud.Register[SshConnection](rg, "sshConns", crud.Opts[SshConnection]{
+	crud.Register[SshConnection](rg, "ssh-conns", crud.Opts[SshConnection]{
 		Searchable:   []string{"name", "host", "username", "remark"},
 		Sortable:     []string{"id", "name", "host", "username"},
 		ToResponse:   sshConnsToResponse,
@@ -30,10 +30,10 @@ func Register(rg *gin.RouterGroup) {
 		AfterUpdate:  ValidateSshConnForUpdate,
 		AfterDelete:  GuardSshConnDeletion,
 	})
-	rg.Group("/sshConns").POST("/:id/test", testSshConnection)
+	rg.Group("/ssh-conns").POST("/:id/test", testSshConnection)
 
 	// 端口转发规则
-	crud.Register[PortForwarding](rg, "portForwards", crud.Opts[PortForwarding]{
+	crud.Register[PortForwarding](rg, "port-forwards", crud.Opts[PortForwarding]{
 		Searchable:   []string{"name", "direction", "target_host", "remark"},
 		Sortable:     []string{"id", "name", "direction", "port", "target_port"},
 		Protected:    []string{"Status"},
@@ -42,12 +42,12 @@ func Register(rg *gin.RouterGroup) {
 		AfterUpdate:  GuardPortForwardUpdate,
 		AfterDelete:  StopPortForwardOnDelete,
 	})
-	rg.Group("/portForwards").PATCH("/:id/status", updatePortForwardingStatus)
+	rg.Group("/port-forwards").PATCH("/:id/status", updatePortForwardingStatus)
 }
 
 // ── 自定义路由 ──────────────────────────────────────────────────
 
-// testSshConnection 测试 SSH 连接可达性与凭据有效性（POST /sshConns/:id/test）。
+// testSshConnection 测试 SSH 连接可达性与凭据有效性（POST /ssh-conns/:id/test）。
 func testSshConnection(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -66,7 +66,7 @@ func testSshConnection(c *gin.Context) {
 	renv.Success(c, result)
 }
 
-// updatePortForwardingStatus 启停单条转发规则（PATCH /portForwards/:id/status，body {status:bool}）。
+// updatePortForwardingStatus 启停单条转发规则（PATCH /port-forwards/:id/status，body {status:bool}）。
 func updatePortForwardingStatus(c *gin.Context) {
 	var req struct {
 		Status bool

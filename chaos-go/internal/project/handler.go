@@ -23,7 +23,7 @@ func init() {
 // 标准 CRUD 交给通用 crud（回调只做转发，实现见 service.go）；
 // 项目列表（合并未认领目录）与移动 / 访问为扩展能力，自定义挂载。
 func Register(rg *gin.RouterGroup) {
-	crud.Register[ProjectGroup](rg, "projectGroups", crud.Opts[ProjectGroup]{
+	crud.Register[ProjectGroup](rg, "project-groups", crud.Opts[ProjectGroup]{
 		Searchable:   []string{"name"},
 		Sortable:     []string{"order_num", "created_at", "id"},
 		BeforeCreate: ValidateGroupForCreate,

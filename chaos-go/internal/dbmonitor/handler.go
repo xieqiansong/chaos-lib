@@ -14,13 +14,13 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("dbMonitor", Register)
+	routehub.Register("db-monitors", Register)
 }
 
 // Register 把数据库监控（只读自省）的路由挂载到给定路由组（通常来自 routes.go 的 api 组），
 // 使本资源的接口自包含、按业务分离：搜索本业务只需看 internal/dbmonitor，搜索本路由只需看这里。
 func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/dbMonitor")
+	g := rg.Group("/db-monitors")
 	{
 		g.GET("/overview", GetOverview)
 		g.GET("/tables", ListTables)

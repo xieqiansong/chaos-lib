@@ -92,7 +92,7 @@ function ratingLabel(v: number): string {
 async function loadRaw() {
   loading.value = true
   try {
-    const res = await get(`taskPlans/${props.planId}/raw`)
+    const res = await get(`task-plans/${props.planId}/raw`)
     rawLink.value = res?.rawLink ?? ''
     content.value = res.content || ''
   } catch (e: any) {
@@ -114,7 +114,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await post(`taskPlans/${props.planId}/review`, {
+    await post(`task-plans/${props.planId}/review`, {
       rating: selectedRating.value,
       answer: answer.value, ai: aiResult.value,
     })

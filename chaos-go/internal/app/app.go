@@ -8,6 +8,7 @@ import (
 	"chaos-go/internal/config"
 	"chaos-go/internal/cronjob"
 	"chaos-go/internal/datacache"
+	_ "chaos-go/internal/dbmonitor"
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	"chaos-go/internal/mqttsync"

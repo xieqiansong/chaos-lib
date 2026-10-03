@@ -20,10 +20,10 @@ export interface StandardData {
     IsDeleted: boolean
 }
 
-const rest = useRestApi<StandardData>('standardData')
+const rest = useRestApi<StandardData>('standard-data')
 
 export const standardDataApi = {
     ...rest,
     // 自定义接口：状态切换（标准 CRUD 之外，由本资源自实现，对应后端 PATCH /standardData/:id/status）
-    setStatus: (id: number, status: boolean) => patch(`standardData/${id}/status`, {status}),
+    setStatus: (id: number, status: boolean) => patch(`standard-data/${id}/status`, {status}),
 }

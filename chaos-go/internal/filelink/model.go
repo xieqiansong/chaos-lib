@@ -6,7 +6,7 @@
 //   - AfterDelete：清理联接点，清理失败则整笔软删回滚
 //   - ToResponse：派生字段 LinkStatus 按文件系统实时计算（不落库，返回时重新算）
 //
-// 启用开关有副作用（建 / 删联接点）且带校验，故保留自定义子路由 PATCH /fileLinks/:id/status。
+// 启用开关有副作用（建 / 删联接点）且带校验，故保留自定义子路由 PATCH /file-links/:id/status。
 //
 // 分层（见 chaos-lib/AGENTS.md「分层契约」）：
 //   - model.go：实体

@@ -13,12 +13,12 @@ export interface EnvResponse {
 
 /** 读取全部环境变量（用户 + 系统），以及快照元信息 */
 export function getEnvVariables(): Promise<EnvResponse> {
-    return get<EnvResponse>('envVariables')
+    return get<EnvResponse>('env-variables')
 }
 
 /** 将当前系统环境变量同步到快照 */
 export function syncEnvVariables(): Promise<unknown> {
-    return post('envVariables/sync', {})
+    return post('env-variables/sync', {})
 }
 
 /** 增量修改环境变量：set 新增/覆盖，unset 删除；外层 key 为 scope（'system' | 'user'） */
@@ -30,5 +30,5 @@ export interface EnvPatchPayload {
 }
 
 export function patchEnvVariables(payload: EnvPatchPayload): Promise<EnvResponse | null> {
-    return patch<EnvResponse | null>('envVariables', payload)
+    return patch<EnvResponse | null>('env-variables', payload)
 }

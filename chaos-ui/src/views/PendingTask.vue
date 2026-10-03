@@ -69,7 +69,7 @@ function toPlanTreeOptions(nodes: any[]): PlanTreeNode[] {
 async function loadPlanTree() {
   try {
 
-    const result = await get('taskPlans/tree')
+    const result = await get('task-plans/tree')
     if (Array.isArray(result)) {
       planTree.value = toPlanTreeOptions(result)
     }

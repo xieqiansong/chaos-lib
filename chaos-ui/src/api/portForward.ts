@@ -25,10 +25,10 @@ export interface PortForward {
     Remark: string
 }
 
-const rest = useRestApi<PortForward>('portForwards')
+const rest = useRestApi<PortForward>('port-forwards')
 
 export const portForwardApi = {
     ...rest,
     // 启停单条转发：local/remote 经关联 SSH 连接建立隧道，direct 直接在本机监听并直连目标
-    setStatus: (id: number, status: boolean) => patch(`portForwards/${id}/status`, {status}),
+    setStatus: (id: number, status: boolean) => patch(`port-forwards/${id}/status`, {status}),
 }

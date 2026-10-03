@@ -15,13 +15,13 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("fileLinks", Register)
+	routehub.Register("file-links", Register)
 }
 
 // Register 把本资源的路由挂载到给定路由组。
 // 纯 CRUD 交给通用 crud；状态切换在基线之外由本包自实现并挂载。
 func Register(rg *gin.RouterGroup) {
-	crud.Register[FileLink](rg, "fileLinks", crud.Opts[FileLink]{
+	crud.Register[FileLink](rg, "file-links", crud.Opts[FileLink]{
 		Searchable: []string{"source_path", "target_path", "remark"},
 		Sortable:   []string{"id", "sort"},
 		// Status 只能走 /:id/status（带建删联接点副作用），禁止通用 PATCH 改写
@@ -31,10 +31,10 @@ func Register(rg *gin.RouterGroup) {
 		AfterDelete:  CleanupLink,
 	})
 	// 自定义子路由：状态切换（标准 CRUD 之外的本业务实现）
-	rg.Group("/fileLinks").PATCH("/:id/status", status)
+	rg.Group("/file-links").PATCH("/:id/status", status)
 }
 
-// status 状态切换：PATCH /fileLinks/:id/status，body {status:bool}。
+// status 状态切换：PATCH /file-links/:id/status，body {status:bool}。
 func status(c *gin.Context) {
 	var req struct {
 		Status bool `json:"status"`

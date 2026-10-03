@@ -16,7 +16,7 @@ const content = ref('')
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await get(`taskPlans/${props.planId}/raw`)
+    const res = await get(`task-plans/${props.planId}/raw`)
     rawLink.value = res?.rawLink ?? ''
     content.value = res?.content ?? ''
   } catch (e: any) {

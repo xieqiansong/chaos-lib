@@ -15,13 +15,13 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("quickEdit", Register)
+	routehub.Register("quick-edits", Register)
 }
 
 // Register 把 quickedit 全部路由挂载到给定路由组。
 // 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载快照/虚拟文件等定制行为。
 func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/quickEdits")
+	g := rg.Group("/quick-edits")
 	g.GET("/", ListQuickEdits)
 	g.POST("/", CreateQuickEdit)
 	g.DELETE("/:id", DeleteQuickEdit)

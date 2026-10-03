@@ -15,12 +15,12 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("envVariables", Register)
+	routehub.Register("env-variables", Register)
 }
 
 // Register 挂载环境变量相关路由（资源接口自包含，router.go 仅做编排调用）。
 func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/envVariables")
+	g := rg.Group("/env-variables")
 	g.GET("/", GetEnvVariables)
 	g.PATCH("/", PatchEnvVariables)
 	g.PUT("/", PutEnvVariables)

@@ -46,7 +46,7 @@ export interface TableDetail extends TableStat {
 }
 
 export function getDbOverview(): Promise<DbOverview> {
-    return get('dbMonitor/overview')
+    return get('db-monitors/overview')
 }
 
 // 分页列表（真实分页接口）：透传 page/page_size/sort/order/name，响应为统一信封的 data { list, pagination }。
@@ -54,9 +54,9 @@ export function getTables(params?: Record<string, any>): Promise<{
     list: TableStat[];
     pagination: { page: number; page_size: number; total: number; total_pages: number }
 }> {
-    return get('dbMonitor/tables', params)
+    return get('db-monitors/tables', params)
 }
 
 export function getTableDetail(name: string): Promise<TableDetail> {
-    return get(`dbMonitor/tables/${encodeURIComponent(name)}`)
+    return get(`db-monitors/tables/${encodeURIComponent(name)}`)
 }

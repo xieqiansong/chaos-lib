@@ -71,10 +71,10 @@ async function submitRatingDialog(rating: number) {
   submittingRating.value = true
   try {
     if (ratingAction.value === 'start-plan' && ratingTargetPlan.value) {
-      await patch(`taskPlans/${ratingTargetPlan.value.ID}/start`, {rating})
+      await patch(`task-plans/${ratingTargetPlan.value.ID}/start`, {rating})
       ElMessage.success('已开启')
     } else if (ratingAction.value === 'complete-plan' && ratingTargetPlan.value) {
-      await patch(`taskPlans/${ratingTargetPlan.value.ID}/complete`, {rating})
+      await patch(`task-plans/${ratingTargetPlan.value.ID}/complete`, {rating})
       ElMessage.success('已完成')
     }
     showRatingDialog.value = false
@@ -102,7 +102,7 @@ async function submitPriorityDialog() {
     return
   }
   try {
-    await patch(`taskPlans/${priorityTargetPlan.value.ID}/priority`, {
+    await patch(`task-plans/${priorityTargetPlan.value.ID}/priority`, {
       priority: priorityValue.value,
     })
     showPriorityDialog.value = false
@@ -325,7 +325,7 @@ async function fetchAllPlans() {
   const isSearch = !!searchParam
 
   try {
-    const result = await get('taskPlans/tree', searchParam ? {search: searchParam} : undefined)
+    const result = await get('task-plans/tree', searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
     }
@@ -394,7 +394,7 @@ function resetForm() {
 }
 
 function openLink(ID: string) {
-  get(`taskPlans/${ID}`).then(res => {
+  get(`task-plans/${ID}`).then(res => {
     if (res.Link) {
       window.open(res.Link, '_blank')
     }
@@ -444,7 +444,7 @@ async function createPlan() {
       payload.Priority = formData.value.Priority
     }
 
-    await post('taskPlans/', payload)
+    await post('task-plans/', payload)
     showCreateDialog.value = false
     showAddChildDialog.value = false
     resetForm()
@@ -466,7 +466,7 @@ async function updatePlan() {
   }
 
   try {
-    await patch(`taskPlans/${editingPlan.value.ID}`, {
+    await patch(`task-plans/${editingPlan.value.ID}`, {
       Name: formData.value.Name.trim(),
       PlanType: formData.value.PlanType,
       CronExpr: formData.value.CronExpr.trim() || undefined,
@@ -495,7 +495,7 @@ async function startPlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'info',
     })
-    await patch(`taskPlans/${plan.ID}/start`, {})
+    await patch(`task-plans/${plan.ID}/start`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已开启')
@@ -517,7 +517,7 @@ async function completePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'info',
     })
-    await patch(`taskPlans/${plan.ID}/complete`, {})
+    await patch(`task-plans/${plan.ID}/complete`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已完成')
@@ -535,7 +535,7 @@ async function archivePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'warning'
     })
-    await patch(`taskPlans/${plan.ID}/archive`, {})
+    await patch(`task-plans/${plan.ID}/archive`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已归档')
@@ -554,7 +554,7 @@ async function deletePlan(plan: TaskPlan) {
       cancelButtonText: '取消',
       type: 'error'
     })
-    await del(`taskPlans/${plan.ID}`)
+    await del(`task-plans/${plan.ID}`)
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已删除')
@@ -573,7 +573,7 @@ async function suspendPlan(plan: TaskPlan) {
         '提示',
         {confirmButtonText: '挂起', cancelButtonText: '取消', type: 'warning'}
     )
-    await patch(`taskPlans/${plan.ID}/suspend`, {})
+    await patch(`task-plans/${plan.ID}/suspend`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已挂起')
@@ -591,7 +591,7 @@ async function resumePlan(plan: TaskPlan) {
         '提示',
         {confirmButtonText: '恢复', cancelButtonText: '取消', type: 'info'}
     )
-    await patch(`taskPlans/${plan.ID}/resume`, {})
+    await patch(`task-plans/${plan.ID}/resume`, {})
     refreshAll()
     await refreshAllPlans()
     ElMessage.success('已恢复')
@@ -603,7 +603,7 @@ async function resumePlan(plan: TaskPlan) {
 }
 
 async function openEditDialog(ID: string) {
-  let res = await get(`taskPlans/${ID}`)
+  let res = await get(`task-plans/${ID}`)
 
   editingPlan.value = res
   formData.value = {

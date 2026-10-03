@@ -16,10 +16,10 @@ export interface FileLink {
     UpdatedAt: string
 }
 
-const rest = useRestApi<FileLink>('fileLinks')
+const rest = useRestApi<FileLink>('file-links')
 
 export const fileLinkApi = {
     ...rest,
     // 自定义接口：状态切换（标准 CRUD 之外，由本资源自实现，对应后端 PATCH /fileLinks/:id/status）
-    setStatus: (id: number, status: boolean) => patch(`fileLinks/${id}/status`, {status}),
+    setStatus: (id: number, status: boolean) => patch(`file-links/${id}/status`, {status}),
 }

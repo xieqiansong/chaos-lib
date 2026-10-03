@@ -30,7 +30,7 @@ type module struct {
 var modules []module
 
 // Register 登记一个路由模块，通常由业务模块的 init 调用。
-// name 建议取该模块的路由组名（如 "envVariables"），需全局唯一。
+// name 建议取该模块的路由组名（如 "env-variables"），需全局唯一。
 func Register(name string, mount MountFunc) {
 	if mount == nil {
 		panic(fmt.Sprintf("routehub: 模块 %q 的挂载函数为 nil", name))

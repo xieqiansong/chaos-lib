@@ -40,7 +40,7 @@ export const DATATYPE_OPTIONS = [
   {label: '其他', value: 'other'},
 ] as const
 
-const rest = useRestApi<DataCache>('dataCache')
+const rest = useRestApi<DataCache>('data-caches')
 
 export const dataCacheApi = {
   ...rest,

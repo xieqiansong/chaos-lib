@@ -33,7 +33,7 @@ export interface SshConnectionPayload {
     Remark?: string
 }
 
-const rest = useRestApi<SshConnection>('sshConns')
+const rest = useRestApi<SshConnection>('ssh-conns')
 
 export const sshConnApi = {
     ...rest,
@@ -47,5 +47,5 @@ export const sshConnApi = {
         return rest.update(id, patch)
     },
     // 测试连接：不启动端口转发，仅验证主机可达性与凭据有效性
-    test: (id: number) => post(`sshConns/${id}/test`, {}),
+    test: (id: number) => post(`ssh-conns/${id}/test`, {}),
 }

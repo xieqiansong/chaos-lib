@@ -50,7 +50,7 @@ onUnmounted(() => {
 })
 
 // 广播：新建消息（AfterCreate 钩子广播到集群并记录到本地消息表）。
-// 对应后端标准 CRUD 的 create，即 POST /api/mqttSync。
+// 对应后端标准 CRUD 的 create，即 POST /api/mqtt-syncs。
 async function broadcast() {
   const body = payload.value.trim()
   if (!body) {

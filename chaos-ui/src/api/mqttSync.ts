@@ -26,12 +26,12 @@ export interface MqttStatus {
     encrypt: boolean
 }
 
-const rest = useRestApi<MqttSyncMessage>('mqttSync')
+const rest = useRestApi<MqttSyncMessage>('mqtt-syncs')
 
 export const mqttSyncApi = {
     ...rest,
     // 集群状态：GET /mqttSync/status
-    status: () => get('mqttSync/status') as Promise<MqttStatus>,
+    status: () => get('mqtt-syncs/status') as Promise<MqttStatus>,
     // 按主题删除（软删）：DELETE /mqttSync/channel?name=
-    deleteChannel: (name: string) => del(`mqttSync/channel?name=${encodeURIComponent(name)}`),
+    deleteChannel: (name: string) => del(`mqtt-syncs/channel?name=${encodeURIComponent(name)}`),
 }

@@ -56,7 +56,7 @@ async function fetchFiles() {
   loading.value = true
   error.value = ''
   try {
-    const result = await get('quickEdits')
+    const result = await get('quick-edits')
     if (Array.isArray(result)) {
       files.value = result
     } else if (result && Array.isArray(result.data)) {
@@ -91,7 +91,7 @@ async function createFile() {
     return
   }
   try {
-    const result = await post('quickEdits', {
+    const result = await post('quick-edits', {
       Name: newFile.value.Name,
       FilePath: newFile.value.FilePath,
       Remark: newFile.value.Remark
@@ -111,7 +111,7 @@ async function createFile() {
 
 async function deleteFile(id: number) {
   try {
-    const result = await del(`quickEdits/${id}`)
+    const result = await del(`quick-edits/${id}`)
     if (result && result.error) {
       error.value = result.error || '删除失败'
       return
@@ -135,7 +135,7 @@ async function openFile(file: QuickEditFile) {
   contentLoading.value = true
   error.value = ''
   try {
-    const result = await get(`quickEdits/${file.ID}/content`)
+    const result = await get(`quick-edits/${file.ID}/content`)
     if (result && result.content !== undefined) {
       content.value = result.content
       originalContent.value = result.content
@@ -169,7 +169,7 @@ async function saveContent() {
   saving.value = true
   error.value = ''
   try {
-    const result = await put(`quickEdits/${activeFileId.value}/content`, {
+    const result = await put(`quick-edits/${activeFileId.value}/content`, {
       content: content.value
     })
     if (result && !result.error) {
@@ -200,7 +200,7 @@ async function fetchSnapshots() {
   snapshotLoading.value = true
   try {
     const result = await get(
-        `quickEdits/${activeFileId.value}/snapshots`,
+        `quick-edits/${activeFileId.value}/snapshots`,
         {page: snapshotPage.value, page_size: 20}
     )
     if (result && Array.isArray(result.list)) {
@@ -225,7 +225,7 @@ async function viewSnapshot(snap: QuickEditSnapshot) {
   selectedSnapshotId.value = snap.ID
   snapshotContentLoading.value = true
   try {
-    const result = await get(`quickEdits/${activeFileId.value}/snapshots/${snap.ID}`)
+    const result = await get(`quick-edits/${activeFileId.value}/snapshots/${snap.ID}`)
     if (result && result.content !== undefined) {
       snapshotContent.value = result.content
     } else {
@@ -250,7 +250,7 @@ async function restoreSnapshot() {
   if (activeFileId.value === null || selectedSnapshotId.value === null) return
   try {
     const result = await post(
-        `quickEdits/${activeFileId.value}/restore`,
+        `quick-edits/${activeFileId.value}/restore`,
         {SnapshotID: selectedSnapshotId.value}
     )
     if (result && !result.error) {
