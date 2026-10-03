@@ -1,10 +1,14 @@
 package standarddata
 
 import (
+	"errors"
+
 	"chaos-go/internal/config"
+
+	"gorm.io/gorm"
 )
 
-// FindActiveByID 按 ID 加载未删除的记录。
+// FindActiveByID 按 ID 加载未删除的记录；不存在返回 ErrRecordNotFound。
 func FindActiveByID(id string) (*StandardData, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -12,6 +16,9 @@ func FindActiveByID(id string) (*StandardData, error) {
 	}
 	var row StandardData
 	if err := db.Where("is_deleted = ?", false).First(&row, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRecordNotFound
+		}
 		return nil, err
 	}
 	return &row, nil

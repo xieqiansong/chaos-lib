@@ -10,6 +10,9 @@ import (
 // ErrDBUnavailable 表示数据库单例不可用。
 var ErrDBUnavailable = errors.New("standarddata: database unavailable")
 
+// ErrRecordNotFound 指定记录不存在（或已软删）。
+var ErrRecordNotFound = errors.New("standarddata: 记录不存在")
+
 // StandardData 标准数据行。
 // 嵌入 crud.BaseModel 自动获得 ID / CreatedAt / UpdatedAt / IsDeleted。
 type StandardData struct {

@@ -46,7 +46,10 @@
 
 新增 / 重写业务模块一律套用本基线；参考实现：`internal/standarddata/` + `src/views/StandardData.vue` + `src/api/standardData.ts`。后端包内的 handler / model / service / repository 职责划分见下一节「分层契约」。
 
-- **后端**：模型在 `internal/<模块>/<资源>.go`，CRUD 资源嵌入 `crud.BaseModel` 并走 `crud.Register[T]`（反射生成 list/get/create/update/delete 五路由，免写标准 handler）；实现 `TableName()` 与 `Register(rg *gin.RouterGroup)`，`routes.go` 只写 `<pkg>.Register(api)`；扩展能力（如状态切换）在 `Register` 内自定义路由挂载。
+- **后端**：模型在 `internal/<模块>/<资源>.go`，CRUD 资源嵌入 `crud.BaseModel` 并走 `crud.Register[T]`（反射生成 list/get/create/update/delete 五路由，免写标准 handler）；实现 `TableName()` 与 `Register(rg *gin.RouterGroup)`，`routes.go` 只写 `<pkg>.Register(api)`。
+  - `crud.Register` 返回该资源的路由组，扩展子路由直接挂在其上，**不重复写前缀字符串**。
+  - 启停（PATCH `/:id/status`）一律走 `crud.RegisterToggle`，业务包只提供 `Setter` 与错误表。
+  - 路径参数解析与领域错误映射一律走 `internal/httpx`（`ParseID` / `ParseParam` / `MapError` + `ErrRule` 表），**不再自写 `strconv.Atoi` 样板与 `writeXxxError` 的 switch**。
 - **前端**：`src/api/<resource>.ts` 定义 `interface` + `useRestApi<Resource>('<resource>')`；`src/views/<Resource>.vue` 用通用 `DataTable`，仅声明 `columns`，无增删改查样板。
 - **约定**：资源名前端 camelCase、表名 snake_case；时间列须 RFC3339 带时区 `value-format="YYYY-MM-DDTHH:mm:ssZ"`，否则 Go `time.Time` 反序列化报错。
 

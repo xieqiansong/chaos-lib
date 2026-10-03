@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"chaos-go/internal/httpx"
 	renv "chaos-go/internal/resp"
 	"chaos-go/internal/routehub"
 
@@ -43,7 +44,7 @@ func GetSdkVersions(c *gin.Context) {
 func GetSdkVersion(c *gin.Context) {
 	info, err := SdkVersion(c.Param("type"))
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, sdkErrRules)
 		return
 	}
 	renv.Success(c, info)
@@ -63,7 +64,7 @@ func UpdateSdkVersion(c *gin.Context) {
 			renv.Error(c, http.StatusBadRequest, "Target version does not exist: "+req.Version)
 			return
 		}
-		writeError(c, err)
+		httpx.MapError(c, err, sdkErrRules)
 		return
 	}
 	renv.Success(c, nil)
@@ -93,7 +94,7 @@ func CreateSdkSource(c *gin.Context) {
 			renv.Error(c, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(c, err)
+		httpx.MapError(c, err, sdkErrRules)
 		return
 	}
 	renv.Success(c, req)
@@ -108,7 +109,7 @@ func UpdateSdkSource(c *gin.Context) {
 	}
 	updated, err := UpdateSource(c.Param("name"), patch)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, sdkErrRules)
 		return
 	}
 	renv.Success(c, updated)
@@ -117,20 +118,15 @@ func UpdateSdkSource(c *gin.Context) {
 // DeleteSdkSource 软删除 SDK 类型。
 func DeleteSdkSource(c *gin.Context) {
 	if err := DeleteSource(c.Param("name")); err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, sdkErrRules)
 		return
 	}
 	renv.Success(c, nil)
 }
 
-// writeError 把 service / repository 返回的领域错误映射为 HTTP 状态码。
-func writeError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, ErrSdkNotFound):
-		renv.Error(c, http.StatusNotFound, "SDK type not found")
-	case errors.Is(err, ErrInvalidInput), errors.Is(err, ErrNameRequired):
-		renv.Error(c, http.StatusBadRequest, err.Error())
-	default:
-		renv.Error(c, http.StatusInternalServerError, err.Error())
-	}
+// sdkErrRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeError。
+var sdkErrRules = []httpx.ErrRule{
+	{Err: ErrSdkNotFound, Status: http.StatusNotFound, Msg: "SDK type not found"},
+	{Err: ErrInvalidInput, Status: http.StatusBadRequest},
+	{Err: ErrNameRequired, Status: http.StatusBadRequest},
 }

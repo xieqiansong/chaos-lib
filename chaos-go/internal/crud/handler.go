@@ -11,10 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Register[T] 在路由组 rg 下为 prefix 注册一套标准 CRUD 路由。
+// Register[T] 在路由组 rg 下为 prefix 注册一套标准 CRUD 路由，返回该资源的路由组。
 // 模型类型由类型参数 T 推导（无需再传零值指针），同时约束了回调与切片的元素类型。
-// 状态切换等扩展能力不在基线内，由业务包自行实现并挂载（见各业务包的 Register）。
-func Register[T any](rg *gin.RouterGroup, prefix string, opts Opts[T]) {
+// 返回值供业务包直接挂载扩展子路由（避免前缀字符串二次书写），状态切换用 RegisterToggle。
+func Register[T any](rg *gin.RouterGroup, prefix string, opts Opts[T]) *gin.RouterGroup {
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
 	if opts.ListHandler != nil {
@@ -26,6 +26,7 @@ func Register[T any](rg *gin.RouterGroup, prefix string, opts Opts[T]) {
 	g.POST("", h.create)
 	g.PATCH("/:id", h.update)
 	g.DELETE("/:id", h.delete)
+	return g
 }
 
 // handler[T] 持有资源选项，按方法分发。

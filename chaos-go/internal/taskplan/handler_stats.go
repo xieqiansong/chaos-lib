@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"chaos-go/internal/httpx"
 	renv "chaos-go/internal/resp"
 
 	"github.com/gin-gonic/gin"
@@ -56,7 +57,7 @@ func GetTaskContributionStats(c *gin.Context) {
 	}
 	stats, err := BuildContributionStats(planID, strings.TrimSpace(c.Query("rootName")))
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, stats)

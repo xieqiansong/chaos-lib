@@ -1,12 +1,12 @@
 package taskplan
 
 import (
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"chaos-go/internal/httpx"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
 	"chaos-go/internal/routehub"
@@ -65,7 +65,7 @@ func CreateTaskPlan(c *gin.Context) {
 	}
 	resp, err := CreatePlan(req)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -93,13 +93,13 @@ func GetTaskPlanTree(c *gin.Context) {
 
 // GetTaskPlan 返回单个计划。
 func GetTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	plan, err := FindActiveTaskPlan(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, plan)
@@ -107,7 +107,7 @@ func GetTaskPlan(c *gin.Context) {
 
 // UpdateTaskPlan 按字段更新计划。
 func UpdateTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
@@ -118,7 +118,7 @@ func UpdateTaskPlan(c *gin.Context) {
 	}
 	plan, err := UpdatePlan(id, req)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, plan)
@@ -126,13 +126,13 @@ func UpdateTaskPlan(c *gin.Context) {
 
 // StartTaskPlan 开启计划（必要时生成首条任务）。
 func StartTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	resp, err := StartPlan(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -140,13 +140,13 @@ func StartTaskPlan(c *gin.Context) {
 
 // CompleteTaskPlan 完成计划并结束其进行中的任务。
 func CompleteTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	plan, err := CompletePlan(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, plan)
@@ -154,13 +154,13 @@ func CompleteTaskPlan(c *gin.Context) {
 
 // ArchiveTaskPlan 归档计划。
 func ArchiveTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	plan, err := ArchivePlan(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, plan)
@@ -168,13 +168,13 @@ func ArchiveTaskPlan(c *gin.Context) {
 
 // DeleteTaskPlan 删除计划；?cascade=true 时连同子孙计划与任务一起删除。
 func DeleteTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	resp, err := DeletePlan(id, c.Query("cascade") == "true")
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -182,12 +182,12 @@ func DeleteTaskPlan(c *gin.Context) {
 
 // SuspendTaskPlan 挂起计划及其子孙。
 func SuspendTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	if err := SuspendPlans(id); err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, nil)
@@ -195,12 +195,12 @@ func SuspendTaskPlan(c *gin.Context) {
 
 // ResumeTaskPlan 恢复计划及其子孙。
 func ResumeTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	if err := ResumePlans(id); err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, nil)
@@ -208,7 +208,7 @@ func ResumeTaskPlan(c *gin.Context) {
 
 // SetPriorityTaskPlan 设置计划及其子孙的优先级。
 func SetPriorityTaskPlan(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
@@ -224,7 +224,7 @@ func SetPriorityTaskPlan(c *gin.Context) {
 		return
 	}
 	if err := SetPlanPriority(id, req.Priority); err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, nil)
@@ -232,13 +232,13 @@ func SetPriorityTaskPlan(c *gin.Context) {
 
 // ListPlanTasks 列出某计划下的任务。
 func ListPlanTasks(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	tasks, err := PlanTasks(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, tasks)
@@ -270,7 +270,7 @@ func GetPendingTasks(c *gin.Context) {
 
 // CompleteTask 完成任务（interval 类型须带 rating）。
 func CompleteTask(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
@@ -283,7 +283,7 @@ func CompleteTask(c *gin.Context) {
 	}
 	resp, err := CompleteTaskByID(id, req.Rating)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -291,7 +291,7 @@ func CompleteTask(c *gin.Context) {
 
 // PostponeTask 单条任务延期（body {days}）。
 func PostponeTask(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
@@ -303,7 +303,7 @@ func PostponeTask(c *gin.Context) {
 		return
 	}
 	if err := PostponeTaskByID(id, req.Days); err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, nil)
@@ -325,7 +325,7 @@ func BatchPostponeTasks(c *gin.Context) {
 	}
 	resp, err := PostponeTasks(req.IDs, req.Days)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -333,13 +333,13 @@ func BatchPostponeTasks(c *gin.Context) {
 
 // CancelTask 取消任务（仅 cron / interval 支持），并生成下一条。
 func CancelTask(c *gin.Context) {
-	id, ok := parseID(c)
+	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
 	}
 	resp, err := CancelTaskByID(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, resp)
@@ -347,26 +347,9 @@ func CancelTask(c *gin.Context) {
 
 // ── 辅助 ────────────────────────────────────────────────────────
 
-// parseID 解析路径参数 id。
-func parseID(c *gin.Context) (int, bool) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的ID")
-		return 0, false
-	}
-	return id, true
-}
-
-// writeError 把 service / repository 返回的领域错误映射为 HTTP 状态码。
-func writeError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, ErrPlanNotFound):
-		renv.Error(c, http.StatusNotFound, "任务计划不存在")
-	case errors.Is(err, ErrTaskNotFound):
-		renv.Error(c, http.StatusNotFound, "任务不存在")
-	case errors.Is(err, ErrInvalidState):
-		renv.Error(c, http.StatusBadRequest, err.Error())
-	default:
-		renv.Error(c, http.StatusInternalServerError, err.Error())
-	}
+// errRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeError。
+var errRules = []httpx.ErrRule{
+	{Err: ErrPlanNotFound, Status: http.StatusNotFound, Msg: "任务计划不存在"},
+	{Err: ErrTaskNotFound, Status: http.StatusNotFound, Msg: "任务不存在"},
+	{Err: ErrInvalidState, Status: http.StatusBadRequest},
 }

@@ -3,8 +3,8 @@ package quickedit
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
+	"chaos-go/internal/httpx"
 	"chaos-go/internal/pagination"
 	renv "chaos-go/internal/resp"
 	"chaos-go/internal/routehub"
@@ -74,9 +74,8 @@ func CreateQuickEdit(c *gin.Context) {
 
 // DeleteQuickEdit 删除受管控文件记录（不动磁盘文件）。
 func DeleteQuickEdit(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 id")
+	id, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
 	if err := DeleteFileByID(id); err != nil {
@@ -92,14 +91,13 @@ func DeleteQuickEdit(c *gin.Context) {
 
 // GetQuickEditContent 读取文件当前内容（虚拟文件走 envvar 回调）。
 func GetQuickEditContent(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 id")
+	id, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
 	view, err := ReadContent(id)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, view)
@@ -107,9 +105,8 @@ func GetQuickEditContent(c *gin.Context) {
 
 // UpdateQuickEditContent 保存内容并追加一条快照。
 func UpdateQuickEditContent(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 id")
+	id, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
 	var req struct{ Content string }
@@ -119,7 +116,7 @@ func UpdateQuickEditContent(c *gin.Context) {
 	}
 	res, err := SaveContent(id, req.Content)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, saveResultToMap(res, false))
@@ -127,15 +124,14 @@ func UpdateQuickEditContent(c *gin.Context) {
 
 // ListQuickEditSnapshots 分页列出某文件的历史快照。
 func ListQuickEditSnapshots(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 id")
+	id, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
 	q := pagination.Parse(c)
 	items, total, err := ListSnapshotsOf(id, q)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, pagination.New(items, total, q))
@@ -143,19 +139,17 @@ func ListQuickEditSnapshots(c *gin.Context) {
 
 // GetQuickEditSnapshot 读取单条快照内容。
 func GetQuickEditSnapshot(c *gin.Context) {
-	fileID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 file id")
+	fileID, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
-	snapID, err := strconv.Atoi(c.Param("snapshotId"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 snapshot id")
+	snapID, ok := httpx.ParseParam(c, "snapshotId")
+	if !ok {
 		return
 	}
 	snap, err := GetSnapshot(fileID, snapID)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, gin.H{
@@ -169,9 +163,8 @@ func GetQuickEditSnapshot(c *gin.Context) {
 
 // RestoreQuickEdit 回滚到指定快照，并追加一条新快照。
 func RestoreQuickEdit(c *gin.Context) {
-	fileID, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		renv.Error(c, http.StatusBadRequest, "无效的 id")
+	fileID, ok := httpx.ParseID(c)
+	if !ok {
 		return
 	}
 	var req struct{ SnapshotID int }
@@ -181,7 +174,7 @@ func RestoreQuickEdit(c *gin.Context) {
 	}
 	res, err := RestoreSnapshot(fileID, req.SnapshotID)
 	if err != nil {
-		writeError(c, err)
+		httpx.MapError(c, err, errRules)
 		return
 	}
 	renv.Success(c, saveResultToMap(res, true))
@@ -189,20 +182,12 @@ func RestoreQuickEdit(c *gin.Context) {
 
 // ── 响应辅助 ────────────────────────────────────────────────────
 
-// writeError 把 service 返回的领域错误映射为 HTTP 状态码。
-func writeError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, ErrFileNotFound):
-		renv.Error(c, http.StatusNotFound, "文件不存在")
-	case errors.Is(err, ErrSnapshotNotFound):
-		renv.Error(c, http.StatusNotFound, "快照不存在")
-	case errors.Is(err, ErrEnvNotReady):
-		renv.Error(c, http.StatusNotImplemented, err.Error())
-	case errors.Is(err, ErrContentTooLarge):
-		renv.Error(c, http.StatusBadRequest, err.Error())
-	default:
-		renv.Error(c, http.StatusInternalServerError, err.Error())
-	}
+// errRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeError。
+var errRules = []httpx.ErrRule{
+	{Err: ErrFileNotFound, Status: http.StatusNotFound, Msg: "文件不存在"},
+	{Err: ErrSnapshotNotFound, Status: http.StatusNotFound, Msg: "快照不存在"},
+	{Err: ErrEnvNotReady, Status: http.StatusNotImplemented},
+	{Err: ErrContentTooLarge, Status: http.StatusBadRequest},
 }
 
 // saveResultToMap 把保存 / 回滚结果转为响应体；withFrom 时附带来源快照 id。

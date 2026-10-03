@@ -121,3 +121,16 @@ func SetStatus(l *FileLink, enable bool) error {
 	l.Status = false
 	return nil
 }
+
+// ToggleStatus 按 ID 切换联接点状态：先取未软删的实体，再执行带副作用的启停。
+// 供通用启停路由 crud.RegisterToggle 使用，编排留在用例层，handler 只做配置与转调。
+func ToggleStatus(id int, enable bool) (any, error) {
+	link, err := findActiveByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := SetStatus(link, enable); err != nil {
+		return nil, err
+	}
+	return toOne(link), nil
+}
