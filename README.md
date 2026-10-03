@@ -6,7 +6,7 @@
 
 - **📋 任务管理**：待办 / 定时（cron）/ 间隔复习三种任务计划，父子任务树，优先级、延期、逾期检测与统计
 - **🕒 定时任务**：基于 `robfig/cron/v3` 的**独立 cron job 模块**，按表达式在后台触发 HTTP/Webhook 或命令动作并记录运行日志；原内置周期任务（任务计划扫描、端口转发自愈、STUN 同步）已并入此模块，可在「定时任务」页面配置
-- **📖 FSRS 间隔复习**：内嵌 FSRS 算法（`internal/taskplan/fsrs.go`），按遗忘曲线计算下次最佳复习时间，支持 AI 评分辅助
+- **📖 FSRS 间隔复习**：基于官方 `go-fsrs` 实现，按遗忘曲线计算下次最佳复习时间，支持 AI 评分辅助（`internal/taskplan/fsrs.go` 只做任务计划与卡片的转换）
 - **📊 看板**：任务概览、每日 / 活跃 / 贡献统计（ECharts）
 - **📁 项目管理**：按 ProjectGroup / Project 组织本地项目，记录 Git URL 与访问时间；移动（同卷 rename / 跨卷 copy）、访问、删除
 - **🔗 文件连接**：管理 Windows 目录联接（Junction），创建 / 删除 / 切换 / 状态检测（功能开关 `FEATURE_FILE_LINK`）
@@ -69,7 +69,7 @@
 | 前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + ECharts 6 + Monaco Editor |
 | 数据库 | PostgreSQL（`gorm.io/driver/postgres`，默认）/ SQLite3（`glebarez/sqlite`） |
 | 任务调度 | robfig/cron v3 + 内置 `scheduler` 周期调度器 |
-| 其他 | 后端：`x/crypto/ssh`（端口转发）、`eclipse/paho.mqtt.golang`（MQTT 同步）、`go-toml`（快照）、`x/sys`（Windows API）；前端：markdown-it + DOMPurify、date-fns、polyform-tools（格式转换） |
+| 其他 | 后端：`go-fsrs`（间隔复习算法）、`x/crypto/ssh`（端口转发）、`eclipse/paho.mqtt.golang`（MQTT 同步）、`go-toml`（快照）、`x/sys`（Windows API）；前端：markdown-it + DOMPurify、date-fns、polyform-tools（格式转换） |
 
 ## 快速开始
 
@@ -209,6 +209,7 @@ chaos-lib/
 
 - [TypeWords](https://github.com/zyronon/TypeWords) — FSRS 间隔复习功能参考
 - [FSRS](https://github.com/open-spaced-repetition/free-spaced-repetition-scheduler) — 间隔复习算法
+- [go-fsrs](https://github.com/open-spaced-repetition/go-fsrs) — FSRS 的官方 Go 实现，本项目直接依赖它以跟进算法版本
 
 ## License
 

@@ -13,9 +13,6 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// fsrsInstance 全局 FSRS 调度器（默认参数）。
-var fsrsInstance = NewFsrs(nil)
-
 const (
 	schedulerInterval = time.Minute
 	cronLookahead     = 1
@@ -150,27 +147,10 @@ func generateTask(plan *TaskPlan, now time.Time, rating *FsrsRating) (*Task, err
 
 	case TaskPlanTypeInterval:
 		if rating != nil {
-			fsrsCard := FsrsCard{
-				Stability:     plan.FsrsStability,
-				Difficulty:    plan.FsrsDifficulty,
-				Reps:          plan.FsrsReps,
-				Lapses:        plan.FsrsLapses,
-				State:         FsrsState(plan.FsrsState),
-				LearningSteps: plan.FsrsLearningSteps,
-			}
-			if plan.FsrsLastReviewAt != nil {
-				fsrsCard.LastReview = plan.FsrsLastReviewAt
-			}
-			result := fsrsInstance.Next(&fsrsCard, now, *rating)
+			// 评分驱动 FSRS：还原卡片 → 推进一次 → 下次到期作为新任务的 startedAt
+			result := NextReview(CardFromPlan(plan), now, *rating)
 			task.StartedAt = &result.Due
-
-			plan.FsrsStability = result.Card.Stability
-			plan.FsrsDifficulty = result.Card.Difficulty
-			plan.FsrsReps = result.Card.Reps
-			plan.FsrsLapses = result.Card.Lapses
-			plan.FsrsState = int(result.Card.State)
-			plan.FsrsLearningSteps = result.Card.LearningSteps
-			plan.FsrsLastReviewAt = &now
+			result.ApplyToPlan(plan, now)
 			plan.UpdatedAt = now
 		}
 	}
