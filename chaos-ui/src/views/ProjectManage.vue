@@ -3,7 +3,7 @@
 // 左：项目组（标准 CRUD，由 DataTable + projectGroupApi 驱动，无样板）。
 // 右：项目（DataTable 配置驱动展示 + 分页 + 搜索；列表由后端合并「已认领 / 磁盘未认领」，
 //      认领 / 移动 / 访问 / 复制路径 / 删除等动作经 #actions 插槽注入，保持基线纯净）。
-import {onMounted, ref, watch} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
 import {format} from 'date-fns'
 import DataTable from '@/components/DataTable.vue'
 import DataFormDialog from '@/components/DataFormDialog.vue'
@@ -233,6 +233,30 @@ async function copyPath(p: Project) {
   }
 }
 
+// 详情弹窗：复用通用表单弹窗的查看模式（字段只读），底部操作经 #footer 插槽注入。
+const projectDetailFields: FormField[] = [
+  {field: 'ClaimedText', title: '状态', type: 'text', span: 24},
+  {field: 'Name', title: '名称', type: 'text', span: 24},
+  {field: 'AbsolutePath', title: '绝对路径', type: 'text', span: 24},
+  {field: 'RelativePath', title: '相对路径', type: 'text', span: 24},
+  {field: 'GitURL', title: 'Git 地址', type: 'text', span: 24},
+  {field: 'Remark', title: '备注', type: 'textarea', rows: 2, span: 24},
+  {field: 'CreatedAtText', title: '添加时间', type: 'text', span: 24},
+  {field: 'LastAccessedAtText', title: '上次访问', type: 'text', span: 24},
+]
+
+// 派生展示值：状态与时间列在详情里以可读文本呈现（原实体字段保持原样给其它动作使用）
+const detailForm = computed<Record<string, any>>(() => {
+  const p = detailItem.value
+  if (!p) return {}
+  return {
+    ...p,
+    ClaimedText: p.Claimed ? '已认领' : '未认领',
+    CreatedAtText: formatTime(p.CreatedAt),
+    LastAccessedAtText: formatTime(p.LastAccessedAt),
+  }
+})
+
 function formatTime(value: string | null | undefined): string {
   if (!value) return '—'
   const d = new Date(value)
@@ -324,44 +348,14 @@ onMounted(async () => {
         @save="saveEdit"
     />
 
-    <!-- 详情 -->
-    <el-dialog v-model="showDetail" title="项目详情" width="40rem">
-      <div v-if="detailItem" class="detail-body">
-        <div class="detail-row">
-          <span class="detail-label">状态</span>
-          <el-tag :type="detailItem.Claimed ? 'success' : 'warning'" size="small">
-            {{ detailItem.Claimed ? '已认领' : '未认领' }}
-          </el-tag>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">名称</span>
-          <span class="text-primary">{{ detailItem.Name }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">绝对路径</span>
-          <span class="text-xs font-mono truncate">{{ detailItem.AbsolutePath }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">相对路径</span>
-          <span class="text-xs font-mono truncate">{{ detailItem.RelativePath || '—' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Git 地址</span>
-          <span class="text-xs truncate">{{ detailItem.GitURL || '—' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">备注</span>
-          <span class="text-xs">{{ detailItem.Remark || '—' }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">添加时间</span>
-          <span class="text-xs">{{ formatTime(detailItem.CreatedAt) }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">上次访问</span>
-          <span class="text-xs">{{ formatTime(detailItem.LastAccessedAt) }}</span>
-        </div>
-      </div>
+    <!-- 详情：复用通用表单弹窗的查看模式，底部操作经 #footer 插槽注入 -->
+    <DataFormDialog
+        v-model="showDetail"
+        title="项目详情"
+        mode="view"
+        :fields="projectDetailFields"
+        :form="detailForm"
+    >
       <template #footer>
         <template v-if="detailItem?.Claimed">
           <el-button size="small" @click="accessProject(detailItem); showDetail = false">访问</el-button>
@@ -371,8 +365,9 @@ onMounted(async () => {
           <el-button size="small" type="danger" @click="deleteProject(detailItem); showDetail = false">删除</el-button>
         </template>
         <el-button v-else type="success" size="small" @click="claimProject(detailItem); showDetail = false">认领</el-button>
+        <el-button size="small" @click="showDetail = false">关闭</el-button>
       </template>
-    </el-dialog>
+    </DataFormDialog>
 
     <!-- 移动 -->
     <el-dialog v-model="showMove" title="移动项目" width="37.5rem">
@@ -395,26 +390,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.detail-body {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.detail-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-md);
-  padding: var(--space-sm) 0;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-}
-
-.detail-label {
-  width: 80px;
-  flex-shrink: 0;
-  color: var(--el-text-color-secondary);
-  font-size: var(--el-font-size-small);
-}
-
 /* 选中的项目组行：浅绿背景（作用于 td，避免被斑马纹的 td 背景盖住） */
 :deep(.el-table .el-table__body tr.group-row-active > td.el-table__cell) {
   background-color: #e8f8ec !important;

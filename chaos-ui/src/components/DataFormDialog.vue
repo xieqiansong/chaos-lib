@@ -147,12 +147,15 @@ function downloadBinary(f: FormField) {
         </el-col>
       </el-row>
     </el-form>
+    <!-- 默认底部按钮；业务需要额外操作（如详情页的跳转 / 删除）时用 #footer 插槽覆盖 -->
     <template #footer>
-      <el-button v-if="readonly" @click="visible = false">关闭</el-button>
-      <template v-else>
-        <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="emit('save')">保存</el-button>
-      </template>
+      <slot name="footer">
+        <el-button v-if="readonly" @click="visible = false">关闭</el-button>
+        <template v-else>
+          <el-button @click="visible = false">取消</el-button>
+          <el-button type="primary" :loading="saving" @click="emit('save')">保存</el-button>
+        </template>
+      </slot>
     </template>
   </el-dialog>
 </template>

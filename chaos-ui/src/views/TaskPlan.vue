@@ -41,11 +41,24 @@ const fullTree = ref<TaskPlanTree[]>([])
 const treeLoading = ref(false)
 const error = ref('')
 
-const showCreateDialog = ref(false)
-const showEditDialog = ref(false)
-const showAddChildDialog = ref(false)
+// 新建 / 添加子任务 / 修改三份表单结构相同（同一 TaskPlanForm），
+// 故合并为单个弹窗，用 mode 区分标题、父选择器显隐与提交动作。
+const showPlanDialog = ref(false)
+const planDialogMode = ref<'create' | 'addChild' | 'edit'>('create')
 const editingPlan = ref<TaskPlan | null>(null)
 const parentPlan = ref<TaskPlan | null>(null)
+
+const planDialogTitle = computed(() => {
+  if (planDialogMode.value === 'edit') return '修改任务计划'
+  if (planDialogMode.value === 'addChild') return `添加子任务 — ${parentPlan.value?.Name}`
+  return '新建任务计划'
+})
+
+function closePlanDialog() {
+  showPlanDialog.value = false
+  editingPlan.value = null
+  parentPlan.value = null
+}
 
 const showRatingDialog = ref(false)
 const ratingAction = ref<'start-plan' | 'complete-plan'>('complete-plan')
@@ -449,10 +462,8 @@ async function createPlan() {
     }
 
     await post('task-plans/', payload)
-    showCreateDialog.value = false
-    showAddChildDialog.value = false
+    closePlanDialog()
     resetForm()
-    parentPlan.value = null
   }, {
     success: '创建成功',
     error: '创建失败',
@@ -479,8 +490,7 @@ async function updatePlan() {
       OrderNum: formData.value.OrderNum ?? undefined,
       Priority: formData.value.Priority ?? undefined,
     })
-    showEditDialog.value = false
-    editingPlan.value = null
+    closePlanDialog()
     resetForm()
   }, {
     success: '修改成功',
@@ -572,20 +582,23 @@ async function openEditDialog(ID: string) {
     OrderNum: res.OrderNum ?? null,
     Priority: res.Priority ?? null,
   }
-  showEditDialog.value = true
+  planDialogMode.value = 'edit'
+  showPlanDialog.value = true
 }
 
 function openAddChild(plan: TaskPlan) {
   parentPlan.value = plan
   resetForm()
   formData.value.PlanType = plan.PlanType
-  showAddChildDialog.value = true
+  planDialogMode.value = 'addChild'
+  showPlanDialog.value = true
 }
 
 function openCreateRoot() {
   parentPlan.value = null
   resetForm()
-  showCreateDialog.value = true
+  planDialogMode.value = 'create'
+  showPlanDialog.value = true
 }
 
 watch(() => props.searchText, () => {
@@ -716,38 +729,20 @@ watch(taskPlansVersion, () => {
     </el-table>
 
     <el-dialog
-        v-model="showCreateDialog"
-        title="新建任务计划"
+        v-model="showPlanDialog"
+        :title="planDialogTitle"
         width="31.25rem"
     >
-      <TaskPlanForm :form-data="formData"/>
+      <TaskPlanForm
+          :form-data="formData"
+          :show-parent-select="planDialogMode === 'edit'"
+          :selectable-parents="selectableParents"
+      />
       <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" @click="createPlan">创建</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog
-        v-model="showAddChildDialog"
-        :title="`添加子任务 — ${parentPlan?.Name}`"
-        width="31.25rem"
-    >
-      <TaskPlanForm :form-data="formData"/>
-      <template #footer>
-        <el-button @click="showAddChildDialog = false; parentPlan = null">取消</el-button>
-        <el-button type="primary" @click="createPlan">创建</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog
-        v-model="showEditDialog"
-        title="修改任务计划"
-        width="31.25rem"
-    >
-      <TaskPlanForm :form-data="formData" show-parent-select :selectable-parents="selectableParents"/>
-      <template #footer>
-        <el-button @click="showEditDialog = false; editingPlan = null">取消</el-button>
-        <el-button type="primary" @click="updatePlan">保存修改</el-button>
+        <el-button @click="closePlanDialog">取消</el-button>
+        <el-button type="primary" @click="planDialogMode === 'edit' ? updatePlan() : createPlan()">
+          {{ planDialogMode === 'edit' ? '保存修改' : '创建' }}
+        </el-button>
       </template>
     </el-dialog>
     <RatingDialog
