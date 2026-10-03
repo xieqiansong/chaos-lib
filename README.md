@@ -176,7 +176,6 @@ chaos-lib/
 │   └── tools/                   # 通用工具函数（Windows API / HTTP / 通知等）
 ├── chaos-ui/                    # Vue 3 + TypeScript 前端
 │   └── src/                     # views / components / router / utils
-├── openspec/                    # 规格驱动开发（specs / changes / archive）
 ├── scripts/chaos.deploy.ps1     # 一键构建 + 部署
 └── docs/screenshots/            # 界面截图
 ```
@@ -205,10 +204,6 @@ chaos-lib/
 | `/board` | 全屏看板 | 手机端时钟 + 天气（隐藏、全屏） |
 
 路由表 `chaos-ui/src/router/index.ts` 的 `meta.title` / `meta.icon` 是侧边菜单与面包屑的唯一数据源，新增页面只需追加路由。
-
-## 规格驱动开发
-
-功能规格与变更规划由 [`openspec/`](openspec/) 管理：`openspec/specs/<module>/spec.md` 为真值源，变更提案放 `openspec/changes/<name>/`。使用方式见 [`openspec/README.md`](openspec/README.md)。
 
 ## 参考
 

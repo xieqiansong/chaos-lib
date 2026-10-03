@@ -1,6 +1,6 @@
 // Package supabase 提供对 Supabase Data API（PostgREST）的最小访问能力。
 //
-// 三条硬约束（对应 openspec/changes/supabase-http-api）：
+// 三条硬约束：
 //  1. 凭据只通过 apikey 请求头传递。Supabase 新式凭据（sb_publishable_* /
 //     sb_secret_*）不是 JWT，放进 Authorization: Bearer 会被平台判为 Invalid JWT。
 //  2. 只允许访问显式登记的表名，未命中的表名在发出请求前即被拒绝。

@@ -1,6 +1,6 @@
 # chaos-lib 代码规则
 
-> 只列代码层面的硬规则。功能规格、变更规划、设计决策由 `openspec/` 管理。
+> 只列代码层面的硬规则。
 
 ## 公开仓库红线
 
@@ -92,14 +92,6 @@
 >   - `sdk`：新建 `seed.go`（默认类型，由 `app.go` 显式调用，取代 repository 的 `init` 播种）与 `dto.go`；`service.go` 收编校验与用例；修掉两处缺陷：`note` 的更新条件误用 `len(patch.Sources)`，以及更新后返回的是修改前的快照。
 >   - `dbmonitor`：`postgres.go` / `sqlite.go` 改名为 `repo_postgres.go` / `repo_sqlite.go`；新建 `dto.go`；过滤 / 排序 / 分页切片由 handler 下沉到 `service.ListTableStats`。
 >   - `apilog`：拆除 `service.go`，拆为 `middleware.go`（gin 中间件）与 `worker.go`（异步落库 + `Start()`）；后台 goroutine 改为由 `app.go` 显式启动，不再在 `init` 里起。
-
-## OpenSpec 规格驱动开发
-
-- 规格为真值源：`openspec/specs/<module>/spec.md`；变更提案 `openspec/changes/<name>/`（proposal/design/tasks/specs 四件套）。
-- 工作流：`/opsx:propose` → `/opsx:apply`（按 tasks.md）→ 补测试并**实跑 `go test ./...`** → 确认后 `/opsx:archive`。
-- 每次改动后提醒用户 `/opsx:archive` 关闭变更；未归档 change 会污染提案列表。
-- `spec.md` 须含 `## Purpose`、`## Requirements`（SHALL/MUST）、`#### Scenario:`（WHEN/THEN），否则 `openspec validate` 不过。
-- 后端改动主动提醒补 `_test.go`（用户决定）；前端改动不引入测试框架，tasks.md 须附「前端手动验证清单」人工验收。
 
 ## 构建与部署
 
