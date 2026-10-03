@@ -1,17 +1,15 @@
 package stunsync
 
 import (
+	"chaos-go/internal/config"
+	"chaos-go/internal/mqttsync"
+	"chaos-go/pkg/tools"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
-	"time"
-
-	"chaos-go/internal/config"
-	"chaos-go/internal/mqttsync"
-	"chaos-go/pkg/tools"
 )
 
 const (
@@ -61,15 +59,6 @@ func RunSync() {
 		return
 	}
 	run()
-}
-
-// interval 返回同步间隔：读取配置，非法值时回退到 60 秒。
-func interval() time.Duration {
-	sec := config.GetConfig().Lucky.SyncIntervalSec
-	if sec <= 0 {
-		sec = 60
-	}
-	return time.Duration(sec) * time.Second
 }
 
 // enabled 控制任务是否启动：仅当 MQTT 已启用且已配置 LUCKY_OPEN_TOKEN 时生效。

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"chaos-go/internal/config"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
 )
@@ -55,8 +56,6 @@ func setConnected(v bool) {
 	connected = v
 	connectedMu.Unlock()
 }
-
-const aesGCMNonceSize = 12
 
 // envelope 是加密后的外层信封；无 enc 字段的报文视为明文旧消息（兼容滚动升级）。
 type envelope struct {

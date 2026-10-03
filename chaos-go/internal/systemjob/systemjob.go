@@ -16,12 +16,12 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("systemJob", Register)
+	routehub.Register("system-jobs", Register)
 }
 
 // Register 挂载内部动作接口，均触发有副作用的下游动作并以标准响应返回。
 func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/systemJobs")
+	g := rg.Group("/system-jobs")
 	g.POST("/sweep", func(c *gin.Context) {
 		taskplan.SweepScheduledTaskPlans()
 		renv.Success(c, nil)

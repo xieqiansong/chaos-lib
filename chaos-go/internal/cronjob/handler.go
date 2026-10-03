@@ -32,13 +32,13 @@ import (
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/modules 导入该包而自动生效，无需 router.go 逐条编排。
 func init() {
-	routehub.Register("cronJob", Register)
+	routehub.Register("cron-jobs", Register)
 }
 
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 标准 CRUD 由通用 crud 反射生成，扩展能力挂在同一前缀下，routes.go 只写一行 cronjob.Register(api)。
 func Register(rg *gin.RouterGroup) {
-	crud.Register[CronJob](rg, "cronJob", crud.Opts[CronJob]{
+	crud.Register[CronJob](rg, "cron-jobs", crud.Opts[CronJob]{
 		Searchable:  []string{"name", "cron_expr", "action_type"},
 		Sortable:    []string{"id", "name", "enabled", "created_at"},
 		ToResponse:  CronJobViews,
@@ -46,7 +46,7 @@ func Register(rg *gin.RouterGroup) {
 		AfterUpdate: OnSaved,
 		AfterDelete: RemoveJobOnDelete,
 	})
-	g := rg.Group("/cronJob")
+	g := rg.Group("/cron-jobs")
 	{
 		g.PATCH("/:id/status", status) // 启停（带调度副作用）
 		g.POST("/:id/run", run)        // 立即执行一次

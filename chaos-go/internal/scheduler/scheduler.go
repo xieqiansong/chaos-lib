@@ -17,16 +17,6 @@ type RegisteredTask struct {
 
 var registeredTasks []RegisteredTask
 
-func Register(name string, interval time.Duration, fn TaskFunc, enabledFn ...func() bool) {
-	var enabled func() bool
-	if len(enabledFn) > 0 {
-		enabled = enabledFn[0]
-	}
-	registeredTasks = append(registeredTasks, RegisteredTask{
-		Name: name, Interval: interval, Func: fn, Enabled: enabled,
-	})
-}
-
 func Start() {
 	for _, t := range registeredTasks {
 		if t.Enabled != nil && !t.Enabled() {

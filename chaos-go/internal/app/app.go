@@ -19,6 +19,7 @@ import (
 	"chaos-go/internal/scheduler"
 	"chaos-go/internal/sdk"
 	"chaos-go/internal/standarddata"
+	_ "chaos-go/internal/systemjob"
 	"chaos-go/internal/taskplan"
 	"io/fs"
 	"log/slog"
@@ -82,12 +83,6 @@ func Run(webFS fs.FS) error {
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
 
-	// SDK 类型缺省数据（此前由 repository 的 init 隐式播种，现改为显式调用）
-	sdk.SeedDefaults()
-
-	// 定时任务模块：首次运行时写入由原内置周期任务转换而来的默认任务，
-	// 随后启动基于 robfig/cron 的调度器，按 cron 表达式触发各类动作。
-	cronjob.SeedDefaults()
 	cronjob.Start()
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())

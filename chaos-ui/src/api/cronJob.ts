@@ -29,20 +29,20 @@ export interface CronJobRun {
     Error: string
 }
 
-const rest = useRestApi<CronJob>('cronJob')
+const rest = useRestApi<CronJob>('cron-jobs')
 
 export const cronJobApi = {
     ...rest,
-    // 自定义接口：启停（标准 CRUD 之外，由本资源自实现，对应后端 PATCH /cronJob/:id/status）
-    setStatus: (id: number, status: boolean) => patch(`cronJob/${id}/status`, {status}),
+    // 自定义接口：启停（标准 CRUD 之外，由本资源自实现，对应后端 PATCH /cron-jobs/:id/status）
+    setStatus: (id: number, status: boolean) => patch(`cron-jobs/${id}/status`, {status}),
     // 立即执行一次，返回本次运行记录
-    run: (id: number): Promise<CronJobRun> => post(`cronJob/${id}/run`, {}),
+    run: (id: number): Promise<CronJobRun> => post(`cron-jobs/${id}/run`, {}),
     // 运行历史（分页）：响应为统一信封的 data，即 { list, pagination }
     runs: (id: number, params?: Record<string, any>): Promise<{
         list: CronJobRun[];
         pagination: { page: number; page_size: number; total: number; total_pages: number }
-    }> => get(`cronJob/${id}/runs`, params),
+    }> => get(`cron-jobs/${id}/runs`, params),
     // cron 表达式校验 + 未来若干次触发时间预览
     preview: (cronExpr: string, count = 5): Promise<{ valid: boolean; error?: string; nextRuns: string[] }> =>
-        post('cronJob/preview', {cronExpr, count}),
+        post('cron-jobs/preview', {cronExpr, count}),
 }
