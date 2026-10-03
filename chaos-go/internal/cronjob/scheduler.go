@@ -61,7 +61,7 @@ func SyncJob(job *CronJob) {
 		cronInstance.Remove(old)
 		delete(entryIDs, job.ID)
 	}
-	if job.Enabled && !job.IsDeleted {
+	if job.Enabled && !job.Deleted() {
 		addEntry(job)
 	}
 }

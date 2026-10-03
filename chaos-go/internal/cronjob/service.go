@@ -119,7 +119,7 @@ func PreviewRuns(expr string, count int) ([]time.Time, error) {
 
 // nextRunOf 计算任务的下次执行时间；未启用 / 已删除 / 表达式非法时为空。
 func nextRunOf(job *CronJob) *time.Time {
-	if !job.Enabled || job.IsDeleted {
+	if !job.Enabled || job.Deleted() {
 		return nil
 	}
 	next, err := NextRuns(job.CronExpr, 1)

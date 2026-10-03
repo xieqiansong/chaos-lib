@@ -25,7 +25,7 @@ func CollectDescendantPlanIDs(rootID int) ([]int, error) {
 	walk = func(id int) error {
 		ids = append(ids, id)
 		var children []TaskPlan
-		if err := db.Where("parent_id = ? AND is_deleted = ?", id, false).Find(&children).Error; err != nil {
+		if err := db.Where("parent_id = ?", id).Find(&children).Error; err != nil {
 			return err
 		}
 		for _, child := range children {
@@ -47,7 +47,7 @@ func FindActiveTaskPlan(id int) (*TaskPlan, error) {
 		return nil, ErrDBUnavailable
 	}
 	var plan TaskPlan
-	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&plan).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&plan).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPlanNotFound
 		}
@@ -87,7 +87,7 @@ func UpdateTaskPlanColumns(id int, updates map[string]interface{}) error {
 	if db == nil {
 		return ErrDBUnavailable
 	}
-	return db.Model(&TaskPlan{}).Where("id = ? AND is_deleted = ?", id, false).Updates(updates).Error
+	return db.Model(&TaskPlan{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // SaveTaskPlan 全量保存计划（用于状态机迁移后回写）。
@@ -106,7 +106,7 @@ func CountChildPlans(id int) (int64, error) {
 		return 0, ErrDBUnavailable
 	}
 	var c int64
-	if err := db.Model(&TaskPlan{}).Where("parent_id = ? AND is_deleted = ?", id, false).Count(&c).Error; err != nil {
+	if err := db.Model(&TaskPlan{}).Where("parent_id = ?", id).Count(&c).Error; err != nil {
 		return 0, err
 	}
 	return c, nil
@@ -119,7 +119,7 @@ func CountActiveTasks(planID int) (int64, error) {
 		return 0, ErrDBUnavailable
 	}
 	var c int64
-	if err := db.Model(&Task{}).Where("plan_id = ? AND status = ? AND is_deleted = ?", planID, TaskStatusActive, false).Count(&c).Error; err != nil {
+	if err := db.Model(&Task{}).Where("plan_id = ? AND status = ?", planID, TaskStatusActive).Count(&c).Error; err != nil {
 		return 0, err
 	}
 	return c, nil
@@ -140,7 +140,7 @@ func ListPlans(planType, status string) ([]TaskPlan, error) {
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
-	q := db.Model(&TaskPlan{}).Where("is_deleted = ?", false)
+	q := db.Model(&TaskPlan{})
 	if planType != "" {
 		q = q.Where("plan_type = ?", planType)
 	}
@@ -162,7 +162,7 @@ func ListPlanTreeRows() ([]TaskPlan, error) {
 	}
 	var plans []TaskPlan
 	if err := db.Select("ID", "ParentID", "Name", "Status", "PlanType", "TaskCount", "Priority", "OrderNum", "Link", "IsSuspended", "FsrsReps").
-		Where("is_deleted = ?", false).Find(&plans).Error; err != nil {
+		Find(&plans).Error; err != nil {
 		return nil, err
 	}
 	return plans, nil
@@ -177,7 +177,7 @@ func FindActiveTask(id int) (*Task, error) {
 		return nil, ErrDBUnavailable
 	}
 	var task Task
-	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&task).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&task).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrTaskNotFound
 		}
@@ -193,7 +193,7 @@ func FindActiveTaskForPlan(planID int) (*Task, bool) {
 		return nil, false
 	}
 	var task Task
-	if err := db.Where("plan_id = ? AND status = ? AND is_deleted = ?", planID, TaskStatusActive, false).First(&task).Error; err != nil {
+	if err := db.Where("plan_id = ? AND status = ?", planID, TaskStatusActive).First(&task).Error; err != nil {
 		return nil, false
 	}
 	return &task, true
@@ -206,7 +206,7 @@ func FindTaskAt(planID int, t time.Time) (*Task, bool) {
 		return nil, false
 	}
 	var task Task
-	if err := db.Where("plan_id = ? AND started_at = ? AND is_deleted = ?", planID, t, false).First(&task).Error; err != nil {
+	if err := db.Where("plan_id = ? AND started_at = ?", planID, t).First(&task).Error; err != nil {
 		return nil, false
 	}
 	return &task, true
@@ -246,7 +246,7 @@ func ListTasksByPlan(planID int) ([]Task, error) {
 		return nil, ErrDBUnavailable
 	}
 	var tasks []Task
-	if err := db.Where("plan_id = ? AND is_deleted = ?", planID, false).Order("created_at DESC, id DESC").Find(&tasks).Error; err != nil {
+	if err := db.Where("plan_id = ?", planID).Order("created_at DESC, id DESC").Find(&tasks).Error; err != nil {
 		return nil, err
 	}
 	return tasks, nil
@@ -261,12 +261,12 @@ func CompleteActiveTasksForPlan(planID int, now time.Time) error {
 		return ErrDBUnavailable
 	}
 	tx := db.Begin()
-	if err := tx.Model(&Task{}).Where("plan_id = ? AND status = ? AND is_deleted = ?", planID, TaskStatusActive, false).
+	if err := tx.Model(&Task{}).Where("plan_id = ? AND status = ?", planID, TaskStatusActive).
 		Updates(map[string]interface{}{"status": TaskStatusDone, "completed_at": now}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	if err := tx.Model(&TaskPlan{}).Where("id = ? AND is_deleted = ?", planID, false).
+	if err := tx.Model(&TaskPlan{}).Where("id = ?", planID).
 		Updates(map[string]interface{}{"status": TaskPlanStatusCompleted, "updated_at": now}).Error; err != nil {
 		tx.Rollback()
 		return err
@@ -289,13 +289,14 @@ func SoftDeletePlanAndTasks(planID int, cascade bool) (int, error) {
 		}
 		tx := db.Begin()
 		if len(ids) > 0 {
-			if err := tx.Model(&Task{}).Where("plan_id IN ?", ids).Update("is_deleted", true).Error; err != nil {
+			// Delete 在 soft_delete 插件下即软删（UPDATE ... SET is_deleted = 1）
+			if err := tx.Where("plan_id IN ?", ids).Delete(&Task{}).Error; err != nil {
 				tx.Rollback()
 				return 0, err
 			}
 		}
 		if err := tx.Model(&TaskPlan{}).Where("id IN ?", ids).
-			Updates(map[string]interface{}{"is_deleted": true, "updated_at": now}).Error; err != nil {
+			Updates(map[string]interface{}{"is_deleted": 1, "updated_at": now}).Error; err != nil {
 			tx.Rollback()
 			return 0, err
 		}
@@ -305,12 +306,12 @@ func SoftDeletePlanAndTasks(planID int, cascade bool) (int, error) {
 		return len(ids), nil
 	}
 	tx := db.Begin()
-	if err := tx.Model(&Task{}).Where("plan_id = ?", planID).Update("is_deleted", true).Error; err != nil {
+	if err := tx.Where("plan_id = ?", planID).Delete(&Task{}).Error; err != nil {
 		tx.Rollback()
 		return 0, err
 	}
 	if err := tx.Model(&TaskPlan{}).Where("id = ?", planID).
-		Updates(map[string]interface{}{"is_deleted": true, "updated_at": now}).Error; err != nil {
+		Updates(map[string]interface{}{"is_deleted": 1, "updated_at": now}).Error; err != nil {
 		tx.Rollback()
 		return 0, err
 	}
@@ -326,8 +327,8 @@ func ListScheduledPlans(planType TaskPlanType, status TaskPlanStatus) ([]TaskPla
 		return nil, ErrDBUnavailable
 	}
 	var plans []TaskPlan
-	if err := db.Where("plan_type = ? AND status = ? AND is_suspended = ? AND is_deleted = ?",
-		planType, status, false, false).Find(&plans).Error; err != nil {
+	if err := db.Where("plan_type = ? AND status = ? AND is_suspended = ?",
+		planType, status, false).Find(&plans).Error; err != nil {
 		return nil, err
 	}
 	return plans, nil
@@ -341,7 +342,7 @@ func CountActiveUpcomingTasks(planID int, now time.Time) (int64, error) {
 	}
 	var c int64
 	if err := db.Model(&Task{}).
-		Where("plan_id = ? AND status = ? AND started_at > ? AND is_deleted = ?", planID, TaskStatusActive, now, false).
+		Where("plan_id = ? AND status = ? AND started_at > ?", planID, TaskStatusActive, now).
 		Count(&c).Error; err != nil {
 		return 0, err
 	}
@@ -355,7 +356,7 @@ func FindLatestTaskByPlan(planID int) (*Task, error) {
 		return nil, ErrDBUnavailable
 	}
 	var last Task
-	if err := db.Where("plan_id = ? AND is_deleted = ?", planID, false).Order("started_at DESC").First(&last).Error; err != nil {
+	if err := db.Where("plan_id = ?", planID).Order("started_at DESC").First(&last).Error; err != nil {
 		return nil, err
 	}
 	return &last, nil
@@ -373,8 +374,9 @@ func QueryPendingTasks(now time.Time, early bool, planID int, name, sort, order 
 	base := db.Table("tasks").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", TaskStatusActive).
-		Where("tasks.is_deleted = ?", false).
-		Where("task_plans.is_deleted = ?", false).
+		// 联表走 Table（无模型 schema），soft_delete 插件不生效，两张表的软删条件仍须显式书写
+		Where("tasks.is_deleted = ?", 0).
+		Where("task_plans.is_deleted = ?", 0).
 		Where("task_plans.is_suspended = ?", false)
 
 	if !early {
@@ -464,7 +466,7 @@ func DailyCompletionRows(cutoff time.Time) ([]time.Time, error) {
 		Select("completed_at").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.completed_at IS NOT NULL AND tasks.completed_at >= ?",
-			TaskStatusDone, false, cutoff).
+			TaskStatusDone, 0, cutoff).
 		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -490,7 +492,7 @@ func ActiveStartRows(start, end time.Time) ([]time.Time, error) {
 		Select("started_at").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ? AND tasks.started_at < ?",
-			TaskStatusActive, false, start, end.AddDate(0, 0, 1)).
+			TaskStatusActive, 0, start, end.AddDate(0, 0, 1)).
 		Where("task_plans.is_suspended = ?", false).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -518,7 +520,7 @@ func ContributionRows(planIDs []int, start time.Time) ([]ContributionRow, error)
 	if err := db.Table("tasks").
 		Select("tasks.plan_id, tasks.started_at").
 		Where("tasks.status = ? AND tasks.is_deleted = ? AND tasks.started_at IS NOT NULL AND tasks.started_at >= ?",
-			TaskStatusDone, false, start).
+			TaskStatusDone, 0, start).
 		Where("tasks.plan_id IN ?", planIDs).
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -533,7 +535,7 @@ func FindActiveUnsuspendedPlanByID(id int) (*TaskPlan, error) {
 		return nil, ErrDBUnavailable
 	}
 	var plan TaskPlan
-	if err := db.Where("id = ? AND is_deleted = ? AND is_suspended = ?", id, false, false).First(&plan).Error; err != nil {
+	if err := db.Where("id = ? AND is_suspended = ?", id, false).First(&plan).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPlanNotFound
 		}
@@ -549,7 +551,7 @@ func FindActiveUnsuspendedPlansByName(name string) ([]TaskPlan, error) {
 		return nil, ErrDBUnavailable
 	}
 	var plans []TaskPlan
-	if err := db.Where("name = ? AND is_deleted = ? AND is_suspended = ?", name, false, false).Find(&plans).Error; err != nil {
+	if err := db.Where("name = ? AND is_suspended = ?", name, false).Find(&plans).Error; err != nil {
 		return nil, err
 	}
 	return plans, nil
@@ -562,7 +564,7 @@ func ListChildren(planID int) ([]TaskPlan, error) {
 		return nil, ErrDBUnavailable
 	}
 	var children []TaskPlan
-	if err := db.Where("parent_id = ? AND is_deleted = ? AND is_suspended = ?", planID, false, false).
+	if err := db.Where("parent_id = ? AND is_suspended = ?", planID, false).
 		Order("order_num ASC, id ASC").Find(&children).Error; err != nil {
 		return nil, err
 	}

@@ -14,7 +14,7 @@ func ListActiveSdkSources() ([]SdkSource, error) {
 		return nil, ErrDBUnavailable
 	}
 	var srcs []SdkSource
-	if err := db.Where("is_deleted = ?", false).Find(&srcs).Error; err != nil {
+	if err := db.Find(&srcs).Error; err != nil {
 		return nil, err
 	}
 	return srcs, nil
@@ -27,7 +27,7 @@ func FindSdkSource(typ string) (*SdkSource, error) {
 		return nil, ErrDBUnavailable
 	}
 	var s SdkSource
-	if err := db.Where("name = ? AND is_deleted = ?", typ, false).First(&s).Error; err != nil {
+	if err := db.Where("name = ?", typ).First(&s).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrSdkNotFound
 		}
@@ -42,7 +42,7 @@ func SetCurrentVersion(typ string, abs string) error {
 	if db == nil {
 		return ErrDBUnavailable
 	}
-	return db.Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", typ, false).
+	return db.Model(&SdkSource{}).Where("name = ?", typ).
 		Update("current", abs).Error
 }
 
@@ -53,7 +53,7 @@ func CountActiveByName(name string) (int64, error) {
 		return 0, ErrDBUnavailable
 	}
 	var count int64
-	if err := db.Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", name, false).Count(&count).Error; err != nil {
+	if err := db.Model(&SdkSource{}).Where("name = ?", name).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -74,7 +74,7 @@ func ApplySdkSourcePatch(name string, updates map[string]interface{}) error {
 	if db == nil {
 		return ErrDBUnavailable
 	}
-	return db.Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", name, false).
+	return db.Model(&SdkSource{}).Where("name = ?", name).
 		Updates(updates).Error
 }
 
@@ -84,6 +84,6 @@ func SoftDeleteSdkSource(name string) error {
 	if db == nil {
 		return ErrDBUnavailable
 	}
-	return db.Model(&SdkSource{}).Where("name = ? AND is_deleted = ?", name, false).
-		Update("is_deleted", true).Error
+	// Delete 在 soft_delete 插件下即软删（UPDATE ... SET is_deleted = 1）
+	return db.Where("name = ?", name).Delete(&SdkSource{}).Error
 }

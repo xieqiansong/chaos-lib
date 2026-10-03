@@ -22,15 +22,27 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/plugin/soft_delete"
 )
 
 // BaseModel 标准基字段：所有简单表嵌入它即可获得统一的
 // 主键 / 创建时间 / 更新时间 / 逻辑删除。IsDeleted 不对外暴露（json:"-"）。
+//
+// 逻辑删除交给 gorm.io/plugin/soft_delete 的 flag 模式：
+// 查询自动追加 is_deleted = 0、Delete() 自动置 1，Unscoped() 可绕过。
+// 因此业务与 crud 基线都不必再手写 is_deleted 条件。
 type BaseModel struct {
-	ID        int       `gorm:"primaryKey" json:"ID"`
-	CreatedAt time.Time `json:"CreatedAt"`
-	UpdatedAt time.Time `json:"UpdatedAt"`
-	IsDeleted bool      `gorm:"default:false" json:"-"`
+	ID        int                   `gorm:"primaryKey" json:"ID"`
+	CreatedAt time.Time             `json:"CreatedAt"`
+	UpdatedAt time.Time             `json:"UpdatedAt"`
+	IsDeleted soft_delete.DeletedAt `gorm:"softDelete:flag" json:"-"`
+}
+
+// Deleted 判定该记录是否已被软删。
+// soft_delete.DeletedAt 底层是 uint，不能直接当 bool 用（!x.IsDeleted 无法编译），
+// 统一经本方法判断，嵌入 BaseModel 的模型自动获得。
+func (m BaseModel) Deleted() bool {
+	return m.IsDeleted != 0
 }
 
 // Opts[T] 资源级配置。T 为业务模型类型（如 StandardData），约束了回调与切片的元素类型。

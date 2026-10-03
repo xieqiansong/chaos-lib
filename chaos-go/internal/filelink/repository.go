@@ -13,7 +13,7 @@ var ErrLinkNotFound = errors.New("filelink: 文件连接不存在")
 // findActiveByID 按 ID 加载未软删的联接点记录。
 func findActiveByID(id int) (*FileLink, error) {
 	var link FileLink
-	if err := config.GetDB().Where("is_deleted = ?", false).First(&link, "id = ?", id).Error; err != nil {
+	if err := config.GetDB().First(&link, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrLinkNotFound
 		}

@@ -18,7 +18,7 @@ func SshConnExists(id int) (bool, error) {
 		return false, ErrDBUnavailable
 	}
 	var conn SshConnection
-	if err := db.Where("is_deleted = ?", false).First(&conn, "id = ?", id).Error; err != nil {
+	if err := db.First(&conn, "id = ?", id).Error; err != nil {
 		if isNotFound(err) {
 			return false, nil
 		}
@@ -34,7 +34,7 @@ func FindSshConnByID(id int) (*SshConnection, error) {
 		return nil, ErrDBUnavailable
 	}
 	var conn SshConnection
-	if err := db.Where("is_deleted = ?", false).First(&conn, "id = ?", id).Error; err != nil {
+	if err := db.First(&conn, "id = ?", id).Error; err != nil {
 		if isNotFound(err) {
 			return nil, ErrConnNotFound
 		}
@@ -51,7 +51,7 @@ func CountPortForwardingsByConn(connID int) (int64, error) {
 	}
 	var count int64
 	if err := db.Model(&PortForwarding{}).
-		Where("ssh_connection_id = ? AND is_deleted = ?", connID, false).
+		Where("ssh_connection_id = ?", connID).
 		Count(&count).Error; err != nil {
 		return 0, err
 	}
@@ -65,7 +65,7 @@ func FindPortForwardingByID(id int) (*PortForwarding, error) {
 		return nil, ErrDBUnavailable
 	}
 	var rule PortForwarding
-	if err := db.Where("is_deleted = ?", false).First(&rule, "id = ?", id).Error; err != nil {
+	if err := db.First(&rule, "id = ?", id).Error; err != nil {
 		if isNotFound(err) {
 			return nil, ErrRuleNotFound
 		}
@@ -81,7 +81,7 @@ func FindEnabledPortForwardings() ([]PortForwarding, error) {
 		return nil, ErrDBUnavailable
 	}
 	var rules []PortForwarding
-	if err := db.Where("status = ? AND is_deleted = ?", true, false).
+	if err := db.Where("status = ?", true).
 		Order("id ASC").Find(&rules).Error; err != nil {
 		return nil, err
 	}

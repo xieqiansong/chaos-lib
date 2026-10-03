@@ -12,7 +12,6 @@ func CreateCache(row *DataCache) error {
 func FindLatest(category, key string) (*DataCache, error) {
 	var row DataCache
 	err := config.GetDB().
-		Where("is_deleted = ?", false).
 		Where("category = ? AND key = ?", category, key).
 		Order("id DESC").
 		First(&row).Error

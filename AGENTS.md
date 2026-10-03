@@ -17,7 +17,10 @@
 
 - 用 `config.GetDB()` 单例，**不搞依赖注入**。
 - GORM 模型只加必要标签；列名自动 snake_case，**不写 `gorm:"column:xxx"`**。
-- 软删除统一 `IsDeleted bool`（`json:"-"`），查询走 crud 基线自动过滤。
+- 软删除统一走 `gorm.io/plugin/soft_delete` 的 flag 模式：嵌入 `crud.BaseModel` 即自动获得（`IsDeleted soft_delete.DeletedAt`，`gorm:"softDelete:flag" json:"-"`）。插件在查询 / 更新 / 删除时自动追加 `is_deleted = 0`、`Delete()` 自动置 1，`Unscoped()` 可绕过。
+  - **业务与 crud 基线不再手写 `is_deleted` 条件**；例外：`db.Table(...)` 的联表 / 子查询没有模型 schema，插件不生效，仍须显式写 `is_deleted = 0`。
+  - 该字段底层是 uint，判空用 `crud.BaseModel` 提供的 `Deleted()`，写 `!x.IsDeleted` 无法编译。
+  - 存量 PostgreSQL 库须先应用 `migrations/chaos_postgres_update.sql` 中 2026-10-04 那批 `boolean → smallint` 的 ALTER（插件以整数读写该列）；SQLite 以整数存储，无需变更。
 - 新模型须在 `cmd/server/main.go` 的 `config.AutoMigrate(...)` 登记。
 - `sql/chaos_postgres_schema.sql` 为手动导出基准快照，**AI 不得修改**；模型变动追加 `sql/chaos_postgres_update.sql`（增量日志，注日期与用途）。
 

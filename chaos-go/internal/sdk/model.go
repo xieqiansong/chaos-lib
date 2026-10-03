@@ -3,6 +3,8 @@ package sdk
 import (
 	"encoding/json"
 	"errors"
+
+	"gorm.io/plugin/soft_delete"
 )
 
 const (
@@ -57,7 +59,7 @@ type SdkSource struct {
 	Current   string          // 当前启用版本绝对路径
 	Enabled   bool            `gorm:"default:true"`
 	Note      string
-	IsDeleted bool `gorm:"default:false"`
+	IsDeleted soft_delete.DeletedAt `gorm:"softDelete:flag"`
 }
 
 // SdkInfo 返回给前端的版本信息。

@@ -12,7 +12,7 @@ import (
 // FindJobByID 读取未删除的指定任务；不存在返回 ErrJobNotFound。
 func FindJobByID(id int) (CronJob, error) {
 	var job CronJob
-	if err := config.GetDB().Where("is_deleted = ?", false).First(&job, "id = ?", id).Error; err != nil {
+	if err := config.GetDB().First(&job, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return CronJob{}, ErrJobNotFound
 		}
@@ -24,7 +24,7 @@ func FindJobByID(id int) (CronJob, error) {
 // FindEnabledJobs 读取所有启用且未删除的任务（调度器启动时加载）。
 func FindEnabledJobs() ([]CronJob, error) {
 	var jobs []CronJob
-	if err := config.GetDB().Where("enabled = ? AND is_deleted = ?", true, false).Find(&jobs).Error; err != nil {
+	if err := config.GetDB().Where("enabled = ?", true).Find(&jobs).Error; err != nil {
 		return nil, err
 	}
 	return jobs, nil
@@ -75,7 +75,7 @@ func FindRuns(jobID int, q pagination.Query) ([]CronJobRun, int64, error) {
 // CountJobs 统计未删除的任务数量（用于判断是否需写入默认任务）。
 func CountJobs() (int64, error) {
 	var count int64
-	if err := config.GetDB().Model(&CronJob{}).Where("is_deleted = ?", false).Count(&count).Error; err != nil {
+	if err := config.GetDB().Model(&CronJob{}).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil

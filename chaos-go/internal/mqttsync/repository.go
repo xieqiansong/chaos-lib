@@ -39,9 +39,10 @@ func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
+	// 子查询走 Table（无模型 schema），soft_delete 插件不生效，故此处仍显式过滤
 	sub := db.Table("mqtt_sync_messages").
 		Select("MAX(id)").
-		Where("is_deleted = ?", false).
+		Where("is_deleted = ?", 0).
 		Group("channel")
 	if prefix != "" {
 		sub = sub.Where("channel LIKE ?", prefix+"%")
@@ -49,7 +50,6 @@ func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	var msgs []MqttSyncMessage
 	if err := db.
 		Where("id IN (?)", sub).
-		Where("is_deleted = ?", false).
 		Order("created_at DESC").
 		Find(&msgs).Error; err != nil {
 		return nil, err
@@ -63,9 +63,8 @@ func DeleteChannelByName(name string) (int64, error) {
 	if db == nil {
 		return 0, ErrDBUnavailable
 	}
-	res := db.Model(&MqttSyncMessage{}).
-		Where("channel = ? AND is_deleted = ?", name, false).
-		Update("is_deleted", true)
+	// Delete 在 soft_delete 插件下即软删（UPDATE ... SET is_deleted = 1）
+	res := db.Where("channel = ?", name).Delete(&MqttSyncMessage{})
 	return res.RowsAffected, res.Error
 }
 

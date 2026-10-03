@@ -62,7 +62,8 @@ func (h *handler[T]) runHook(hook func(row *T) error, row *T) error {
 // list 列表：分页 + 搜索 + 排序 + 软删过滤。
 func (h *handler[T]) list(c *gin.Context) {
 	q := pagination.Parse(c)
-	base := config.GetDB().Model(new(T)).Where("is_deleted = ?", false)
+	// 软删过滤由 soft_delete 插件自动追加，此处不再手写 is_deleted 条件
+	base := config.GetDB().Model(new(T))
 
 	for _, f := range h.opts.Searchable {
 		if v := strings.TrimSpace(c.Query(f)); v != "" {
@@ -97,7 +98,7 @@ func (h *handler[T]) list(c *gin.Context) {
 // get 单条（含软删过滤）。
 func (h *handler[T]) get(c *gin.Context) {
 	var row T
-	if err := config.GetDB().Where("is_deleted = ?", false).First(&row, "id = ?", c.Param("id")).Error; err != nil {
+	if err := config.GetDB().First(&row, "id = ?", c.Param("id")).Error; err != nil {
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
@@ -137,7 +138,7 @@ func (h *handler[T]) create(c *gin.Context) {
 func (h *handler[T]) update(c *gin.Context) {
 	tx := config.GetDB().Begin()
 	var ptr T
-	if err := tx.Where("is_deleted = ?", false).First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
+	if err := tx.First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
 		tx.Rollback()
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
@@ -185,12 +186,13 @@ func (h *handler[T]) update(c *gin.Context) {
 func (h *handler[T]) delete(c *gin.Context) {
 	tx := config.GetDB().Begin()
 	var ptr T
-	if err := tx.Where("is_deleted = ?", false).First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
+	if err := tx.First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
 		tx.Rollback()
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
-	if err := tx.Model(&ptr).Update("is_deleted", true).Error; err != nil {
+	// Delete 在 soft_delete 插件下即软删：插件把语句改写为 UPDATE ... SET is_deleted = 1
+	if err := tx.Delete(&ptr).Error; err != nil {
 		tx.Rollback()
 		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
 		return

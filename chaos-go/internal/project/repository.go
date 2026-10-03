@@ -15,7 +15,7 @@ func FindGroupByID(id int) (*ProjectGroup, error) {
 		return nil, ErrDBUnavailable
 	}
 	var g ProjectGroup
-	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&g).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&g).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGroupNotFound
 		}
@@ -31,7 +31,7 @@ func FindProjectByID(id int) (*Project, error) {
 		return nil, ErrDBUnavailable
 	}
 	var p Project
-	if err := db.Where("id = ? AND is_deleted = ?", id, false).First(&p).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&p).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrProjectNotFound
 		}
@@ -48,8 +48,8 @@ func CascadeDeleteProjectsByGroup(groupID int) error {
 	}
 	now := time.Now()
 	return db.Model(&Project{}).
-		Where("group_id = ? AND is_deleted = ?", groupID, false).
-		Updates(map[string]interface{}{"is_deleted": true, "updated_at": now}).Error
+		Where("group_id = ?", groupID).
+		Updates(map[string]interface{}{"is_deleted": 1, "updated_at": now}).Error
 }
 
 // FindActiveProjectsByGroup 返回某项目组下所有未软删的子项目。
@@ -59,7 +59,7 @@ func FindActiveProjectsByGroup(groupID int) ([]Project, error) {
 		return nil, ErrDBUnavailable
 	}
 	var children []Project
-	if err := db.Where("group_id = ? AND is_deleted = ?", groupID, false).Find(&children).Error; err != nil {
+	if err := db.Where("group_id = ?", groupID).Find(&children).Error; err != nil {
 		return nil, err
 	}
 	return children, nil
@@ -73,7 +73,7 @@ func UpdateProjectAbsolutePath(id int, newAbs string) error {
 	}
 	now := time.Now()
 	return db.Model(&Project{}).
-		Where("id = ? AND is_deleted = ?", id, false).
+		Where("id = ?", id).
 		Updates(map[string]interface{}{"absolute_path": newAbs, "updated_at": now}).Error
 }
 
@@ -83,7 +83,7 @@ func ListActiveProjects(groupID *int, name string) ([]Project, error) {
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
-	q := db.Model(&Project{}).Where("is_deleted = ?", false)
+	q := db.Model(&Project{})
 	if groupID != nil {
 		q = q.Where("group_id = ?", *groupID)
 	}
@@ -105,7 +105,7 @@ func UpdateProjectLocation(id, groupID int, newAbs, newRel string) error {
 	}
 	now := time.Now()
 	return db.Model(&Project{}).
-		Where("id = ? AND is_deleted = ?", id, false).
+		Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"group_id":      groupID,
 			"absolute_path": newAbs,
@@ -122,6 +122,6 @@ func TouchProjectAccess(id int) error {
 	}
 	now := time.Now()
 	return db.Model(&Project{}).
-		Where("id = ? AND is_deleted = ?", id, false).
+		Where("id = ?", id).
 		Updates(map[string]interface{}{"last_accessed_at": now, "updated_at": now}).Error
 }
