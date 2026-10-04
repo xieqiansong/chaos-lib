@@ -2828,7 +2828,7 @@ CREATE UNIQUE INDEX idx_project_groups_recycle ON public.project_groups USING bt
 -- Name: idx_projects_abs_path; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_projects_abs_path ON public.projects USING btree (absolute_path) WHERE (is_deleted = FALSE);
+CREATE UNIQUE INDEX idx_projects_abs_path ON public.projects USING btree (absolute_path) WHERE (is_deleted = 0);
 
 
 --
@@ -2856,7 +2856,7 @@ CREATE INDEX idx_quick_edit_snapshots_file_time ON public.quick_edit_snapshots U
 -- Name: idx_sdk_sources_name; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_sdk_sources_name ON public.sdk_sources USING btree (name) WHERE (is_deleted = FALSE);
+CREATE UNIQUE INDEX idx_sdk_sources_name ON public.sdk_sources USING btree (name) WHERE (is_deleted = 0);
 
 
 --
