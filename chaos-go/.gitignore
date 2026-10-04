@@ -21,6 +21,3 @@ data/*.db-wal
 configs/config.yaml
 .env
 .env.*
-
-# 一次性批处理/测试脚本（可能含硬编码密码/路径，禁止提交）
-cmd/test/*
