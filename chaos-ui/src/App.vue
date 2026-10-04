@@ -1,51 +1,25 @@
 <script setup lang="ts">
-import {computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {format} from 'date-fns'
+import {computed, defineAsyncComponent, onUnmounted, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
 import Search from './views/Search.vue'
 import TerminalFrame from './components/TerminalFrame.vue'
-import CommandPalette from './components/CommandPalette.vue'
 import PendingTaskBadge from './components/PendingTaskBadge.vue'
 import {centerPanel, closeCenterPanel} from './utils/centerPanel'
 import {refreshPendingTasks} from './utils/pendingTasksStore'
 import {refreshTaskPlans} from './utils/taskPlansStore'
-import {Moon, Sunny, FullScreen, Search as SearchIcon} from '@element-plus/icons-vue'
+import {FullScreen, Moon, Sunny} from '@element-plus/icons-vue'
 import {theme, toggleTheme} from './theme'
 import {useLandscape} from './composables/useLandscape'
-import {buildMenu, flattenMenu} from './router'
+import {buildMenu} from './router'
 
 // 中心面板（预览原文 / 复习）打开时才加载，避免 markdown-it/dompurify 常驻主包
 const CenterPreview = defineAsyncComponent(() => import('./components/CenterPreview.vue'))
 const ReviewDialog = defineAsyncComponent(() => import('./components/ReviewDialog.vue'))
 
 const route = useRoute()
-const router = useRouter()
-
-// 终端风格：命令面板开关 + 全局热键
-const CMD_ALIAS: Record<string, string> = {
-  dashboard: 'top',
-  taskPlan: 'task',
-  pendingTask: 'todo',
-  projectManage: 'proj',
-  sdk: 'sdk',
-  fileLink: 'link',
-  sshConn: 'conn',
-  portForward: 'fwd',
-  quickEdit: 'edit',
-  environment: 'env',
-  board: 'board',
-  polyform: 'conv',
-}
 
 // 侧边菜单：完全由路由表自动生成（见 router/index.ts）
 const menuItems = computed(() => buildMenu())
-
-// 命令面板条目：菜单拍平 + shell 别名
-const commandItems = computed(() => flattenMenu(menuItems.value).map(m => ({
-  key: m.path,
-  label: m.title,
-  alias: CMD_ALIAS[m.name] || m.name,
-})))
 
 const paletteVisible = ref(false)
 
@@ -56,11 +30,6 @@ function togglePalette() {
   paletteVisible.value = !paletteVisible.value
 }
 
-function onPaletteSelect(path: string) {
-  router.push(path)
-  paletteVisible.value = false
-}
-
 function onGlobalKey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault()
@@ -68,18 +37,7 @@ function onGlobalKey(e: KeyboardEvent) {
   }
 }
 
-// CRT 装饰开关：?crt=0 或系统减少动态效果时关闭
-function applyCrtPreference() {
-  const params = new URLSearchParams(window.location.search)
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (params.get('crt') === '0' || reduceMotion) {
-    document.body.classList.add('no-crt')
-  }
-}
-
 const searchText = ref('')
-const now = ref(format(new Date(), 'MM-dd HH:mm:ss'))
-let timer: ReturnType<typeof setInterval>
 
 const handleSearchChange = (value: string) => {
   searchText.value = value
@@ -109,16 +67,7 @@ function onCenterReviewDone() {
   closeCenterPanel()
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onGlobalKey)
-  applyCrtPreference()
-  timer = setInterval(() => {
-    now.value = format(new Date(), 'MM-dd HH:mm:ss')
-  }, 1000)
-})
-
 onUnmounted(() => {
-  clearInterval(timer)
   window.removeEventListener('keydown', onGlobalKey)
 })
 </script>
@@ -130,10 +79,6 @@ onUnmounted(() => {
   <div v-else class="app-layout">
     <aside class="app-sidebar app-sidebar--frame">
       <TerminalFrame title="nav" prompt="chaos@nav" hide-titlebar>
-        <div class="sidebar-header">
-          <span class="text-sm font-mono text-primary">{{ now }}</span>
-        </div>
-
         <div class="sidebar-nav">
           <el-menu
               :default-active="activePath"
@@ -202,11 +147,6 @@ onUnmounted(() => {
                 <FullScreen/>
               </el-icon>
             </button>
-            <button class="cmdpalette-hint" title="命令面板 (Ctrl/Cmd+K)" @click="togglePalette">
-              <el-icon :size="16">
-                <SearchIcon/>
-              </el-icon>
-            </button>
           </div>
         </header>
         <main class="app-content">
@@ -242,13 +182,6 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
-
-  <CommandPalette
-      :visible="paletteVisible"
-      :commands="commandItems"
-      @select="onPaletteSelect"
-      @update:visible="paletteVisible = $event"
-  />
 </template>
 
 <style scoped>
@@ -259,7 +192,7 @@ onUnmounted(() => {
 }
 
 .app-sidebar {
-  width: 12rem; /* 192px @1920 */
+  width: 10rem;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -267,7 +200,7 @@ onUnmounted(() => {
 }
 
 .app-sidebar--frame {
-  padding: var(--space-xs);
+  padding: 0;
 }
 
 .sidebar-nav {
@@ -277,23 +210,11 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-/* 注意：高度用大写 PX 绕过 postcss-pxtorem 的 rem 转换 —— 顶栏内嵌的
-   Element Plus 控件（搜索框/按钮，固定 32px）不随根字号缩放，若标题栏
-   高度跟着 rem 缩小，窄窗口下控件会溢出容器。 */
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  height: 32.8PX;
-  padding: 0 var(--space-lg);
-  border-bottom: 1px solid var(--term-border);
-  flex-shrink: 0;
-}
-
 .app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 32.8PX;
+  height: 2.5rem;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -303,7 +224,7 @@ onUnmounted(() => {
 .sidebar-menu {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-sm) 0;
+  padding: 0;
   border-right: none;
   background: transparent;
   /* 终端风格：覆盖 Element Plus 菜单变量，随主题自动切换 */
@@ -312,8 +233,8 @@ onUnmounted(() => {
   --el-menu-active-color: var(--term-green);
   --el-menu-hover-bg-color: var(--term-active-bg);
   --el-menu-hover-text-color: var(--term-green);
-  --el-menu-item-height: 26px;
-  --el-menu-sub-item-height: 24px;
+  --el-menu-item-height: 2.5rem;
+  --el-menu-sub-item-height: 2.5rem;
   --el-menu-base-level-padding: var(--space-sm);
   --el-menu-level-padding: var(--space-sm);
 }
@@ -337,7 +258,7 @@ onUnmounted(() => {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  padding: var(--space-xs);
+  padding: 0;
 }
 
 .center-panel {
@@ -353,7 +274,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 32.8px;
+  height: 2.5rem;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -370,8 +291,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 25.6px;
-  height: 25.6px;
+  width: 2.5rem;
+  height: 2.5rem;
   background: transparent;
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
@@ -395,7 +316,7 @@ onUnmounted(() => {
 
 .search-wrapper {
   flex: 1;
-  max-width: 60%;
+  max-width: 50%;
   min-width: 0;
   margin-left: var(--space-lg);
   display: flex;
@@ -408,7 +329,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 6PX;
+  gap: var(--space-md);
   margin-left: var(--space-lg);
 }
 
@@ -420,15 +341,16 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 5PX;
+  gap: var(--space-sm);
   background: var(--term-inner);
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
-  font-size: 13PX;
-  padding: 5PX 12PX;
+  font-size: var(--font-sm);
+  padding: var(--space-sm);
   cursor: pointer;
-  border-radius: 4PX;
+  border-radius: 0.5rem;
+  height: 2.4rem;
 }
 
 .cmdpalette-hint:hover {

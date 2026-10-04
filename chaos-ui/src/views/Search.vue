@@ -85,7 +85,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .search-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-md);
   width: 100%;
   min-width: 0;
 }
@@ -93,14 +93,17 @@ const handleKeydown = (e: KeyboardEvent) => {
 .search-input {
   flex: 1;
   min-width: 0;
+  height: 2.4rem;
 }
 
 .engine-button {
   flex-shrink: 0;
+  height: 2.4rem;
 }
 
 .search-button {
   flex-shrink: 0;
+  height: 2.4rem;
 }
 
 .popover-content {

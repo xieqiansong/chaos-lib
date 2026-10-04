@@ -68,10 +68,11 @@ onUnmounted(() => {
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
   font-family: inherit;
-  font-size: 13PX;
-  padding: 5PX 12PX;
+  font-size: var(--font-sm);
+  padding: var(--space-sm);
   cursor: pointer;
-  border-radius: 4PX;
+  border-radius: 0.5rem;
+  height: 2.4rem;
 }
 
 .pending-badge-btn:hover {
@@ -88,7 +89,7 @@ onUnmounted(() => {
   height: 15px;
   padding: 0 3px;
   box-sizing: border-box;
-  border-radius: 8px;
+  border-radius: 2px;
   background: var(--term-red);
   color: #fff;
   font-size: 10px;

@@ -70,7 +70,7 @@ export const appRoutes: RouteRecordRaw[] = [
     path: '/fileLink',
     name: 'fileLink',
     component: () => import('@/views/FileLink.vue'),
-    meta: {title: '文件连接', icon: 'Link'},
+    meta: {title: '文件链接', icon: 'Link'},
   },
   {
     path: '/sshConn',
