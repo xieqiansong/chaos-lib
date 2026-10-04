@@ -158,41 +158,6 @@ onMounted(() => {
 
 <template>
   <div class="home">
-    <!-- 书签栏：始终横向展示，不受顶部搜索影响 -->
-    <div class="section-toolbar">
-      <span class="text-primary text-base section-title">书签栏</span>
-      <span class="section-subtitle">浏览器书签栏</span>
-      <div class="section-actions">
-        <el-popover placement="bottom-start" :width="320" trigger="click">
-          <template #reference>
-            <el-button size="small" text :icon="Setting">直连 ID</el-button>
-          </template>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <span style="font-size:13px; font-weight:500;">扩展直连 ID</span>
-            <el-input
-                v-model="extId"
-                size="small"
-                placeholder="粘贴扩展 ID（chrome://extensions 可见）"
-                @change="saveExtId"
-            />
-            <span style="font-size:12px; color:#909399;">填写后与浏览器扩展直连，修改后自动刷新。</span>
-          </div>
-        </el-popover>
-        <el-button size="small" type="primary" :icon="Refresh" :loading="bookmarksLoading" @click="loadBookmarks">
-          刷新
-        </el-button>
-      </div>
-    </div>
-
-    <el-alert
-        v-if="(status?.connected ?? 0) <= 0"
-        class="mb-sm"
-        type="warning"
-        show-icon
-        :closable="false"
-        title="未连接扩展：请点击「直连 ID」填写正确的扩展 ID 并确保插件已加载"
-    />
-
     <!-- 书签栏：直接子节点横向展示（文件夹点击竖向下拉）；不响应顶部搜索 -->
     <div v-loading="bookmarksLoading" class="bm-bar">
       <el-empty v-if="!barChildren.length" description="暂无书签，点击「刷新」同步浏览器书签栏"/>
