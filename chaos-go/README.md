@@ -21,35 +21,40 @@ chaos-go/
 ├── deployments/
 │   ├── Dockerfile
 │   └── docker-compose.yml    # Docker 部署
-├── internal/                 # 私有业务代码（按功能分包）
-│   ├── apilog/               # 接口访问日志
-│   ├── app/                  # 应用装配
-│   ├── config/               # 配置加载（config.go / loader.go / testing_hook.go）
-│   ├── cronjob/              # 定时任务
-│   ├── crud/                 # 通用 CRUD
-│   ├── datacache/            # 数据缓存
-│   ├── dbmonitor/            # 数据库监控
-│   ├── deepseek/             # DeepSeek 集成
-│   ├── envvar/               # 环境变量管理
-│   ├── filelink/             # 文件连接
-│   ├── memcache/             # 内存缓存
-│   ├── mqttsync/             # MQTT 多节点同步
-│   ├── notify/               # 通知
-│   ├── pagination/           # 分页
-│   ├── portfwd/              # SSH 端口转发
-│   ├── project/              # 项目管理
-│   ├── proxy/                # 代理
-│   ├── quickedit/            # 快速编辑
-│   ├── resp/                 # 统一响应
-│   ├── router/               # 路由（router.go）
-│   ├── scheduler/            # 调度器
-│   ├── sdk/                  # 内部 SDK
-│   ├── standarddata/         # 标准数据
-│   ├── stunpf/               # STUN 端口转发
-│   ├── stunsync/             # STUN 同步
-│   ├── supabase/             # Supabase 集成
-│   ├── taskplan/             # 任务计划
-│   └── testkit/              # 测试套件
+├── internal/                 # 私有代码，按「框架 / 平台 / 业务」分层
+│   ├── framework/            # 框架与基础设施（不依赖任何业务包）
+│   │   ├── resp/             # 统一响应信封
+│   │   ├── pagination/       # 分页
+│   │   ├── httpx/            # HTTP 工具
+│   │   ├── routehub/         # 路由登记中心
+│   │   ├── router/           # 路由装配
+│   │   ├── config/           # 配置加载（config.go / loader.go / testing_hook.go）
+│   │   ├── apilog/           # 接口访问日志
+│   │   ├── datacache/        # 数据缓存
+│   │   ├── memcache/         # 内存缓存
+│   │   ├── dbmonitor/        # 数据库监控
+│   │   ├── scheduler/        # 调度器
+│   │   └── crud/             # 通用 CRUD
+│   ├── platform/             # 外部系统集成适配器（无业务概念）
+│   │   ├── deepseek/         # DeepSeek 集成
+│   │   ├── supabase/         # Supabase 集成
+│   │   ├── mqttsync/         # MQTT 多节点同步
+│   │   ├── stunsync/         # STUN 同步
+│   │   └── stunpf/           # STUN 端口转发
+│   ├── domain/               # 业务领域模块
+│   │   ├── taskplan/         # 任务计划
+│   │   ├── project/          # 项目管理
+│   │   ├── portfwd/          # SSH 端口转发
+│   │   ├── filelink/         # 文件连接
+│   │   ├── quickedit/        # 快速编辑
+│   │   ├── note/             # 笔记
+│   │   ├── proxy/            # 代理
+│   │   ├── cronjob/          # 定时任务
+│   │   ├── envvar/           # 环境变量管理
+│   │   ├── sdk/              # 内部 SDK
+│   │   ├── standarddata/     # 标准数据
+│   │   └── systemjob/        # 系统任务
+│   └── app/                  # 应用装配根（composition root）
 ├── migrations/               # 数据库 schema（原 sql/）
 │   ├── chaos_postgres_schema.sql
 │   ├── chaos_postgres_update.sql
