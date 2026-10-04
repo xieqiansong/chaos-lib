@@ -25,6 +25,12 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '首页', icon: 'HomeFilled'},
   },
   {
+    path: '/notes',
+    name: 'notes',
+    component: () => import('@/views/Notes.vue'),
+    meta: {title: '笔记', icon: 'Notebook'},
+  },
+  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/Dashboard.vue'),

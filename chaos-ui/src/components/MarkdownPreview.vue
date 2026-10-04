@@ -9,6 +9,8 @@ const props = withDefaults(defineProps<{
   /** 原文链接；以 .md / .markdown 结尾时按 Markdown 渲染，否则按纯文本展示 */
   rawLink?: string
   content: string
+  /** 显式格式：优先级高于 rawLink 后缀推断（笔记等无 .md 后缀的接口用它） */
+  format?: 'markdown' | 'text'
   /** 纯文本模式是否水平居中（CenterPreview 用，ReviewDialog 用左对齐） */
   centered?: boolean
   /** 复习场景下未「显示答案」前的模糊态 */
@@ -22,6 +24,9 @@ const props = withDefaults(defineProps<{
 const md = new MarkdownIt({html: true, linkify: true, breaks: true})
 
 const isMarkdown = computed(() => {
+  if (props.format) {
+    return props.format === 'markdown'
+  }
   const url = props.rawLink.split(/[?#]/)[0].toLowerCase()
   return url.endsWith('.md') || url.endsWith('.markdown')
 })

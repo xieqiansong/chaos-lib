@@ -21,4 +21,52 @@ ALTER TABLE public.ssh_connections          ALTER COLUMN is_deleted TYPE smallin
 ALTER TABLE public.standard_datas           ALTER COLUMN is_deleted TYPE smallint USING CASE WHEN is_deleted THEN 1 ELSE 0 END, ALTER COLUMN is_deleted SET DEFAULT 0;
 ALTER TABLE public.task_plans               ALTER COLUMN is_deleted TYPE smallint USING CASE WHEN is_deleted THEN 1 ELSE 0 END, ALTER COLUMN is_deleted SET DEFAULT 0;
 ALTER TABLE public.tasks                    ALTER COLUMN is_deleted TYPE smallint USING CASE WHEN is_deleted THEN 1 ELSE 0 END, ALTER COLUMN is_deleted SET DEFAULT 0;
+ALTER TABLE public.api_logs                 ALTER COLUMN is_deleted TYPE smallint USING CASE WHEN is_deleted THEN 1 ELSE 0 END, ALTER COLUMN is_deleted SET DEFAULT 0;
+
+-- 2026-10-04 新增笔记模块（internal/note）：磁盘 Vault 派生索引。
+-- 设计：磁盘 md 是唯一真相，本组表仅存索引，可随时从文件全量重建。
+CREATE TABLE IF NOT EXISTS public.notes (
+    id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    created_at   timestamptz,
+    updated_at   timestamptz,
+    is_deleted   smallint NOT NULL DEFAULT 0,          -- soft_delete flag 模式
+    vault_id     integer NOT NULL DEFAULT 1,
+    rel_path     text NOT NULL,
+    parent_rel   text NOT NULL DEFAULT '',
+    name         text NOT NULL,
+    title        text NOT NULL DEFAULT '',
+    summary      text NOT NULL DEFAULT '',
+    search_text  text NOT NULL DEFAULT '',
+    format       text NOT NULL DEFAULT '',
+    size_bytes   integer NOT NULL DEFAULT 0,
+    content_hash text NOT NULL DEFAULT '',
+    disk_mtime   timestamptz,
+    disk_missing boolean NOT NULL DEFAULT false,
+    starred      boolean NOT NULL DEFAULT false,
+    word_count   integer NOT NULL DEFAULT 0,
+    tag_names    text NOT NULL DEFAULT '',
+    indexed_at   timestamptz,
+    UNIQUE (vault_id, rel_path)
+);
+CREATE INDEX IF NOT EXISTS idx_note_parent ON public.notes (parent_rel);
+CREATE INDEX IF NOT EXISTS idx_note_title ON public.notes (title);
+
+CREATE TABLE IF NOT EXISTS public.note_tags (
+    id   integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name text NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS public.note_tag_rels (
+    note_id integer NOT NULL,
+    tag_id  integer NOT NULL,
+    PRIMARY KEY (note_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.note_links (
+    id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    source_id  integer NOT NULL,
+    target_ref text NOT NULL DEFAULT '',
+    resolved   boolean NOT NULL DEFAULT false
+);
+
 

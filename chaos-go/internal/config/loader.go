@@ -26,6 +26,7 @@ type AppConfig struct {
 	Baidu    BaiduConfig    `yaml:"baidu"`
 	Lucky    LuckyConfig    `yaml:"lucky"`
 	Stun     StunConfig     `yaml:"stun"`
+	Note     NoteConfig     `yaml:"note"`
 }
 
 type ServerConfig struct {
@@ -145,6 +146,78 @@ type LuckyConfig struct {
 	SyncIntervalSec int    `yaml:"sync_interval_sec"` // 同步间隔（秒），缺省 60
 }
 
+// NoteConfig 笔记库（Vault）配置。
+// RootPath 是本机敏感路径，只允许出现在未被版本控制的 configs/config.yaml。
+type NoteConfig struct {
+	Enabled     bool       `yaml:"enabled"`      // 模块开关，缺省 false
+	RootPath    string     `yaml:"root_path"`    // Vault 根目录，缺省空（模块不可用）
+	IncludeExt  StringList `yaml:"include_ext"`  // 纳入索引的扩展名清单，缺省 md,markdown,txt
+	IgnoreGlobs StringList `yaml:"ignore_globs"` // 忽略的目录 / 文件名清单，缺省见 DefaultNoteIgnores
+	MaxFileSize int        `yaml:"max_file_size"`
+}
+
+// 笔记模块的缺省值：配置缺省或异常时回退到这里。
+const (
+	DefaultNoteMaxFileSize = 2 * 1024 * 1024 // 2MB
+)
+
+// DefaultNoteIgnores 默认忽略的目录 / 文件（避免把版本控制与工具元数据扫进索引）。
+var DefaultNoteIgnores = []string{".git", "node_modules", ".obsidian", ".trash", ".idea", ".vscode"}
+
+// DefaultNoteExts 默认纳入索引的扩展名（不带点）。
+var DefaultNoteExts = []string{"md", "markdown", "txt"}
+
+// Available 判定笔记模块是否可用：开关打开且已配置 Vault 根目录。
+func (c *NoteConfig) Available() bool {
+	return c.Enabled && strings.TrimSpace(c.RootPath) != ""
+}
+
+// Root 返回 Vault 根目录的绝对路径；模块不可用时返回空串。
+func (c *NoteConfig) Root() string {
+	if !c.Available() {
+		return ""
+	}
+	abs, err := filepath.Abs(c.RootPath)
+	if err != nil {
+		slog.Warn("笔记库根目录解析失败，模块不可用", "rootPath", c.RootPath, "err", err)
+		return ""
+	}
+	return abs
+}
+
+// Exts 返回纳入索引的扩展名（小写、无前导点）；未配置时回退默认值。
+func (c *NoteConfig) Exts() []string {
+	if len(c.IncludeExt) == 0 {
+		return DefaultNoteExts
+	}
+	exts := make([]string, 0, len(c.IncludeExt))
+	for _, e := range c.IncludeExt {
+		if e = strings.TrimSpace(strings.TrimPrefix(e, ".")); e != "" {
+			exts = append(exts, strings.ToLower(e))
+		}
+	}
+	if len(exts) == 0 {
+		return DefaultNoteExts
+	}
+	return exts
+}
+
+// Ignores 返回忽略的目录 / 文件名清单；未配置时回退默认值。
+func (c *NoteConfig) Ignores() []string {
+	if len(c.IgnoreGlobs) == 0 {
+		return DefaultNoteIgnores
+	}
+	return []string(c.IgnoreGlobs)
+}
+
+// LimitBytes 返回单文件大小上限（字节）；非正数回退默认值。
+func (c *NoteConfig) LimitBytes() int {
+	if c.MaxFileSize <= 0 {
+		return DefaultNoteMaxFileSize
+	}
+	return c.MaxFileSize
+}
+
 // StunConfig STUN 公网地址同步到端口转发目标的定时任务配置。
 // 仅当 MQTT 启用时，后台任务才会启动。
 type StunConfig struct {
@@ -164,6 +237,7 @@ func defaultConfig() *AppConfig {
 		Feature:  FeatureConfig{FileLink: true},
 		Lucky:    LuckyConfig{SyncIntervalSec: 60},
 		Stun:     StunConfig{PortForwardSyncIntervalSec: 30},
+		Note:     NoteConfig{Enabled: false, MaxFileSize: DefaultNoteMaxFileSize},
 	}
 }
 

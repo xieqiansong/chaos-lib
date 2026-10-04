@@ -12,6 +12,7 @@ import (
 	"chaos-go/internal/envvar"
 	"chaos-go/internal/filelink"
 	"chaos-go/internal/mqttsync"
+	"chaos-go/internal/note"
 	"chaos-go/internal/portfwd"
 	"chaos-go/internal/project"
 	"chaos-go/internal/proxy"
@@ -59,6 +60,10 @@ func Run(webFS fs.FS) error {
 		&cronjob.CronJobRun{},
 		&standarddata.StandardData{},
 		&datacache.DataCache{},
+		&note.Note{},
+		&note.NoteTag{},
+		&note.NoteTagRel{},
+		&note.NoteLink{},
 		&apilog.ApiLog{},
 	); err != nil {
 		slog.Error("数据库迁移失败", "err", err)

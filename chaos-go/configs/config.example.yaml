@@ -68,6 +68,22 @@ mqtt:
   # 仅放 configs/config.yaml（已被 .gitignore 忽略），禁止提交；泄露等同全集群失效
   encrypt_key: ""
 
+# 笔记库（Vault）：Web 端 Markdown 笔记。磁盘文件是唯一真相，数据库只存派生索引。
+# 需先创建目录并在此处配置其绝对路径（内网 / 本地路径，切勿提交真实值）。
+note:
+  enabled: false
+  root_path: ""              # Vault 根目录绝对路径，例如 /data/notes（占位，请替换）
+  include_ext:              # 纳入索引的扩展名（可逗号字符串或 YAML 列表），缺省 md,markdown,txt
+    - md
+    - markdown
+    - txt
+  ignore_globs:             # 忽略的目录 / 文件，缺省 .git,node_modules,.obsidian,.trash,.idea,.vscode
+    - .git
+    - node_modules
+    - .obsidian
+    - .trash
+  max_file_size: 2097152    # 单文件大小上限（字节），缺省 2MB
+
 # Supabase 云端数据通道（Data API / PostgREST）
 # 凭据只通过 apikey 请求头传递；新式 key 不是 JWT，放进 Authorization 会被判 Invalid JWT。
 supabase:
