@@ -93,17 +93,17 @@ const handleKeydown = (e: KeyboardEvent) => {
 .search-input {
   flex: 1;
   min-width: 0;
-  height: 2.4rem;
+  height: 2.1rem;
 }
 
 .engine-button {
   flex-shrink: 0;
-  height: 2.4rem;
+  height: 2.1rem;
 }
 
 .search-button {
   flex-shrink: 0;
-  height: 2.4rem;
+  height: 2.1rem;
 }
 
 .popover-content {

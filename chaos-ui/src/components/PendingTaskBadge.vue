@@ -72,7 +72,7 @@ onUnmounted(() => {
   padding: var(--space-sm);
   cursor: pointer;
   border-radius: 0.5rem;
-  height: 2.4rem;
+  height: 2.1rem;
 }
 
 .pending-badge-btn:hover {

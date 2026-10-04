@@ -214,7 +214,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.5rem;
+  height: 2.2rem;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -233,8 +233,8 @@ onUnmounted(() => {
   --el-menu-active-color: var(--term-green);
   --el-menu-hover-bg-color: var(--term-active-bg);
   --el-menu-hover-text-color: var(--term-green);
-  --el-menu-item-height: 2.5rem;
-  --el-menu-sub-item-height: 2.5rem;
+  --el-menu-item-height: 2.2rem;
+  --el-menu-sub-item-height: 2.2rem;
   --el-menu-base-level-padding: var(--space-sm);
   --el-menu-level-padding: var(--space-sm);
 }
@@ -274,7 +274,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.5rem;
+  height: 2.2rem;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -291,8 +291,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.2rem;
+  height: 2.2rem;
   background: transparent;
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
@@ -350,7 +350,7 @@ onUnmounted(() => {
   padding: var(--space-sm);
   cursor: pointer;
   border-radius: 0.5rem;
-  height: 2.4rem;
+  height: 2.1rem;
 }
 
 .cmdpalette-hint:hover {
