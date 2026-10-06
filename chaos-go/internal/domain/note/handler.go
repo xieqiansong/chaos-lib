@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"chaos-go/internal/framework/crud"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
@@ -73,6 +74,29 @@ func RegisterV1(rg *gin.RouterGroup) {
 // listNotes 自定义列表：支持目录过滤 + 全文关键词 + 星标 + 磁盘缺失。
 func listNotes(c *gin.Context) {
 	q := pagination.Parse(c)
+	filter := filterFromRequest(c, q)
+	notes, total, err := ListNotes(filter)
+	if err != nil {
+		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
+		return
+	}
+	renv.Success(c, pagination.New(notes, total, q))
+}
+
+// filterFromRequest 把列表筛选参数收敛为 ListFilter。
+//
+// 参数有两个来源，必须同时兼容：
+//   - 存量 RESTful（GET /notes?dir=…）：参数全在 query string；
+//   - v1（POST /notes/list）：参数在信封 meta。前端 DataTable 的 search 经
+//     useRestApi 统一收进 meta.like，而 envelope.MetaToQuery 只把整个 like map
+//     压成一个字符串 query key（like=map[…]）、不会展开成 dir=…/q=…，
+//     所以此处 c.Query 恒为空串——早期实现只读 query，导致目录过滤完全失效：
+//     无论在哪个目录点击，列表都退化为「根目录直属笔记」，树里点笔记也就永远
+//     匹配不到、右侧不打开。
+//
+// 语义约定：meta.like 中缺失的字段一律回落到 query 读取；而 dir="" 即根目录，
+// 与 query 缺失的默认值一致，故前端「空串不传」的做法无需额外处理。
+func filterFromRequest(c *gin.Context, q pagination.Query) ListFilter {
 	filter := ListFilter{
 		Dir:      c.Query("dir"),
 		Query:    c.Query("q"),
@@ -81,12 +105,20 @@ func listNotes(c *gin.Context) {
 		Offset:   q.Offset(),
 		PageSize: q.PageSize,
 	}
-	notes, total, err := ListNotes(filter)
-	if err != nil {
-		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
-		return
+	like, _ := envelope.GetMetaMap(c)["like"].(map[string]any)
+	if v, ok := like["dir"].(string); ok && v != "" {
+		filter.Dir = v
 	}
-	renv.Success(c, pagination.New(notes, total, q))
+	if v, ok := like["q"].(string); ok && v != "" {
+		filter.Query = v
+	}
+	if v, ok := like["starred"].(bool); ok {
+		filter.Starred = v
+	}
+	if v, ok := like["missing"].(bool); ok {
+		filter.Missing = v
+	}
+	return filter
 }
 
 // getTree 返回目录树。

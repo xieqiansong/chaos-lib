@@ -114,7 +114,6 @@ async function onDelete() {
   <div class="note-editor">
     <div class="note-editor__toolbar">
       <div class="note-editor__title">
-        <span class="note-editor__name">{{ note.Title || note.Name }}</span>
         <span class="note-editor__path">{{ note.RelPath }}</span>
       </div>
       <div class="note-editor__actions">
@@ -168,7 +167,7 @@ async function onDelete() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 14px;
+  padding: 3px 14px;
   border-bottom: 1px solid var(--el-border-color);
   background: var(--el-fill-color-lighter);
 }
@@ -182,11 +181,13 @@ async function onDelete() {
 .note-editor__name {
   font-weight: 600;
   font-size: 15px;
+  line-height: 1.25;
 }
 
 .note-editor__path {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+  line-height: 1.25;
   word-break: break-all;
 }
 

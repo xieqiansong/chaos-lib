@@ -24,10 +24,14 @@ export interface Note {
 }
 
 export interface TreeNode {
-  name: string
-  relPath: string
-  isLeaf: boolean
-  children?: TreeNode[]
+    name: string
+    relPath: string
+    isLeaf: boolean
+    /** 仅叶子（笔记）节点有值：叶节点自带索引 ID，点击即可直达编辑器 */
+    id?: number
+    /** 仅叶子节点有值，可能为空（取自文件首个标题） */
+    title?: string
+    children?: TreeNode[]
 }
 
 export interface ScanResult {

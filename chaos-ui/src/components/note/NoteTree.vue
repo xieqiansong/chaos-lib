@@ -11,7 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select-dir', relPath: string): void
-  (e: 'open-note', relPath: string): void
+  (e: 'open-note', node: TreeNode): void
 }>()
 
 const treeData = ref<TreeNode[]>([])
@@ -26,9 +26,10 @@ async function load() {
   }
 }
 
+// 叶节点（笔记）直接回传整个节点：它已带ID / Title，父组件据此打开编辑器即可。
 function onNodeClick(node: TreeNode) {
   if (node.isLeaf) {
-    emit('open-note', node.relPath)
+    emit('open-note', node)
   } else {
     emit('select-dir', node.relPath)
   }

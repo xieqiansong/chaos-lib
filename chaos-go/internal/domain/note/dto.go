@@ -47,9 +47,13 @@ type NoteResponse struct {
 
 // TreeNode 目录树节点（前端 el-tree 使用）。
 type TreeNode struct {
-	Name     string      `json:"name"`
-	RelPath  string      `json:"relPath"`
-	IsLeaf   bool        `json:"isLeaf"`
+	Name    string `json:"name"`
+	RelPath string `json:"relPath"`
+	IsLeaf  bool   `json:"isLeaf"`
+	// ID / Title 仅叶子（笔记）节点有值：让前端点击叶子即可直接打开编辑器，
+	// 无需再发一次列表请求去反查 ID。目录节点省略这两个字段。
+	ID       int         `json:"id,omitempty"`
+	Title    string      `json:"title,omitempty"`
 	Children []*TreeNode `json:"children,omitempty"`
 }
 

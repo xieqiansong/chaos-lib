@@ -237,16 +237,23 @@ func buildTree(notes []Note) []*TreeNode {
 	nodes := make(map[string]*TreeNode, len(notes))
 	for i := range notes {
 		n := &notes[i]
-		nodes[n.RelPath] = &TreeNode{Name: n.Name, RelPath: n.RelPath, IsLeaf: true}
-	}
-	// 确保目录节点存在（某些父目录本身不是笔记文件）。
-	for i := range notes {
-		n := &notes[i]
-		if n.ParentRel == "" {
-			continue
+		// 叶子即笔记本身，带上 ID / Title 供前端直达编辑器。
+		nodes[n.RelPath] = &TreeNode{
+			Name:    n.Name,
+			RelPath: n.RelPath,
+			IsLeaf:  true,
+			ID:      n.ID,
+			Title:   n.Title,
 		}
-		if _, ok := nodes[n.ParentRel]; !ok {
-			nodes[n.ParentRel] = &TreeNode{Name: filepathBase(n.ParentRel), RelPath: n.ParentRel, IsLeaf: false}
+	}
+	// 补齐目录节点：必须自ParentRel 逐级上溯到根、递归补齐全部祖先。
+	// 早期实现只补一层，深度 ≥3 的笔记其祖父目录始终缺失，挂接时命中孤立分支，
+	// 整棵深层子树被拍平到根级（表现为目录树里出现重名目录）。
+	for i := range notes {
+		for dir := notes[i].ParentRel; dir != ""; dir = parentRel(dir) {
+			if _, ok := nodes[dir]; !ok {
+				nodes[dir] = &TreeNode{Name: filepathBase(dir), RelPath: dir, IsLeaf: false}
+			}
 		}
 	}
 
@@ -257,11 +264,12 @@ func buildTree(notes []Note) []*TreeNode {
 			roots = append(roots, node)
 			continue
 		}
+		// 注意不要改写 node.IsLeaf：目录节点创建时已是 false、笔记文件为 true，
+		// 在此把子节点强制置 false 会把叶子笔记错标成目录（前端据此显示文件夹图标）。
 		if p, ok := nodes[parent]; ok {
-			node.IsLeaf = false
 			p.Children = append(p.Children, node)
 		} else {
-			// 父目录不在索引中（孤立路径），归到根。
+			// 父目录不在索引中（脏数据 / 越界路径），归到根但不丢内容。
 			roots = append(roots, node)
 		}
 	}
