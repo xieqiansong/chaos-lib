@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,6 +124,39 @@ func GetAction(c *gin.Context) string {
 		}
 	}
 	return ""
+}
+
+// ID 从信封 data.id 取得主键；无信封（存量 /api）时回落到路径参数 id。
+// 双轨迁移期间，同一 handler 既能被 /api/:id 也能被 /api/v1/{action}（body 含 id）驱动。
+func ID(c *gin.Context) (int, bool) {
+	if raw, ok := c.Get(string(ctxData)); ok {
+		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
+			var m struct {
+				ID int `json:"id"`
+			}
+			if json.Unmarshal(rawMsg, &m) == nil && m.ID != 0 {
+				return m.ID, true
+			}
+		}
+	}
+	if v := c.Param("id"); v != "" {
+		if id, err := strconv.Atoi(v); err == nil {
+			return id, true
+		}
+	}
+	return 0, false
+}
+
+// GetMetaMap 把信封 meta 解析为 map（分页/排序/过滤等）。非信封请求返回空 map，
+// 调用方可再回落到 c.Query 读取存量参数。
+func GetMetaMap(c *gin.Context) map[string]any {
+	out := map[string]any{}
+	if raw, ok := c.Get(string(ctxMeta)); ok {
+		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
+			_ = json.Unmarshal(rawMsg, &out)
+		}
+	}
+	return out
 }
 
 // RequestID 返回本次请求的 requestId：优先取信封携带值，否则生成一个并暂存到 Context，

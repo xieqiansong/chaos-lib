@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
@@ -13,8 +14,10 @@ import (
 
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
+// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
 func init() {
 	routehub.Register("sdk", Register)
+	routehub.RegisterV1("sdk", RegisterV1)
 }
 
 // Register 把 SDK 全部路由挂载到给定路由组。
@@ -28,6 +31,100 @@ func Register(rg *gin.RouterGroup) {
 	g.POST("/defs", CreateSdkSource)
 	g.PATCH("/defs/:name", UpdateSdkSource)
 	g.DELETE("/defs/:name", DeleteSdkSource)
+}
+
+// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
+// 动作：list / get / switch / listSources / createSource / updateSource / deleteSource；
+// 主键（type/name）与补丁字段取自信封 data。
+func RegisterV1(rg *gin.RouterGroup) {
+	g := rg.Group("/sdks")
+	g.POST("/list", func(c *gin.Context) {
+		result, err := SdkVersions()
+		if err != nil {
+			renv.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		renv.Success(c, result)
+	})
+	g.POST("/get", func(c *gin.Context) {
+		var req struct {
+			Type string `json:"type"`
+		}
+		_ = envelope.Bind(c, &req)
+		info, err := SdkVersion(req.Type)
+		if err != nil {
+			httpx.MapError(c, err, sdkErrRules)
+			return
+		}
+		renv.Success(c, info)
+	})
+	g.POST("/switch", func(c *gin.Context) {
+		var req struct {
+			Type    string `json:"type"`
+			Version string `json:"version"`
+		}
+		_ = envelope.Bind(c, &req)
+		if err := SwitchVersion(req.Type, req.Version); err != nil {
+			if errors.Is(err, ErrVersionNotFound) {
+				renv.Error(c, http.StatusBadRequest, "Target version does not exist: "+req.Version)
+				return
+			}
+			httpx.MapError(c, err, sdkErrRules)
+			return
+		}
+		renv.Success(c, nil)
+	})
+	g.POST("/listSources", func(c *gin.Context) {
+		srcs, err := ListSources()
+		if err != nil {
+			renv.Error(c, http.StatusInternalServerError, err.Error())
+			return
+		}
+		renv.Success(c, srcs)
+	})
+	g.POST("/createSource", func(c *gin.Context) {
+		var req SdkSource
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := CreateSource(&req); err != nil {
+			if errors.Is(err, ErrSourceExists) {
+				renv.Error(c, http.StatusConflict, err.Error())
+				return
+			}
+			httpx.MapError(c, err, sdkErrRules)
+			return
+		}
+		renv.Success(c, req)
+	})
+	g.POST("/updateSource", func(c *gin.Context) {
+		var req struct {
+			Name        string `json:"name"`
+			SourcePatch SourcePatch
+		}
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		updated, err := UpdateSource(req.Name, req.SourcePatch)
+		if err != nil {
+			httpx.MapError(c, err, sdkErrRules)
+			return
+		}
+		renv.Success(c, updated)
+	})
+	g.POST("/deleteSource", func(c *gin.Context) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		_ = envelope.Bind(c, &req)
+		if err := DeleteSource(req.Name); err != nil {
+			httpx.MapError(c, err, sdkErrRules)
+			return
+		}
+		renv.Success(c, nil)
+	})
 }
 
 // GetSdkVersions 返回所有启用 SDK 类型的版本信息，map key = 类型 Name。
