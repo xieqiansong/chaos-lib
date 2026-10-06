@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
@@ -93,7 +94,7 @@ func GetTaskPlanTree(c *gin.Context) {
 
 // GetTaskPlan 返回单个计划。
 func GetTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -107,7 +108,7 @@ func GetTaskPlan(c *gin.Context) {
 
 // UpdateTaskPlan 按字段更新计划。
 func UpdateTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -126,7 +127,7 @@ func UpdateTaskPlan(c *gin.Context) {
 
 // StartTaskPlan 开启计划（必要时生成首条任务）。
 func StartTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -140,7 +141,7 @@ func StartTaskPlan(c *gin.Context) {
 
 // CompleteTaskPlan 完成计划并结束其进行中的任务。
 func CompleteTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -154,7 +155,7 @@ func CompleteTaskPlan(c *gin.Context) {
 
 // ArchiveTaskPlan 归档计划。
 func ArchiveTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -168,7 +169,7 @@ func ArchiveTaskPlan(c *gin.Context) {
 
 // DeleteTaskPlan 删除计划；?cascade=true 时连同子孙计划与任务一起删除。
 func DeleteTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -182,7 +183,7 @@ func DeleteTaskPlan(c *gin.Context) {
 
 // SuspendTaskPlan 挂起计划及其子孙。
 func SuspendTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -195,7 +196,7 @@ func SuspendTaskPlan(c *gin.Context) {
 
 // ResumeTaskPlan 恢复计划及其子孙。
 func ResumeTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -208,7 +209,7 @@ func ResumeTaskPlan(c *gin.Context) {
 
 // SetPriorityTaskPlan 设置计划及其子孙的优先级。
 func SetPriorityTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -232,7 +233,7 @@ func SetPriorityTaskPlan(c *gin.Context) {
 
 // ListPlanTasks 列出某计划下的任务。
 func ListPlanTasks(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -270,7 +271,7 @@ func GetPendingTasks(c *gin.Context) {
 
 // CompleteTask 完成任务（interval 类型须带 rating）。
 func CompleteTask(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -291,7 +292,7 @@ func CompleteTask(c *gin.Context) {
 
 // PostponeTask 单条任务延期（body {days}）。
 func PostponeTask(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -333,7 +334,7 @@ func BatchPostponeTasks(c *gin.Context) {
 
 // CancelTask 取消任务（仅 cron / interval 支持），并生成下一条。
 func CancelTask(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
 
@@ -12,7 +13,7 @@ import (
 
 // GetTaskPlanRaw 读取计划关联的 raw_link 原文内容（服务端代理拉取，规避浏览器跨域）。
 func GetTaskPlanRaw(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
@@ -32,7 +33,7 @@ func GetTaskPlanRaw(c *gin.Context) {
 // ReviewTaskPlan 主动回忆式复习：先在前端隐藏原文、用户填写回忆，再提交评分。
 // 评分驱动 FSRS 调度（interval 类型），并把用户的回忆内容写入任务 remark 以便后续对比。
 func ReviewTaskPlan(c *gin.Context) {
-	id, ok := httpx.ParseID(c)
+	id, ok := envelope.ID(c)
 	if !ok {
 		return
 	}
