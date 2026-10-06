@@ -245,7 +245,12 @@ func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], to
 		g.POST("/list", h.listAction)
 	}
 	g.POST("/get", h.getAction)
-	g.POST("/create", h.createAction)
+	if opts.V1CreateHandler != nil {
+		// 自定义创建（如笔记的文件优先创建）：绕过基线 createAction 及其 BeforeCreate 校验。
+		g.POST("/create", opts.V1CreateHandler)
+	} else {
+		g.POST("/create", h.createAction)
+	}
 	g.POST("/update", h.updateAction)
 	g.POST("/delete", h.deleteAction)
 	g.POST("/batchCreate", h.batchCreateAction)

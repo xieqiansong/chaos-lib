@@ -32,19 +32,20 @@ func init() {
 
 // noteOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。
 // 注意：BeforeCreate 故意返回错误——笔记是文件优先模型，禁止经基线 POST 直接建 DB 行，
-// 必须经自定义 createNote（v1 同名动作）走文件系统创建；ListHandler 的目录/树过滤逻辑
-// 暂由存量 /api 路由提供，v1 自定义列表与写动作将在后续迁移。
+// 必须经自定义 createNote（v1 create 动作，见 handler_v1.go）走文件系统创建；
+// V1CreateHandler 覆盖基线 createAction，使 v1 的 create 走文件优先路径；
+// ListHandler 的目录/树过滤逻辑由 listNotes 提供（v1 经 V1ListHandler 复用）。
 var noteOpts = crud.Opts[Note]{
 	Searchable: []string{"title", "name", "summary", "search_text"},
 	Sortable:   []string{"updated_at", "created_at", "title", "size_bytes"},
 	// 笔记是文件优先模型：基线 POST /notes 直接插 DB 行无对应文件，必须禁掉；
 	// 派生字段（路径/名称/格式/hash/大小/时间等）禁止通用 PATCH 改写，仅 Starred 可经 PATCH 切换。
-	Protected:    []string{"RelPath", "ParentRel", "Name", "Title", "Summary", "SearchText", "Format", "SizeBytes", "ContentHash", "DiskMTime", "IndexedAt", "WordCount", "TagNames"},
-	BeforeCreate: func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
-	ToResponse:   ToNoteResponses,
-	ListHandler:  listNotes,
-	// v1 列表复用同一自定义实现（合并文件夹派生数据），与存量 /api 保持一致。
-	V1ListHandler: listNotes,
+	Protected:       []string{"RelPath", "ParentRel", "Name", "Title", "Summary", "SearchText", "Format", "SizeBytes", "ContentHash", "DiskMTime", "IndexedAt", "WordCount", "TagNames"},
+	BeforeCreate:    func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
+	ToResponse:      ToNoteResponses,
+	ListHandler:     listNotes,
+	V1ListHandler:   listNotes,
+	V1CreateHandler: noteCreateV1,
 }
 
 // Register 挂载笔记模块路由：标准 CRUD 交给 crud 基线，树 / 内容 / 写操作为自定义扩展。
@@ -62,11 +63,12 @@ func Register(rg *gin.RouterGroup) {
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 标准 CRUD（list/get/update/delete/batchCreate/batchDelete）由通用 crud 生成；
-// create 因文件优先模型在基线被禁，需配合 v1 自定义 create 动作（后续迁移）。
-// 树 / 内容 / 扫描 / 重命名 / 移动 / 回收等自定义动作暂留 /api，后续逐步迁移。
+// 标准 CRUD（list/get/create/update/delete/batchCreate/batchDelete）由通用 crud 生成，
+// 其中 create 由 V1CreateHandler 覆盖为文件优先创建；树 / 内容 / 扫描 / 保存 /
+// 重命名 / 移动 / 回收等文件优先动作见 handler_v1.go。
 func RegisterV1(rg *gin.RouterGroup) {
-	crud.RegisterActions[Note](rg, "notes", noteOpts, nil)
+	g := crud.RegisterActions[Note](rg, "notes", noteOpts, nil)
+	RegisterNoteV1Actions(g)
 }
 
 // listNotes 自定义列表：支持目录过滤 + 全文关键词 + 星标 + 磁盘缺失。
