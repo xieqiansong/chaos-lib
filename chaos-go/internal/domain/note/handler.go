@@ -27,20 +27,27 @@ var errRules = []httpx.ErrRule{
 
 func init() {
 	routehub.Register("notes", Register)
+	routehub.RegisterV1("notes", RegisterV1)
+}
+
+// noteOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。
+// 注意：BeforeCreate 故意返回错误——笔记是文件优先模型，禁止经基线 POST 直接建 DB 行，
+// 必须经自定义 createNote（v1 同名动作）走文件系统创建；ListHandler 的目录/树过滤逻辑
+// 暂由存量 /api 路由提供，v1 自定义列表与写动作将在后续迁移。
+var noteOpts = crud.Opts[Note]{
+	Searchable: []string{"title", "name", "summary", "search_text"},
+	Sortable:   []string{"updated_at", "created_at", "title", "size_bytes"},
+	// 笔记是文件优先模型：基线 POST /notes 直接插 DB 行无对应文件，必须禁掉；
+	// 派生字段（路径/名称/格式/hash/大小/时间等）禁止通用 PATCH 改写，仅 Starred 可经 PATCH 切换。
+	Protected:    []string{"RelPath", "ParentRel", "Name", "Title", "Summary", "SearchText", "Format", "SizeBytes", "ContentHash", "DiskMTime", "IndexedAt", "WordCount", "TagNames"},
+	BeforeCreate: func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
+	ToResponse:   ToNoteResponses,
+	ListHandler:  listNotes,
 }
 
 // Register 挂载笔记模块路由：标准 CRUD 交给 crud 基线，树 / 内容 / 写操作为自定义扩展。
 func Register(rg *gin.RouterGroup) {
-	g := crud.Register[Note](rg, "notes", crud.Opts[Note]{
-		Searchable: []string{"title", "name", "summary", "search_text"},
-		Sortable:   []string{"updated_at", "created_at", "title", "size_bytes"},
-		// 笔记是文件优先模型：基线 POST /notes 直接插 DB 行无对应文件，必须禁掉；
-		// 派生字段（路径/名称/格式/hash/大小/时间等）禁止通用 PATCH 改写，仅 Starred 可经 PATCH 切换。
-		Protected:    []string{"RelPath", "ParentRel", "Name", "Title", "Summary", "SearchText", "Format", "SizeBytes", "ContentHash", "DiskMTime", "IndexedAt", "WordCount", "TagNames"},
-		BeforeCreate: func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
-		ToResponse:   ToNoteResponses,
-		ListHandler:  listNotes,
-	})
+	g := crud.Register[Note](rg, "notes", noteOpts)
 
 	g.GET("/tree", getTree)
 	g.GET("/:id/content", getContent)
@@ -50,6 +57,14 @@ func Register(rg *gin.RouterGroup) {
 	g.POST("/:id/rename", renameNote)
 	g.POST("/:id/move", moveNote)
 	g.POST("/:id/delete", trashNote)
+}
+
+// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
+// 标准 CRUD（list/get/update/delete/batchCreate/batchDelete）由通用 crud 生成；
+// create 因文件优先模型在基线被禁，需配合 v1 自定义 create 动作（后续迁移）。
+// 树 / 内容 / 扫描 / 重命名 / 移动 / 回收等自定义动作暂留 /api，后续逐步迁移。
+func RegisterV1(rg *gin.RouterGroup) {
+	crud.RegisterActions[Note](rg, "notes", noteOpts, nil)
 }
 
 // listNotes 自定义列表：支持目录过滤 + 全文关键词 + 星标 + 磁盘缺失。

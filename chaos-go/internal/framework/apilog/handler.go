@@ -9,15 +9,25 @@ import (
 
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
+// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
 func init() {
 	routehub.Register("api-logs", Register)
+	routehub.RegisterV1("api-logs", RegisterV1)
+}
+
+// apiLogOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。
+var apiLogOpts = crud.Opts[ApiLog]{
+	Searchable: []string{"path", "method", "error_msg"},
+	Sortable:   []string{"id", "created_at", "latency_ms", "status_code"},
 }
 
 // Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组），
 // 纯 CRUD 交给通用 crud，前端按路径/方法/错误信息搜索、按耗时/状态排序。
 func Register(rg *gin.RouterGroup) {
-	crud.Register[ApiLog](rg, "api-logs", crud.Opts[ApiLog]{
-		Searchable: []string{"path", "method", "error_msg"},
-		Sortable:   []string{"id", "created_at", "latency_ms", "status_code"},
-	})
+	crud.Register[ApiLog](rg, "api-logs", apiLogOpts)
+}
+
+// RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
+func RegisterV1(rg *gin.RouterGroup) {
+	crud.RegisterActions[ApiLog](rg, "api-logs", apiLogOpts, nil)
 }

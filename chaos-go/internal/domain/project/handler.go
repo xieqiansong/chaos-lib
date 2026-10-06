@@ -15,35 +15,48 @@ import (
 
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
+// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
 func init() {
 	routehub.Register("project", Register)
+	routehub.RegisterV1("project", RegisterV1)
+}
+
+// projectGroupOpts / projectOpts 两套资源的 CRUD 选项，存量 /api 与 v1 动作路由共用。
+var projectGroupOpts = crud.Opts[ProjectGroup]{
+	Searchable:   []string{"name"},
+	Sortable:     []string{"order_num", "created_at", "id"},
+	BeforeCreate: ValidateGroupForCreate,
+	AfterUpdate:  RelocateProjectsAfterGroupUpdate,
+	AfterDelete:  CascadeDeleteProjects,
+}
+var projectOpts = crud.Opts[Project]{
+	Searchable: []string{"name"},
+	Sortable:   []string{"last_accessed_at", "created_at", "id"},
+	// 路径类字段只能经带副作用的专属流程（建项目 / 移动）改写，禁止通用 PATCH 绕过。
+	Protected:    []string{"GroupID", "AbsolutePath", "RelativePath", "LastAccessedAt", "CreatedAt"},
+	BeforeCreate: PrepareProjectForCreate,
+	AfterDelete:  RemoveProjectDir,
+	ListHandler:  listProjects,
 }
 
 // Register 把项目管理两套资源的路由挂载到给定路由组。
 // 标准 CRUD 交给通用 crud（回调只做转发，实现见 service.go）；
 // 项目列表（合并未认领目录）与移动 / 访问为扩展能力，自定义挂载。
 func Register(rg *gin.RouterGroup) {
-	crud.Register[ProjectGroup](rg, "project-groups", crud.Opts[ProjectGroup]{
-		Searchable:   []string{"name"},
-		Sortable:     []string{"order_num", "created_at", "id"},
-		BeforeCreate: ValidateGroupForCreate,
-		AfterUpdate:  RelocateProjectsAfterGroupUpdate,
-		AfterDelete:  CascadeDeleteProjects,
-	})
-
-	crud.Register[Project](rg, "projects", crud.Opts[Project]{
-		Searchable: []string{"name"},
-		Sortable:   []string{"last_accessed_at", "created_at", "id"},
-		// 路径类字段只能经带副作用的专属流程（建项目 / 移动）改写，禁止通用 PATCH 绕过。
-		Protected:    []string{"GroupID", "AbsolutePath", "RelativePath", "LastAccessedAt", "CreatedAt"},
-		BeforeCreate: PrepareProjectForCreate,
-		AfterDelete:  RemoveProjectDir,
-		ListHandler:  listProjects,
-	})
+	crud.Register[ProjectGroup](rg, "project-groups", projectGroupOpts)
+	crud.Register[Project](rg, "projects", projectOpts)
 
 	projects := rg.Group("/projects")
 	projects.PATCH("/:id/move", moveProject)
 	projects.PATCH("/:id/access", accessProject)
+}
+
+// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
+// 两套资源的标准 CRUD 由通用 crud 生成；自定义列表（合并未认领目录）、
+// move / access 动作暂留 /api，后续迁移。
+func RegisterV1(rg *gin.RouterGroup) {
+	crud.RegisterActions[ProjectGroup](rg, "project-groups", projectGroupOpts, nil)
+	crud.RegisterActions[Project](rg, "projects", projectOpts, nil)
 }
 
 // ── 自定义列表 ──────────────────────────────────────────────────
