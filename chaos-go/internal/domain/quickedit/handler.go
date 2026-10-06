@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
@@ -14,8 +15,10 @@ import (
 
 // init 把本模块的路由挂载函数登记到 routehub，
 // 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
+// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
 func init() {
 	routehub.Register("quick-edits", Register)
+	routehub.RegisterV1("quick-edits", RegisterV1)
 }
 
 // Register 把 quickedit 全部路由挂载到给定路由组。
@@ -30,6 +33,155 @@ func Register(rg *gin.RouterGroup) {
 	g.GET("/:id/snapshots", ListQuickEditSnapshots)
 	g.GET("/:id/snapshots/:snapshotId", GetQuickEditSnapshot)
 	g.POST("/:id/restore", RestoreQuickEdit)
+}
+
+// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
+// 动作：list / create / delete / getContent / updateContent / listSnapshots / getSnapshot / restore；
+// 主键与分页取自信封，复用既有 service 函数。
+func RegisterV1(rg *gin.RouterGroup) {
+	g := rg.Group("/quick-edits")
+	g.POST("/list", func(c *gin.Context) {
+		items, err := ListFilesWithSnapshot()
+		if err != nil {
+			renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
+			return
+		}
+		renv.Success(c, items)
+	})
+	g.POST("/create", func(c *gin.Context) {
+		var req struct {
+			Name     string `json:"name"`
+			FilePath string `json:"filePath"`
+			Remark   string `json:"remark"`
+		}
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		file, snapshot, err := RegisterFile(req.Name, req.FilePath, req.Remark)
+		if err != nil {
+			quickEditErr(c, err)
+			return
+		}
+		resp := buildFileResponse(*file)
+		renv.Success(c, gin.H{"message": "创建成功", "data": resp, "firstSnapshotId": snapshot.ID})
+	})
+	g.POST("/delete", func(c *gin.Context) {
+		id, ok := envelope.ID(c)
+		if !ok {
+			renv.Error(c, http.StatusBadRequest, "缺少 id")
+			return
+		}
+		if err := DeleteFileByID(id); err != nil {
+			quickEditErr(c, err)
+			return
+		}
+		renv.Success(c, nil)
+	})
+	g.POST("/getContent", func(c *gin.Context) {
+		id, ok := envelope.ID(c)
+		if !ok {
+			renv.Error(c, http.StatusBadRequest, "缺少 id")
+			return
+		}
+		view, err := ReadContent(id)
+		if err != nil {
+			httpx.MapError(c, err, errRules)
+			return
+		}
+		renv.Success(c, view)
+	})
+	g.POST("/updateContent", func(c *gin.Context) {
+		id, ok := envelope.ID(c)
+		if !ok {
+			renv.Error(c, http.StatusBadRequest, "缺少 id")
+			return
+		}
+		var req struct {
+			Content string `json:"content"`
+		}
+		_ = envelope.Bind(c, &req)
+		res, err := SaveContent(id, req.Content)
+		if err != nil {
+			httpx.MapError(c, err, errRules)
+			return
+		}
+		renv.Success(c, saveResultToMap(res, false))
+	})
+	g.POST("/listSnapshots", func(c *gin.Context) {
+		id, ok := envelope.ID(c)
+		if !ok {
+			renv.Error(c, http.StatusBadRequest, "缺少 id")
+			return
+		}
+		var m struct {
+			Page     int `json:"page"`
+			PageSize int `json:"pageSize"`
+		}
+		envelope.GetMeta(c, &m)
+		q := pagination.Query{Page: m.Page, PageSize: m.PageSize}
+		if q.Page < 1 {
+			q.Page = pagination.DefaultPage
+		}
+		if q.PageSize < 1 || q.PageSize > pagination.MaxPageSize {
+			q.PageSize = pagination.DefaultPageSize
+		}
+		items, total, err := ListSnapshotsOf(id, q)
+		if err != nil {
+			httpx.MapError(c, err, errRules)
+			return
+		}
+		renv.Success(c, pagination.New(items, total, q))
+	})
+	g.POST("/getSnapshot", func(c *gin.Context) {
+		var req struct {
+			FileID     int `json:"fileId"`
+			SnapshotID int `json:"snapshotId"`
+		}
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		snap, err := GetSnapshot(req.FileID, req.SnapshotID)
+		if err != nil {
+			httpx.MapError(c, err, errRules)
+			return
+		}
+		renv.Success(c, gin.H{
+			"id":        snap.ID,
+			"fileId":    snap.FileID,
+			"content":   snap.Content,
+			"sizeBytes": snap.SizeBytes,
+			"createdAt": snap.CreatedAt,
+		})
+	})
+	g.POST("/restore", func(c *gin.Context) {
+		var req struct {
+			FileID     int `json:"fileId"`
+			SnapshotID int `json:"snapshotId"`
+		}
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		res, err := RestoreSnapshot(req.FileID, req.SnapshotID)
+		if err != nil {
+			httpx.MapError(c, err, errRules)
+			return
+		}
+		renv.Success(c, saveResultToMap(res, true))
+	})
+}
+
+// quickEditErr 把受管控文件相关的领域错误映射为 HTTP 状态码（与存量 CreateQuickEdit 一致）。
+func quickEditErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrFileExists), errors.Is(err, ErrPathNotFound),
+		errors.Is(err, ErrInvalidPath), errors.Is(err, ErrContentTooLarge):
+		renv.Error(c, http.StatusBadRequest, err.Error())
+	default:
+		renv.Error(c, http.StatusInternalServerError, err.Error())
+	}
 }
 
 // ListQuickEdits 列出受管控文件（含最近一次快照信息）。
