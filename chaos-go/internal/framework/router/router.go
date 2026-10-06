@@ -3,6 +3,7 @@ package router
 import (
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/envelope"
+	"chaos-go/internal/framework/middleware"
 	"chaos-go/internal/framework/routehub"
 	"io"
 	"io/fs"
@@ -41,6 +42,7 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 	// 登记后挂到此处，未迁移模块仍走 /api，实现双轨兼容、可随时回退。
 	v1 := api.Group("v1")
 	v1.Use(envelope.Middleware())
+	v1.Use(middleware.AuthMiddleware())
 	if mounted := routehub.MountAllV1(v1); len(mounted) > 0 {
 		slog.Info("v1 路由模块挂载完成", "modules", strings.Join(mounted, ", "))
 	}
