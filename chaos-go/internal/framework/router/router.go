@@ -2,6 +2,7 @@ package router
 
 import (
 	"chaos-go/internal/framework/apilog"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/routehub"
 	"io"
 	"io/fs"
@@ -33,6 +34,15 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 	// 可把冲突模块退回此处显式调用其 Register，以确定挂载顺序。
 	if mounted := routehub.MountAll(api); len(mounted) > 0 {
 		slog.Info("路由模块挂载完成", "modules", strings.Join(mounted, ", "))
+	}
+
+	// v1 接口组：统一「POST + Action」模式（详见仓库根《接口规范.md》）。
+	// 信封中间件只作用于本组，存量 /api 路由不受影响；迁移中的模块经 routehub.RegisterV1
+	// 登记后挂到此处，未迁移模块仍走 /api，实现双轨兼容、可随时回退。
+	v1 := api.Group("v1")
+	v1.Use(envelope.Middleware())
+	if mounted := routehub.MountAllV1(v1); len(mounted) > 0 {
+		slog.Info("v1 路由模块挂载完成", "modules", strings.Join(mounted, ", "))
 	}
 
 	r.GET("/", func(c *gin.Context) {

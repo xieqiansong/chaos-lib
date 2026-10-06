@@ -2,11 +2,44 @@ import axios, {type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, 
 import router from '@/router'
 import {showError} from '@/utils/message'
 
-/** 后端接口返回的统一结构（按 chaos-nestjs 约定：code === 0 成功） */
+/** 后端接口返回的统一结构（按仓库《接口规范.md》：code === 0 成功，requestId/timestamp 由框架回填） */
 export interface ApiResponse<T = unknown> {
     code: number
     message: string
     data: T
+    /** 本次请求的唯一 ID，链路追踪与幂等用（存量接口也会由后端补全） */
+    requestId?: string
+    /** 响应毫秒时间戳 */
+    timestamp?: number
+}
+
+/** 统一请求信封（POST + Action 模式），详见仓库《接口规范.md》 */
+export interface ActionEnvelope {
+    requestId: string
+    /** 动作名，形如 `user.create` */
+    action: string
+    /** 业务数据 */
+    data: unknown
+    /** 分页/排序/来源等附加信息 */
+    meta?: unknown
+    /** 请求毫秒时间戳 */
+    timestamp: number
+}
+
+/** 生成请求唯一 ID（用于幂等、链路追踪）：优先原生 crypto.randomUUID，降级到随机数 */
+function genRequestId(): string {
+    try {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID()
+        }
+    } catch {
+        // 忽略，走降级
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0
+        const v = c === 'x' ? r : (r & 0x3) | 0x8
+        return v.toString(16)
+    })
 }
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api'
@@ -82,6 +115,33 @@ export function del<T = any>(url: string, config?: AxiosRequestConfig) {
 
 export function patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
     return request.patch<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
+}
+
+/**
+ * action 调用：新接口「POST + Action」统一入口（详见《接口规范.md》）。
+ * 向 POST /api/v1/{module}/{action} 发送带信封的请求体，自动注入 requestId 与 timestamp。
+ * 语义与 get/post 等保持一致——成功时只返回 data 业务字段（信封外层已在拦截器处理）。
+ *
+ * 示例：await action('user', 'create', { username: 'zhangsan' })
+ * 对应后端：POST /api/v1/user/create，body 为 { requestId, action: 'user.create', data: {...}, timestamp }
+ */
+export function action<T = any>(
+    module: string,
+    act: string,
+    data?: unknown,
+    meta?: unknown,
+    config?: AxiosRequestConfig,
+): Promise<T> {
+    const envelope: ActionEnvelope = {
+        requestId: genRequestId(),
+        action: `${module}.${act}`,
+        data: data ?? {},
+        meta,
+        timestamp: Date.now(),
+    }
+    return request
+        .post<ApiResponse<T>>(`/v1/${module}/${act}`, envelope, config)
+        .then((r) => r.data.data)
 }
 
 function buildUrl(path: string, query?: Record<string, any>): string {

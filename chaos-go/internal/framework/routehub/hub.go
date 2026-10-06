@@ -29,6 +29,10 @@ type module struct {
 
 var modules []module
 
+// modulesV1 是「POST + Action」新接口的路由登记（挂在 /api/v1 下），
+// 与存量 /api 模块互不干扰，便于双轨渐进迁移。
+var modulesV1 []module
+
 // Register 登记一个路由模块，通常由业务模块的 init 调用。
 // name 建议取该模块的路由组名（如 "env-variables"），需全局唯一。
 func Register(name string, mount MountFunc) {
@@ -47,6 +51,30 @@ func Register(name string, mount MountFunc) {
 func MountAll(rg *gin.RouterGroup) []string {
 	names := make([]string, 0, len(modules))
 	for _, m := range modules {
+		m.mount(rg)
+		names = append(names, m.name)
+	}
+	return names
+}
+
+// RegisterV1 登记一个「POST + Action」新接口模块，挂在 /api/v1 下，由业务包 init 调用。
+// 用法与 Register 一致，仅作用域不同（新接口组）。name 需全局唯一。
+func RegisterV1(name string, mount MountFunc) {
+	if mount == nil {
+		panic(fmt.Sprintf("routehub: v1 模块 %q 的挂载函数为 nil", name))
+	}
+	for _, m := range modulesV1 {
+		if m.name == name {
+			panic(fmt.Sprintf("routehub: v1 模块 %q 重复登记", name))
+		}
+	}
+	modulesV1 = append(modulesV1, module{name: name, mount: mount})
+}
+
+// MountAllV1 按登记顺序把全部 v1 模块挂载到 rg，并返回实际挂载序列（便于日志与排查）。
+func MountAllV1(rg *gin.RouterGroup) []string {
+	names := make([]string, 0, len(modulesV1))
+	for _, m := range modulesV1 {
 		m.mount(rg)
 		names = append(names, m.name)
 	}
