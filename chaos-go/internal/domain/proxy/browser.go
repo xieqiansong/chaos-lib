@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
 	"crypto/sha256"
@@ -59,7 +60,7 @@ func GetBrowserHistories(c *gin.Context) {
 
 func SaveBrowserHistory(c *gin.Context) {
 	var histories []BrowserHistory
-	if err := c.ShouldBindJSON(&histories); err != nil {
+	if err := envelope.Bind(c, &histories); err != nil {
 		renv.Error(c, 400, err.Error())
 		return
 	}
@@ -83,7 +84,7 @@ func SaveBrowserHistory(c *gin.Context) {
 
 func SaveBrowserHistoryVisits(c *gin.Context) {
 	var visits []BrowserHistoryVisit
-	if err := c.ShouldBindJSON(&visits); err != nil {
+	if err := envelope.Bind(c, &visits); err != nil {
 		renv.Error(c, 400, err.Error())
 		return
 	}

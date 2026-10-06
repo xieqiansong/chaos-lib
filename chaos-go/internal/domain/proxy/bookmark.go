@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
 
@@ -37,7 +38,7 @@ type FrequentBookmark struct {
 // SaveBookmarks 批量 upsert 书签扁平快照（由扩展备份调用）。
 func SaveBookmarks(c *gin.Context) {
 	var items []Bookmark
-	if err := c.ShouldBindJSON(&items); err != nil {
+	if err := envelope.Bind(c, &items); err != nil {
 		renv.Error(c, 400, err.Error())
 		return
 	}
