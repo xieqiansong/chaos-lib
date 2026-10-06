@@ -33,7 +33,7 @@ const saveBrowserHistory = async () => {
 
         // 1) 上传历史条目（url / title / lastVisitTime / visitCount 等）
         for (const chunk of chunkArray(histories, batchSize)) {
-            await postJson("/browserHistories", chunk);
+            await postJson("/proxy/browserHistories/save", chunk);
         }
 
         // 2) 上传每条 url 的访问明细（visit）
@@ -42,7 +42,7 @@ const saveBrowserHistory = async () => {
         const flushVisits = async () => {
             if (visitsBuffer.length === 0) return;
             const batch = visitsBuffer.splice(0, visitsBuffer.length);
-            await postJson("/browserHistoryVisits", batch);
+            await postJson("/proxy/browserHistories/saveVisits", batch);
         };
 
         for (const item of histories) {

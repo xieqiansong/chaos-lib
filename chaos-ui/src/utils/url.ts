@@ -20,8 +20,8 @@ export function hostPortOf(url: string): string {
   }
 }
 
-/** 构造站点 favicon 地址（由自身后端代理 + 缓存，见 /api/favicon/:host，host 需含端口）；URL 非法时返回空串。 */
+/** 构造站点 favicon 地址（由自身后端代理 + 缓存，见 /api/v1/proxy/favicon/:host，host 需含端口）；URL 非法时返回空串。 */
 export function favicon(url: string): string {
   const host = hostPortOf(url)
-  return host ? `/api/favicon/${host}` : ''
+  return host ? `/api/v1/proxy/favicon/${host}` : ''
 }

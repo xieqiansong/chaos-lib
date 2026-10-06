@@ -50,7 +50,7 @@ const saveBookmarks = async () => {
 
         const batchSize = 256;
         for (let i = 0; i < flat.length; i += batchSize) {
-            await postJson("/bookmarks", flat.slice(i, i + batchSize));
+            await postJson("/proxy/bookmarks/save", flat.slice(i, i + batchSize));
         }
     } catch (err) {
         console.error("saveBookmarks failed.", err);

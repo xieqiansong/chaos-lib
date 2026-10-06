@@ -1,6 +1,6 @@
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
-import {del, get, patch, post} from '@/utils/request'
+import {del, get, patch, post, action} from '@/utils/request'
 
 
 // ---- SDK 版本切换 ----
@@ -85,13 +85,13 @@ export interface BrowserHistoryItem {
  *  后端遵循统一分页规范，返回 { code, message, data:{ list, pagination } }，此处仅取出 list。
  *  无 page_size 时取 MaxPageSize=200，近似「全量」，供常用书签基于全量历史按访问频率排序。 */
 export function getBrowserHistories(page_size?: number): Promise<BrowserHistoryItem[]> {
-    const query: Record<string, any> = {page_size: page_size && page_size > 0 ? page_size : 200}
-    return get('browserHistories', query).then((res: any) => res?.list ?? [])
+    const meta: Record<string, any> = {page: 1, page_size: page_size && page_size > 0 ? page_size : 200}
+    return action<any>('proxy', 'browserHistories/list', {}, meta).then((res: any) => res?.list ?? [])
 }
 
 /** 按关键词全文搜索浏览器历史（标题 / URL）。取较大分页近似「全部命中」，避免前端搜索态截断。 */
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
-    return get('browserHistories', {search: q, page_size: 200}).then((res: any) => res?.list ?? [])
+    return action<any>('proxy', 'browserHistories/list', {}, {page: 1, page_size: 200, search: q}).then((res: any) => res?.list ?? [])
 }
 
 // ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
@@ -119,11 +119,11 @@ export interface PagedResult<T> {
 /** 拉取「常用书签」：按访问频率降序分页（默认前 20 条）。search 可选，按标题/URL 模糊匹配。
  *  入参 page + page_size；响应为统一信封的 data，即 { list, pagination }。 */
 export function getFrequentBookmarks(page = 1, page_size = 20, search?: any): Promise<PagedResult<FrequentBookmarkItem>> {
-    const query: Record<string, any> = {page, page_size}
+    const meta: Record<string, any> = {page, page_size}
     if (search && typeof search === "string") {
-        query.search = search
+        meta.search = search
     }
-    return get('frequentBookmarks', query)
+    return action<any>('proxy', 'bookmarks/frequent', {}, meta)
 }
 
 // ---- 主机名（用作浏览器标签标题） ----
@@ -134,7 +134,7 @@ export interface HostnameInfo {
 }
 
 export function getHostname(): Promise<HostnameInfo> {
-    return get('hostname')
+    return action<HostnameInfo>('proxy', 'hostname')
 }
 
 // ---- 浏览器扩展直连通道（externally_connectable）----

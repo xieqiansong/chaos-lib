@@ -49,6 +49,9 @@ func metaToQuery(c *gin.Context) {
 func RegisterV1(rg *gin.RouterGroup) {
 	g := rg.Group("/proxy")
 
+	// favicon 为图片流，保留 GET 端点供前端 <img> 直连（与「POST + Action」规范互补）。
+	g.GET("/favicon/:host", GetFavicon)
+
 	// 浏览器历史 / 书签：列表复用既有 handler（meta→query），保存类已支持信封 data。
 	bh := g.Group("/browserHistories")
 	bh.POST("/list", func(c *gin.Context) { metaToQuery(c); GetBrowserHistories(c) })
