@@ -51,13 +51,11 @@ defineExpose({load})
           :props="{label: 'name', children: 'children', isLeaf: 'isLeaf'}"
           node-key="relPath"
           highlight-current
-          :expand-on-click-node="false"
+          :expand-on-click-node="true"
           @node-click="(_, node) => onNodeClick(node.data as TreeNode)"
       >
         <template #default="{node}">
           <span class="note-tree__label">
-            <el-icon v-if="!(node.data as TreeNode).isLeaf"><Folder /></el-icon>
-            <el-icon v-else><Document /></el-icon>
             <span class="note-tree__name">{{ node.label }}</span>
           </span>
         </template>

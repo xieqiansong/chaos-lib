@@ -139,8 +139,8 @@ async function onCreate() {
     <div class="notes__toolbar">
       <span class="notes__dir">目录：{{ currentDir || '/' }}</span>
       <span class="notes__spacer"/>
-      <el-button type="primary" :loading="scanning" @click="doScan">重新扫描</el-button>
-      <el-button @click="onCreate">+ 新建</el-button>
+      <el-button type="primary" :loading="scanning" @click="doScan" size="small">重新扫描</el-button>
+      <el-button @click="onCreate" size="small">+ 新建</el-button>
       <span v-if="scanMsg" class="notes__scan-msg">{{ scanMsg }}</span>
     </div>
 
