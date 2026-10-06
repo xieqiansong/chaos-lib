@@ -4,6 +4,7 @@ import {format} from 'date-fns'
 import {zhCN} from 'date-fns/locale'
 import {showError, prompt} from '@/utils/message'
 import {useRouter} from 'vue-router'
+import {action, default as request} from '@/utils/request'
 
 const router = useRouter()
 
@@ -84,8 +85,17 @@ function updateScreenRes() {
 // 以本机后端响应的 Date 头作为标准时钟，算出偏移后本地继续走秒，避免抖动/闪烁
 async function syncTime() {
   try {
-    const res = await fetch('/api/tasks/activeStats', {cache: 'no-store'})
-    const dateStr = res.headers.get('Date')
+    // 经由统一 axios 实例（带拦截器）请求 v1 接口，仅取响应 Date 头作为标准时钟。
+    const resp = await request.post(
+        '/v1/task-plans/tasks/activeStats',
+        {
+          requestId: crypto.randomUUID(),
+          action: 'task-plans.tasks.activeStats',
+          data: {}, meta: {}, timestamp: Date.now(),
+        },
+        {headers: {'cache': 'no-store'}},
+    )
+    const dateStr = resp.headers['date']
     if (!dateStr) return
     const serverMs = new Date(dateStr).getTime()
     if (isNaN(serverMs)) return
@@ -161,10 +171,7 @@ async function getPosition(): Promise<GeoPos> {
 // 天气数据：后端代理请求，拉取失败不修改原值（不闪烁、无加载感）
 async function fetchWeatherNow(pos: GeoPos) {
   try {
-    const url = `/api/weather?lat=${pos.lat}&lon=${pos.lon}`
-    const res = await fetch(url, {cache: 'no-store'})
-    if (!res.ok) return
-    const data = await res.json()
+    const data = await action<any>('proxy', 'weather', {}, {lat: pos.lat, lon: pos.lon})
     if (data.status !== 0 || !data.result || !data.result.now) return
     const now = data.result.now
     weatherTemp.value = now.temp

@@ -1,7 +1,7 @@
 // 端口转发规则接口门户：本文件集中承载该资源的「接口契约」。视图只从这里导入类型与 api 对象。
 // 后端接入 crud 基线（internal/portfwd + internal/crud），列表/详情/创建/更新/删除走标准 CRUD，
-// 启停为业务自定义接口（PATCH /portForwards/:id/status）。
-import {patch} from '@/utils/request'
+// 启停为业务自定义接口。标准 CRUD 已走 action()（见 useRestApi）；启停亦迁移为 POST + Action。
+import {action} from '@/utils/request'
 import {useRestApi} from '@/composables/useRestApi'
 
 export type PortForwardDirection = 'local' | 'remote' | 'direct'
@@ -30,5 +30,5 @@ const rest = useRestApi<PortForward>('port-forwards')
 export const portForwardApi = {
     ...rest,
     // 启停单条转发：local/remote 经关联 SSH 连接建立隧道，direct 直接在本机监听并直连目标
-    setStatus: (id: number, status: boolean) => patch(`port-forwards/${id}/status`, {status}),
+    setStatus: (id: number, status: boolean) => action<unknown>('port-forwards', 'status', {id, status}),
 }

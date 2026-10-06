@@ -1,6 +1,7 @@
 // 文件连接（fileLinks）的接口门户：本文件集中承载该资源的「接口契约」。
 // 视图只从这里导入类型与 api 对象，搜索该业务时一键定位。
-import {patch} from '@/utils/request'
+// 标准 CRUD 已统一走 action()（见 useRestApi）；状态切换（status）亦迁移为 POST + Action。
+import {action} from '@/utils/request'
 import {useRestApi} from '@/composables/useRestApi'
 
 export interface FileLink {
@@ -20,6 +21,6 @@ const rest = useRestApi<FileLink>('file-links')
 
 export const fileLinkApi = {
     ...rest,
-    // 自定义接口：状态切换（标准 CRUD 之外，由本资源自实现，对应后端 PATCH /fileLinks/:id/status）
-    setStatus: (id: number, status: boolean) => patch(`file-links/${id}/status`, {status}),
+    // 自定义接口：状态切换（对应后端 POST /api/v1/file-links/status）
+    setStatus: (id: number, status: boolean) => action<unknown>('file-links', 'status', {id, status}),
 }

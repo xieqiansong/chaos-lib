@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/config"
 	"io"
@@ -46,5 +47,12 @@ func GetWeather(c *gin.Context) {
 	if resp.StatusCode != http.StatusOK {
 		slog.Warn("百度天气接口返回错误", "statusCode", resp.StatusCode, "body", string(body))
 	}
-	c.Data(resp.StatusCode, "application/json; charset=utf-8", body)
+	// 接口重构：原始百度 JSON 透传改为统一信封，便于前端走 action()（POST + Action）消费；
+	// 数据形状不变（data.status / data.result 仍可读）。
+	var raw json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		renv.Success(c, string(body))
+		return
+	}
+	renv.Success(c, raw)
 }

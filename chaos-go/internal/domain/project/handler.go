@@ -37,6 +37,8 @@ var projectOpts = crud.Opts[Project]{
 	BeforeCreate: PrepareProjectForCreate,
 	AfterDelete:  RemoveProjectDir,
 	ListHandler:  listProjects,
+	// v1 列表复用同一自定义实现（合并未认领目录），与存量 /api 保持一致。
+	V1ListHandler: listProjects,
 }
 
 // Register 把项目管理两套资源的路由挂载到给定路由组。

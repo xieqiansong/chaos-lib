@@ -43,6 +43,8 @@ var noteOpts = crud.Opts[Note]{
 	BeforeCreate: func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
 	ToResponse:   ToNoteResponses,
 	ListHandler:  listNotes,
+	// v1 列表复用同一自定义实现（合并文件夹派生数据），与存量 /api 保持一致。
+	V1ListHandler: listNotes,
 }
 
 // Register 挂载笔记模块路由：标准 CRUD 交给 crud 基线，树 / 内容 / 写操作为自定义扩展。

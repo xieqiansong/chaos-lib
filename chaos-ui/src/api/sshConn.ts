@@ -1,7 +1,7 @@
 // SSH 连接接口门户：本文件集中承载该资源的「接口契约」。视图只从这里导入类型与 api 对象。
 // 后端接入 crud 基线（internal/portfwd + internal/crud），列表/详情/创建/更新/删除走标准 CRUD，
-// 测试连接为业务自定义接口（POST /sshConns/:id/test）。
-import {post} from '@/utils/request'
+// 测试连接为业务自定义接口。标准 CRUD 已走 action()（见 useRestApi）；测试亦迁移为 POST + Action。
+import {action} from '@/utils/request'
 import {useRestApi} from '@/composables/useRestApi'
 
 export type SshAuthType = 'password' | 'key'
@@ -47,5 +47,5 @@ export const sshConnApi = {
         return rest.update(id, patch)
     },
     // 测试连接：不启动端口转发，仅验证主机可达性与凭据有效性
-    test: (id: number) => post(`ssh-conns/${id}/test`, {}),
+    test: (id: number) => action<unknown>('ssh-conns', 'test', {id}),
 }

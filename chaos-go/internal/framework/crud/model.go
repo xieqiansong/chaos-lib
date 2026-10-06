@@ -73,4 +73,9 @@ type Opts[T any] struct {
 	// 用于列表需要「派生数据 / 外部副作用（如扫描磁盘）」的场景（如项目管理：合并已认领 + 未认领目录）。
 	// 自定义实现须自行处理分页/搜索/软删过滤，并返回统一分页结构 { items, total, page, size }。
 	ListHandler func(c *gin.Context)
+
+	// V1ListHandler: 可选列表处理器覆盖（仅 v1 动作路由生效）。设置后，POST /<prefix>/list 走该
+	// 自定义实现而非基线 listAction，用于 v1 下列表需要派生数据 / 外部副作用的场景。
+	// 与 ListHandler 对称：Restful 侧用 ListHandler，v1 侧用 V1ListHandler。
+	V1ListHandler func(c *gin.Context)
 }

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"encoding/json"
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/config"
 	"io"
@@ -42,5 +43,12 @@ func GetDeepSeekBalance(c *gin.Context) {
 		renv.Error(c, resp.StatusCode, "DeepSeek 返回错误")
 		return
 	}
-	c.Data(resp.StatusCode, "application/json", body)
+	// 接口重构：原样透传改为统一信封，便于前端走 action()（POST + Action）消费。
+	// DeepSeek 余额响应为 JSON 对象，包进 data；非 JSON 则作为字符串透传。
+	var raw json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		renv.Success(c, string(body))
+		return
+	}
+	renv.Success(c, raw)
 }

@@ -1,6 +1,7 @@
 package crud
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -221,6 +222,9 @@ type listMeta struct {
 	Order    string         `json:"order"`
 	Filter   map[string]any `json:"filter"`
 	Keyword  string         `json:"keyword"`
+	// Like：字段级模糊搜索（v1 对应前端 DataTable 的 search），仅对 Searchable 列生效，
+	// 与存量 GET 的「按字段 LIKE」语义一致（存量按 query 参数逐字段 LIKE）。
+	Like map[string]any `json:"like"`
 }
 
 // RegisterActions 在路由组 rg 下为 prefix 注册「POST + Action」风格路由（详见《接口规范.md》），
@@ -230,7 +234,11 @@ type listMeta struct {
 func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], toggle *ToggleOpts) *gin.RouterGroup {
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
-	g.POST("/list", h.listAction)
+	if opts.V1ListHandler != nil {
+		g.POST("/list", opts.V1ListHandler)
+	} else {
+		g.POST("/list", h.listAction)
+	}
 	g.POST("/get", h.getAction)
 	g.POST("/create", h.createAction)
 	g.POST("/update", h.updateAction)
@@ -263,6 +271,17 @@ func (h *handler[T]) listAction(c *gin.Context) {
 			args = append(args, "%"+kw+"%")
 		}
 		base = base.Where(strings.Join(ors, " OR "), args...)
+	}
+	// 字段级模糊搜索：仅对 Searchable 列生效，与存量 GET 的「按字段 LIKE」语义一致。
+	for _, f := range h.opts.Searchable {
+		v, ok := meta.Like[f]
+		if !ok {
+			continue
+		}
+		s := strings.TrimSpace(fmt.Sprintf("%v", v))
+		if s != "" {
+			base = base.Where(f+" LIKE ?", "%"+s+"%")
+		}
 	}
 	for k, v := range meta.Filter {
 		if v != nil {
