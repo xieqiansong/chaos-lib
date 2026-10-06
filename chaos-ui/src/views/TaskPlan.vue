@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, nextTick, onMounted, ref, watch} from 'vue'
-import {del, get, patch, post} from '@/utils/request'
+import {action} from '@/utils/request'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {showError} from '@/utils/message'
 import {openCenterPanel} from '@/utils/centerPanel'
@@ -84,9 +84,9 @@ async function submitRatingDialog(rating: number) {
   const target = ratingTargetPlan.value
   await runRating(async () => {
     if (ratingAction.value === 'start-plan' && target) {
-      await patch(`task-plans/${target.ID}/start`, {rating})
+      await action('task-plans', 'start', {id: target.ID})
     } else if (ratingAction.value === 'complete-plan' && target) {
-      await patch(`task-plans/${target.ID}/complete`, {rating})
+      await action('task-plans', 'complete', {id: target.ID})
     }
     showRatingDialog.value = false
     ratingTargetPlan.value = null
@@ -111,7 +111,7 @@ async function submitPriorityDialog() {
   }
   const target = priorityTargetPlan.value
   await run(async () => {
-    await patch(`task-plans/${target.ID}/priority`, {priority: priorityValue.value})
+    await action('task-plans', 'setPriority', {id: target.ID, priority: priorityValue.value})
     showPriorityDialog.value = false
     priorityTargetPlan.value = null
   }, {
@@ -342,7 +342,7 @@ async function fetchAllPlans() {
   const isSearch = !!searchParam
 
   try {
-    const result = await get('task-plans/tree', searchParam ? {search: searchParam} : undefined)
+    const result = await action('task-plans', 'tree', {}, searchParam ? {search: searchParam} : undefined)
     if (Array.isArray(result)) {
       allPlans.value = processTreeData(result)
     }
@@ -411,7 +411,7 @@ function resetForm() {
 }
 
 function openLink(ID: string) {
-  get(`task-plans/${ID}`).then(res => {
+  action('task-plans', 'get', {id: Number(ID)}).then(res => {
     if (res.Link) {
       window.open(res.Link, '_blank')
     }
@@ -461,7 +461,7 @@ async function createPlan() {
       payload.Priority = formData.value.Priority
     }
 
-    await post('task-plans/', payload)
+    await action('task-plans', 'create', payload)
     closePlanDialog()
     resetForm()
   }, {
@@ -479,7 +479,7 @@ async function updatePlan() {
   }
 
   await run(async () => {
-    await patch(`task-plans/${editingPlan.value!.ID}`, {
+    await action('task-plans', 'update', {id: editingPlan.value!.ID,
       Name: formData.value.Name.trim(),
       PlanType: formData.value.PlanType,
       CronExpr: formData.value.CronExpr.trim() || undefined,
@@ -500,7 +500,7 @@ async function updatePlan() {
 }
 
 async function startPlan(plan: TaskPlan) {
-  await run(() => patch(`task-plans/${plan.ID}/start`, {}), {
+  await run(() => action('task-plans', 'start', {id: plan.ID}), {
     confirm: '确认开启此任务计划？',
     type: 'info',
     success: '已开启',
@@ -514,7 +514,7 @@ async function completePlan(plan: TaskPlan) {
     openRatingDialog('complete-plan', plan)
     return
   }
-  await run(() => patch(`task-plans/${plan.ID}/complete`, {}), {
+  await run(() => action('task-plans', 'complete', {id: plan.ID}), {
     confirm: '确认完成此任务计划？',
     type: 'info',
     success: '已完成',
@@ -524,7 +524,7 @@ async function completePlan(plan: TaskPlan) {
 }
 
 async function archivePlan(plan: TaskPlan) {
-  await run(() => patch(`task-plans/${plan.ID}/archive`, {}), {
+  await run(() => action('task-plans', 'archive', {id: plan.ID}), {
     confirm: '确认归档此任务计划？',
     type: 'warning',
     success: '已归档',
@@ -534,7 +534,7 @@ async function archivePlan(plan: TaskPlan) {
 }
 
 async function deletePlan(plan: TaskPlan) {
-  await run(() => del(`task-plans/${plan.ID}`), {
+  await run(() => action('task-plans', 'delete', {id: plan.ID}), {
     confirm: '确认删除此任务计划？删除后无法恢复。',
     confirmTitle: '警告',
     confirmButtonText: '删除',
@@ -546,7 +546,7 @@ async function deletePlan(plan: TaskPlan) {
 }
 
 async function suspendPlan(plan: TaskPlan) {
-  await run(() => patch(`task-plans/${plan.ID}/suspend`, {}), {
+  await run(() => action('task-plans', 'suspend', {id: plan.ID}), {
     confirm: `确认挂起「${plan.Name}」？其下所有子任务都会一并挂起，待办列表中不再显示，恢复后可继续。`,
     confirmButtonText: '挂起',
     type: 'warning',
@@ -557,7 +557,7 @@ async function suspendPlan(plan: TaskPlan) {
 }
 
 async function resumePlan(plan: TaskPlan) {
-  await run(() => patch(`task-plans/${plan.ID}/resume`, {}), {
+  await run(() => action('task-plans', 'resume', {id: plan.ID}), {
     confirm: `确认恢复「${plan.Name}」？其下所有被挂起的子任务都会一并恢复，重新出现在待办列表。`,
     confirmButtonText: '恢复',
     type: 'info',
@@ -568,7 +568,7 @@ async function resumePlan(plan: TaskPlan) {
 }
 
 async function openEditDialog(ID: string) {
-  let res = await get(`task-plans/${ID}`)
+  let res = await action('task-plans', 'get', {id: Number(ID)})
 
   editingPlan.value = res
   formData.value = {

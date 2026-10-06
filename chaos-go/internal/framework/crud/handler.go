@@ -235,7 +235,12 @@ func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], to
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
 	if opts.V1ListHandler != nil {
-		g.POST("/list", opts.V1ListHandler)
+		// 自定义列表实现通常沿用「从 query 读分页 / 过滤」的既有逻辑（如 projects / notes），
+		// 故先用 envelope.MetaToQuery 把信封 meta 桥接为查询参数，再交给它，保证 v1 语义与存量一致。
+		g.POST("/list", func(c *gin.Context) {
+			envelope.MetaToQuery(c)
+			opts.V1ListHandler(c)
+		})
 	} else {
 		g.POST("/list", h.listAction)
 	}

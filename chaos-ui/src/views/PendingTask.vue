@@ -6,7 +6,7 @@
 // 业务动作、计划树筛选、提前查询、评分/延期弹窗、轮询刷新、逾期高亮等定制能力全部保留在此页。
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue'
 import {batchPostponeTasks} from '@/utils/api'
-import {get, patch} from '@/utils/request'
+import {action} from '@/utils/request'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {showSuccess, showError, showWarning} from '@/utils/message'
 import {format as formatDate, parseISO} from 'date-fns'
@@ -70,7 +70,7 @@ function toPlanTreeOptions(nodes: any[]): PlanTreeNode[] {
 async function loadPlanTree() {
   try {
 
-    const result = await get('task-plans/tree')
+    const result = await action('task-plans', 'tree')
     if (Array.isArray(result)) {
       planTree.value = toPlanTreeOptions(result)
     }
@@ -121,7 +121,7 @@ async function fetchPending(params: DataTableApiParams): Promise<DataTableApiRes
       query.order = params.sort.order === 'ascending' ? 'asc' : 'desc'
     }
   }
-  const result = await get('tasks/pending', query)
+  const result = await action('task-plans', 'tasks/pending', {}, query)
   return {rows: (result?.list ?? []) as PendingTask[], total: result?.pagination?.total ?? 0}
 }
 
@@ -178,7 +178,7 @@ async function completeTask(task: PendingTask) {
     showRatingDialog.value = true
     return
   }
-  await run(() => patch(`tasks/${task.ID}/complete`, {}), {
+  await run(() => action('task-plans', 'tasks/complete', {id: task.ID}), {
     confirm: '确认完成此任务？',
     confirmButtonText: '确定',
     type: 'info',
@@ -189,7 +189,7 @@ async function completeTask(task: PendingTask) {
 }
 
 async function cancelTask(task: PendingTask) {
-  await run(() => patch(`tasks/${task.ID}/cancel`, {}), {
+  await run(() => action('task-plans', 'tasks/cancel', {id: task.ID}), {
     confirm: '确认取消此周期任务？取消后本次任务将不再提醒。',
     confirmButtonText: '确定',
     type: 'warning',
@@ -203,7 +203,7 @@ async function submitRatingDialog(rating: number) {
   const target = ratingTargetTask.value
   await runRating(async () => {
     if (target) {
-      await patch(`tasks/${target.ID}/complete`, {rating})
+      await action('task-plans', 'tasks/complete', {id: target.ID, rating})
     }
     showRatingDialog.value = false
     ratingTargetTask.value = null
@@ -255,7 +255,7 @@ async function submitPostponeDialog() {
   }
   await run(async () => {
     if (postponeTargetTask.value) {
-      await patch(`tasks/${postponeTargetTask.value.ID}/postpone`, {days: postponeDays.value})
+      await action('task-plans', 'tasks/postpone', {id: postponeTargetTask.value.ID, days: postponeDays.value})
       showSuccess(`已延期 ${postponeDays.value} 天`)
     } else if (selectedTasks.value.length > 0) {
       const ids = selectedTasks.value.map(t => t.ID)

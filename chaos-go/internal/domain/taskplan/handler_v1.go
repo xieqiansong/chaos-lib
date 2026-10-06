@@ -2,9 +2,7 @@ package taskplan
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
@@ -19,32 +17,10 @@ func init() {
 	routehub.RegisterV1("task-plans", RegisterV1)
 }
 
-// metaToQuery 把信封 meta 转为查询参数注入请求，使既有的 query 解析逻辑（分页 / 过滤 / 排序）在 v1 下复用。
+// metaToQuery 把信封 meta 桥接为查询参数，使既有的 query 解析逻辑（分页 / 过滤 / 排序）在 v1 下复用。
+// 实现已上收到 framework/envelope.MetaToQuery，本处仅为路由注册处的可读性保留薄封装。
 func metaToQuery(c *gin.Context) {
-	var m map[string]any
-	envelope.GetMeta(c, &m)
-	q := c.Request.URL.Query()
-	for k, v := range m {
-		key := k
-		if key == "pageSize" {
-			key = "page_size"
-		}
-		switch val := v.(type) {
-		case string:
-			if val != "" {
-				q.Set(key, val)
-			}
-		case float64:
-			q.Set(key, strconv.Itoa(int(val)))
-		case bool:
-			q.Set(key, strconv.FormatBool(val))
-		case nil:
-			// 跳过空值
-		default:
-			q.Set(key, fmt.Sprintf("%v", val))
-		}
-	}
-	c.Request.URL.RawQuery = q.Encode()
+	envelope.MetaToQuery(c)
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。

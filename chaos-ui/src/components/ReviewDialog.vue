@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
-import {get, post} from '@/utils/request'
+import {action} from '@/utils/request'
 import {showSuccess, showError, showWarning} from '@/utils/message'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import {FSRS_RATING_OPTIONS} from '@/constants'
@@ -72,7 +72,7 @@ async function aiScore() {
   aiError.value = ''
   aiResult.value = null
   try {
-    const res = await post('ai/review-score', {original: content.value, answer: answer.value,})
+    const res = await action('task-plans', 'ai/reviewScore', {original: content.value, answer: answer.value,})
     aiResult.value = {
       points: res.points || [],
       coverage: res.coverage ?? 0,
@@ -92,7 +92,7 @@ function ratingLabel(v: number): string {
 async function loadRaw() {
   loading.value = true
   try {
-    const res = await get(`task-plans/${props.planId}/raw`)
+    const res = await action('task-plans', 'getRaw', {id: props.planId})
     rawLink.value = res?.rawLink ?? ''
     content.value = res.content || ''
   } catch (e: any) {
@@ -114,7 +114,8 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await post(`task-plans/${props.planId}/review`, {
+    await action('task-plans', 'review', {
+      id: props.planId,
       rating: selectedRating.value,
       answer: answer.value, ai: aiResult.value,
     })

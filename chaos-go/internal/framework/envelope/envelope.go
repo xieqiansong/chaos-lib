@@ -11,6 +11,7 @@ package envelope
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -157,6 +158,43 @@ func GetMetaMap(c *gin.Context) map[string]any {
 		}
 	}
 	return out
+}
+
+// MetaToQuery 把信封 meta 逐字段桥接为查询参数并注入请求 URL，
+// 使大量「从 query 读分页 / 过滤」的既有 handler 在 v1（参数都在 meta）下原样复用，
+// 无需为每个动作另写一份 v1 变体。约定：
+//   - 字符串 / 数字 / 布尔直接写入，空字符串与 null 跳过；
+//   - pageSize 别名映射为 page_size，与存量查询参数命名一致；
+//   - 已存在的查询参数不被覆盖（同 key 以先到为准）。
+//
+// 供 v1 路由包装器（如 tasks.GET 查询类、proxy 列表）在调用既有 handler 前调用。
+func MetaToQuery(c *gin.Context) {
+	m := GetMetaMap(c)
+	if len(m) == 0 {
+		return
+	}
+	q := c.Request.URL.Query()
+	for k, v := range m {
+		key := k
+		if key == "pageSize" {
+			key = "page_size"
+		}
+		switch val := v.(type) {
+		case string:
+			if val != "" {
+				q.Set(key, val)
+			}
+		case float64:
+			q.Set(key, strconv.Itoa(int(val)))
+		case bool:
+			q.Set(key, strconv.FormatBool(val))
+		case nil:
+			// 跳过空值
+		default:
+			q.Set(key, fmt.Sprintf("%v", val))
+		}
+	}
+	c.Request.URL.RawQuery = q.Encode()
 }
 
 // RequestID 返回本次请求的 requestId：优先取信封携带值，否则生成一个并暂存到 Context，

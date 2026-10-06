@@ -14,7 +14,7 @@ import {toSnake} from '@/composables/useRestApi'
 import {showError, showSuccess, showWarning} from '@/utils/message'
 import {type ProjectGroup, projectGroupApi} from '@/api/projectGroup'
 import {type Project, projectApi} from '@/api/project'
-import {get} from '@/utils/request'
+import {action} from '@/utils/request'
 
 const selectedGroupId = ref<number | null>(null)
 const projectsTable = ref<InstanceType<typeof DataTable> | null>(null)
@@ -91,7 +91,8 @@ async function projectsFetch(params: DataTableApiParams) {
   for (const [k, v] of Object.entries(params.search ?? {})) {
     if (v !== '' && v != null) query[toSnake(k)] = v
   }
-  const res = await get('projects', query)
+  // v1 动作：query 走信封 meta，后端 listProjects 经 MetaToQuery 桥接为查询参数读取
+  const res = await action('projects', 'list', {}, query)
   const rows = (res?.list ?? res?.items ?? res?.rows ?? []) as any[]
   const total = res?.pagination?.total ?? res?.total ?? rows.length
   return {rows, total}

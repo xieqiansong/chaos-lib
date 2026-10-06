@@ -1,6 +1,6 @@
 export const API_BASE = (import.meta.env.VITE_API_BASE as string) || '/api'
 
-import {del, get, patch, post, action} from '@/utils/request'
+import {action} from '@/utils/request'
 
 
 // ---- SDK 版本切换 ----
@@ -11,11 +11,11 @@ export interface SdkInfo {
 }
 
 export function getSdkVersions(): Promise<Record<string, SdkInfo>> {
-    return get('sdks')
+    return action('sdks', 'list')
 }
 
 export function updateSdkVersion(type: string, version: string): Promise<any> {
-    return patch(`sdks/${type}/switch`, {version})
+    return action('sdks', 'switch', {type, version})
 }
 
 // ---- SDK 类型 / 来源管理 (defs) ----
@@ -36,7 +36,7 @@ export interface SdkSource {
 }
 
 export function getSdkDefs(): Promise<SdkSource[]> {
-    return get('sdks/defs')
+    return action('sdks', 'listSources')
 }
 
 export function createSdkDef(payload: {
@@ -45,7 +45,7 @@ export function createSdkDef(payload: {
     Enabled?: boolean
     Note?: string
 }): Promise<SdkSource> {
-    return post('sdks/defs', payload)
+    return action('sdks', 'createSource', payload)
 }
 
 export function updateSdkDef(
@@ -57,17 +57,17 @@ export function updateSdkDef(
         Note?: string
     }
 ): Promise<SdkSource> {
-    return patch(`sdks/defs/${name}`, payload)
+    return action('sdks', 'updateSource', {name, SourcePatch: payload})
 }
 
 export function deleteSdkDef(name: string): Promise<any> {
-    return del(`sdks/defs/${name}`)
+    return action('sdks', 'deleteSource', {name})
 }
 
 // ---- 待办任务 ----
 
 export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
-    return post('tasks/batch-postpone', {ids, days})
+    return action('task-plans', 'tasks/batchPostpone', {ids, days})
 }
 
 // ---- 浏览器历史（由扩展周期性备份到 DB）----

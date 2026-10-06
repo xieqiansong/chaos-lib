@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref} from 'vue'
-import {get, patch, post} from '@/utils/request'
+import {action} from '@/utils/request'
 import {showError} from '@/utils/message'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 
@@ -16,7 +16,7 @@ const content = ref('')
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await get(`task-plans/${props.planId}/raw`)
+    const res = await action('task-plans', 'getRaw', {id: props.planId})
     rawLink.value = res?.rawLink ?? ''
     content.value = res?.content ?? ''
   } catch (e: any) {

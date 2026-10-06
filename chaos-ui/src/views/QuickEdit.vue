@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed, defineAsyncComponent, onMounted, ref, watch} from 'vue'
-import {del, get, patch, post} from '@/utils/request'
+import {action} from '@/utils/request'
 const MonacoDiffEditor = defineAsyncComponent(() => import('../components/MonacoDiffEditor.vue'))
 
 const props = defineProps<{
@@ -56,7 +56,7 @@ async function fetchFiles() {
   loading.value = true
   error.value = ''
   try {
-    const result = await get('quick-edits')
+    const result = await action('quick-edits', 'list')
     if (Array.isArray(result)) {
       files.value = result
     } else if (result && Array.isArray(result.data)) {
@@ -91,7 +91,7 @@ async function createFile() {
     return
   }
   try {
-    const result = await post('quick-edits', {
+    const result = await action('quick-edits', 'create', {
       Name: newFile.value.Name,
       FilePath: newFile.value.FilePath,
       Remark: newFile.value.Remark
@@ -111,7 +111,7 @@ async function createFile() {
 
 async function deleteFile(id: number) {
   try {
-    const result = await del(`quick-edits/${id}`)
+    const result = await action('quick-edits', 'delete', {id})
     if (result && result.error) {
       error.value = result.error || '删除失败'
       return
@@ -135,7 +135,7 @@ async function openFile(file: QuickEditFile) {
   contentLoading.value = true
   error.value = ''
   try {
-    const result = await get(`quick-edits/${file.ID}/content`)
+    const result = await action('quick-edits', 'getContent', {id: file.ID})
     if (result && result.content !== undefined) {
       content.value = result.content
       originalContent.value = result.content
@@ -169,7 +169,8 @@ async function saveContent() {
   saving.value = true
   error.value = ''
   try {
-    const result = await put(`quick-edits/${activeFileId.value}/content`, {
+    const result = await action('quick-edits', 'updateContent', {
+      id: activeFileId.value,
       content: content.value
     })
     if (result && !result.error) {
@@ -199,9 +200,9 @@ async function fetchSnapshots() {
   if (activeFileId.value === null) return
   snapshotLoading.value = true
   try {
-    const result = await get(
-        `quick-edits/${activeFileId.value}/snapshots`,
-        {page: snapshotPage.value, page_size: 20}
+    const result = await action('quick-edits', 'listSnapshots',
+        {id: activeFileId.value},
+        {page: snapshotPage.value, pageSize: 20}
     )
     if (result && Array.isArray(result.list)) {
       snapshots.value = result.list
@@ -225,7 +226,7 @@ async function viewSnapshot(snap: QuickEditSnapshot) {
   selectedSnapshotId.value = snap.ID
   snapshotContentLoading.value = true
   try {
-    const result = await get(`quick-edits/${activeFileId.value}/snapshots/${snap.ID}`)
+    const result = await action('quick-edits', 'getSnapshot', {fileId: activeFileId.value, snapshotId: snap.ID})
     if (result && result.content !== undefined) {
       snapshotContent.value = result.content
     } else {
@@ -249,9 +250,8 @@ function onSnapshotSelect(snapshotId: number) {
 async function restoreSnapshot() {
   if (activeFileId.value === null || selectedSnapshotId.value === null) return
   try {
-    const result = await post(
-        `quick-edits/${activeFileId.value}/restore`,
-        {SnapshotID: selectedSnapshotId.value}
+    const result = await action('quick-edits', 'restore',
+        {fileId: activeFileId.value, snapshotId: selectedSnapshotId.value}
     )
     if (result && !result.error) {
       activeFileId.value = null
