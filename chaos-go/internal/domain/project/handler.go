@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"chaos-go/internal/framework/crud"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
@@ -54,11 +55,13 @@ func Register(rg *gin.RouterGroup) {
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 两套资源的标准 CRUD 由通用 crud 生成；自定义列表（合并未认领目录）、
-// move / access 动作暂留 /api，后续迁移。
+// 两套资源的标准 CRUD 由通用 crud 生成；自定义列表（合并未认领目录）经 V1ListHandler 复用；
+// move / access 以动作形式补齐（v1 下已完备，可安全删除存量 /api 路由）。
 func RegisterV1(rg *gin.RouterGroup) {
 	crud.RegisterActions[ProjectGroup](rg, "project-groups", projectGroupOpts, nil)
-	crud.RegisterActions[Project](rg, "projects", projectOpts, nil)
+	projects := crud.RegisterActions[Project](rg, "projects", projectOpts, nil)
+	projects.POST("/move", projectMoveV1)
+	projects.POST("/access", projectAccessV1)
 }
 
 // ── 自定义列表 ──────────────────────────────────────────────────
@@ -136,6 +139,56 @@ func accessProject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, "无效的项目ID")
+		return
+	}
+	if err := RecordAccess(id); err != nil {
+		if errors.Is(err, ErrProjectNotFound) {
+			renv.Error(c, http.StatusNotFound, "项目不存在")
+			return
+		}
+		renv.Error(c, http.StatusInternalServerError, "更新访问时间失败: "+err.Error())
+		return
+	}
+	renv.Success(c, nil)
+}
+
+// ── v1 动作（POST + Action）─────────────────────────────────────────
+
+// projectMoveV1 移动项目（POST /api/v1/projects/move）。v1 路径不带 :id，主键取自信封 data.id。
+func projectMoveV1(c *gin.Context) {
+	id, ok := envelope.ID(c)
+	if !ok {
+		return
+	}
+	var req MoveProjectRequest
+	if err := envelope.Bind(c, &req); err != nil {
+		renv.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.TargetGroupID == 0 {
+		renv.Error(c, http.StatusBadRequest, "目标项目组ID不能为空")
+		return
+	}
+	if err := MoveProject(id, req); err != nil {
+		switch {
+		case errors.Is(err, ErrProjectNotFound):
+			renv.Error(c, http.StatusNotFound, "项目不存在")
+		case errors.Is(err, ErrGroupNotFound):
+			renv.Error(c, http.StatusNotFound, "目标项目组不存在")
+		case errors.Is(err, ErrInvalidPath):
+			renv.Error(c, http.StatusBadRequest, err.Error())
+		default:
+			renv.Error(c, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	renv.Success(c, nil)
+}
+
+// projectAccessV1 记录项目访问时间（POST /api/v1/projects/access）。
+func projectAccessV1(c *gin.Context) {
+	id, ok := envelope.ID(c)
+	if !ok {
 		return
 	}
 	if err := RecordAccess(id); err != nil {
