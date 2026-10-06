@@ -26,7 +26,6 @@ var errRules = []httpx.ErrRule{
 }
 
 func init() {
-	routehub.Register("notes", Register)
 	routehub.RegisterV1("notes", RegisterV1)
 }
 

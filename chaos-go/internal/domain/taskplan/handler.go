@@ -10,16 +10,13 @@ import (
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"github.com/gin-gonic/gin"
 )
 
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-func init() {
-	routehub.Register("task-plans", Register)
-}
+// init 登记 v1 路由挂载函数到 routehub（使 internal/app 导入该包即自动生效）。
+// 说明：本模块曾同时提供存量 /api 的 Register 与 v1 的 RegisterV1，现存量路由已下线，
+// 仅保留 v1（见 handler_v1.go）。
 
 // Register 把任务计划与待办任务全部路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
 // 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载 FSRS / 调度 / 树形等定制行为。

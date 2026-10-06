@@ -11,7 +11,6 @@ import (
 // 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
 // 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
 func init() {
-	routehub.Register("api-logs", Register)
 	routehub.RegisterV1("api-logs", RegisterV1)
 }
 

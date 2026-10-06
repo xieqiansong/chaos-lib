@@ -16,8 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRouter 装配 HTTP 路由：全局中间件在此编排，业务模块路由由 internal/routehub
-// 统一挂载（各模块在自己的包内实现 Register 并登记），静态资源与 SPA 回退在此兜底。
+// SetupRouter 装配 HTTP 路由：全局中间件在此编排，业务模块的 v1 路由由 internal/routehub
+// 统一挂载（各模块实现 RegisterV1 并登记），静态资源与 SPA 回退在此兜底。
 func SetupRouter(webFS fs.FS) *gin.Engine {
 	r := gin.Default()
 
@@ -28,18 +28,8 @@ func SetupRouter(webFS fs.FS) *gin.Engine {
 
 	api := r.Group("/api")
 
-	// 业务模块路由：各模块在自身包内实现 Register(rg *gin.RouterGroup)，并在 init 中
-	// 登记到 internal/framework/routehub；各业务包由 internal/app 装配根统一 blank-import，
-	// 于是新增模块只需建包并登记，本文件不必再改动。
-	// 将来若出现跨模块的路由前缀冲突（如 /xx/:id 与 /xx/new 重叠），
-	// 可把冲突模块退回此处显式调用其 Register，以确定挂载顺序。
-	if mounted := routehub.MountAll(api); len(mounted) > 0 {
-		slog.Info("路由模块挂载完成", "modules", strings.Join(mounted, ", "))
-	}
-
 	// v1 接口组：统一「POST + Action」模式（详见仓库根《接口规范.md》）。
-	// 信封中间件只作用于本组，存量 /api 路由不受影响；迁移中的模块经 routehub.RegisterV1
-	// 登记后挂到此处，未迁移模块仍走 /api，实现双轨兼容、可随时回退。
+	// 所有业务接口均已迁到本组，存量 RESTful /api 路由与其兼容层已下线移除。
 	v1 := api.Group("v1")
 	v1.Use(envelope.Middleware())
 	v1.Use(middleware.AuthMiddleware())
