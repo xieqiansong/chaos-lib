@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // GetLinkInfo 读取路径的链接信息（Windows 下通过 PowerShell Get-Item）。
@@ -26,9 +27,11 @@ $item = Get-Item -LiteralPath $env:CHAOS_LINK_PATH -Force
     Mode       = $item.Mode
 } | ConvertTo-Json -Compress
 `
-	res, err := RunPowershell(context.Background(), script, ShellOpt{
+	t0 := time.Now()
+	res, err := RunPwsh(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_LINK_PATH=" + path},
 	})
+	fmt.Printf("[file_link_windows] GetLinkInfo RunPwsh 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return nil, err
 	}
@@ -36,9 +39,11 @@ $item = Get-Item -LiteralPath $env:CHAOS_LINK_PATH -Force
 		return nil, fmt.Errorf("查询链接信息失败: %s", strings.TrimSpace(res.Stderr))
 	}
 	var info LinkInfo
+	t1 := time.Now()
 	if err := json.Unmarshal([]byte(res.Stdout), &info); err != nil {
 		return nil, fmt.Errorf("解析 PowerShell 输出失败: %w", err)
 	}
+	fmt.Printf("[file_link_windows] GetLinkInfo json.Unmarshal 耗时: %v\n", time.Since(t1))
 	return &info, nil
 }
 
@@ -47,21 +52,27 @@ $item = Get-Item -LiteralPath $env:CHAOS_LINK_PATH -Force
 // targetPath 为目标文件夹。路径均通过环境变量传入，规避空格 / 中文 / 引号转义。
 func CreateJunction(linkPath, targetPath string) error {
 	// 已存在则报错，避免静默覆盖已有路径
+	t0 := time.Now()
 	if _, err := os.Lstat(linkPath); err == nil {
 		return fmt.Errorf("链接路径已存在: %s", linkPath)
 	}
+	fmt.Printf("[file_link_windows] CreateJunction os.Lstat 耗时: %v\n", time.Since(t0))
 	// 确保父目录存在：New-Item 不会自动创建多级父目录
+	t1 := time.Now()
 	if parent := filepath.Dir(linkPath); parent != "" {
 		if err := os.MkdirAll(parent, 0o755); err != nil {
 			return fmt.Errorf("创建父目录失败: %v", err)
 		}
 	}
+	fmt.Printf("[file_link_windows] CreateJunction os.MkdirAll 耗时: %v\n", time.Since(t1))
 	const script = `
 New-Item -ItemType Junction -Path $env:CHAOS_LINK_PATH -Target $env:CHAOS_TARGET_PATH | Out-Null
 `
-	res, err := RunPowershell(context.Background(), script, ShellOpt{
+	t2 := time.Now()
+	res, err := RunPwsh(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_LINK_PATH=" + linkPath, "CHAOS_TARGET_PATH=" + targetPath},
 	})
+	fmt.Printf("[file_link_windows] CreateJunction RunPwsh 耗时: %v\n", time.Since(t2))
 	if err != nil {
 		return err
 	}

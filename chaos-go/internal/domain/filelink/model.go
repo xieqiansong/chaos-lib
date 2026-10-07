@@ -4,7 +4,7 @@
 // （回调只做转发，实现见 service.go）：
 //   - BeforeCreate：校验源 / 目标路径，不合法则不落库
 //   - AfterDelete：清理联接点，清理失败则整笔软删回滚
-//   - ToResponse：派生字段 LinkStatus 按文件系统实时计算（不落库，返回时重新算）
+//   - statusOf：派生字段 LinkStatus 按文件系统实时计算（不落库，前端列表加载后逐行并发刷新）
 //
 // 启用开关有副作用（建 / 删联接点）且带校验，故保留自定义子路由 PATCH /file-links/:id/status。
 //

@@ -50,6 +50,15 @@ func RunPowershell(ctx context.Context, script string, opt ShellOpt) (*ShellResu
 	return run(ctx, bin, args, opt)
 }
 
+// RunPwsh 执行一段 PowerShell 7 (pwsh) 脚本。
+// 与 RunPowershell 语义相同，但固定使用 pwsh（PowerShell 7），
+// 相比 Windows PowerShell 5.1（powershell.exe）冷启动明显更快。
+// 要求运行环境已安装 PowerShell 7，且 pwsh 位于 PATH 中。
+func RunPwsh(ctx context.Context, script string, opt ShellOpt) (*ShellResult, error) {
+	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script}
+	return run(ctx, "pwsh", args, opt)
+}
+
 // run 统一执行逻辑：处理超时、工作目录、环境变量与退出码。
 func run(ctx context.Context, name string, args []string, opt ShellOpt) (*ShellResult, error) {
 	if opt.Timeout > 0 {

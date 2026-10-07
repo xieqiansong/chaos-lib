@@ -45,6 +45,16 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 	return "conflict"
 }
 
+// GetLinkStatus 按文件系统实时推导指定联接点的连接状态（不落库，每次读时重算）。
+// 供前端列表加载后「逐行并发刷新」调用，避免在大列表里把昂贵的磁盘探测塞进 list 接口。
+func GetLinkStatus(id int) (string, error) {
+	link, err := findActiveByID(id)
+	if err != nil {
+		return "", err
+	}
+	return checkLinkStatus(link.SourcePath, link.TargetPath, link.Status), nil
+}
+
 // ── 用例 ────────────────────────────────────────────────────────
 
 // ValidateForCreate 创建前校验：源 / 目标路径必填且源路径存在。
@@ -54,17 +64,6 @@ func ValidateForCreate(l *FileLink) error {
 	}
 	if _, err := os.Stat(l.SourcePath); err != nil {
 		return fmt.Errorf("源路径不存在: %s", l.SourcePath)
-	}
-	return nil
-}
-
-// CleanupLink 记录软删后清理联接点；联接点已不存在视为清理成功（幂等）。
-func CleanupLink(l *FileLink) error {
-	if !l.Status {
-		return nil
-	}
-	if err := os.Remove(l.TargetPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("清理联接点失败: %w", err)
 	}
 	return nil
 }
@@ -122,5 +121,5 @@ func ToggleStatus(id int, enable bool) (any, error) {
 	if err := SetStatus(link, enable); err != nil {
 		return nil, err
 	}
-	return toOne(link), nil
+	return link, nil
 }

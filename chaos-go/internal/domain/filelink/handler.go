@@ -4,7 +4,9 @@ import (
 	"net/http"
 
 	"chaos-go/internal/framework/crud"
+	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
+	"chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
 	"github.com/gin-gonic/gin"
@@ -32,9 +34,7 @@ var fileLinkOpts = crud.Opts[FileLink]{
 	Sortable:   []string{"id", "sort"},
 	// Status 只能走 /status（带建删联接点副作用），禁止通用 PATCH 改写
 	Protected:    []string{"status"},
-	ToResponse:   toResponse,
 	BeforeCreate: ValidateForCreate,
-	AfterDelete:  CleanupLink,
 }
 var fileLinkToggle = &crud.ToggleOpts{
 	Setter:   ToggleStatus,
@@ -43,6 +43,26 @@ var fileLinkToggle = &crud.ToggleOpts{
 
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // CRUD + status（启停）由通用 crud 生成，动作名：list/get/create/update/delete/batchCreate/batchDelete/status。
+// statusOf 为读方向自定义动作：列表加载后前端逐行并发调用，按文件系统实时计算单条 LinkStatus。
 func RegisterV1(rg *gin.RouterGroup) {
-	crud.RegisterActions[FileLink](rg, "file-links", fileLinkOpts, fileLinkToggle)
+	fl := crud.RegisterActions[FileLink](rg, "file-links", fileLinkOpts, fileLinkToggle)
+	fl.POST("/statusOf", statusOfV1)
+}
+
+// statusOfV1 逐行状态刷新接口（POST /api/v1/file-links/statusOf，body {id}）。
+// 对应前端「列表加载完成后单独刷新每一行状态」的需求；返回 { LinkStatus }。
+func statusOfV1(c *gin.Context) {
+	var req struct {
+		ID int `json:"id"`
+	}
+	if err := envelope.Bind(c, &req); err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	status, err := GetLinkStatus(req.ID)
+	if err != nil {
+		httpx.MapError(c, err, linkErrRules, http.StatusBadRequest)
+		return
+	}
+	resp.Success(c, gin.H{"LinkStatus": status})
 }

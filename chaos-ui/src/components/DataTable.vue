@@ -123,12 +123,12 @@ const {
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
   defaultSort: props.defaultSort,
+  onLoaded: (rows) => emit('loaded', rows),
 })
 
 onMounted(async () => {
   if (!props.enabled) return
   await getData()
-  emit('loaded', tableData.value)
 })
 
 // 重置：先通知父级清空自定义筛选（如提前查询/计划树），再清空搜索栏内置项并刷新

@@ -15,6 +15,8 @@ interface UseDataTableProps {
   pageSizeOptions?: number[]
   /** 初始排序：首次取数即带上 sort 参数，无需用户点表头 */
   defaultSort?: { field: string; order: 'ascending' | 'descending' }
+  /** 取数完成回调（每次 getData / 翻页 / 搜索 / 排序 / 刷新后均触发），参数为当前页行 */
+  onLoaded?: (rows: any[]) => void
 }
 
 export function useDataTable(props: UseDataTableProps) {
@@ -81,6 +83,7 @@ export function useDataTable(props: UseDataTableProps) {
         page.value -= 1
         return getData()
       }
+      props.onLoaded?.(rows.value)
     } finally {
       loading.value = false
     }

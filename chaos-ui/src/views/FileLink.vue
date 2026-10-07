@@ -45,6 +45,30 @@ const linkStatusMap: Record<string, { text: string; type: string }> = {
 function onStatusChange(row: FileLink, next: boolean) {
   return fileLinkApi.setStatus(row.ID, next)
 }
+
+// 列表（含翻页 / 搜索 / 排序 / 刷新）加载完成后，逐行并发刷新真实联接状态：
+// 每行独立请求、各自回填，单条失败不影响其他行；不阻塞列表渲染。
+async function onLoaded(rows: FileLink[]) {
+  if (!rows.length) return
+  await Promise.allSettled(
+    rows.map(async (r) => {
+      try {
+        const res = await fileLinkApi.getStatus(r.ID)
+        r.LinkStatus = res.LinkStatus
+      } catch {
+        r.LinkStatus = 'none'
+      }
+    }),
+  )
+}
+
+// 状态展示：LinkStatus 尚未回填时显示「检测中」，避免空白一格。
+function statusText(s: string) {
+  return s ? (linkStatusMap[s]?.text || s) : '检测中'
+}
+function statusType(s: string) {
+  return (s && linkStatusMap[s]?.type) || 'info'
+}
 </script>
 
 <template>
@@ -57,10 +81,11 @@ function onStatusChange(row: FileLink, next: boolean) {
         row-key="ID"
         :default-sort="defaultSort"
         :switch-handler="onStatusChange"
+        @loaded="onLoaded"
     >
       <template #LinkStatus="{ row }">
-        <el-tag :type="(linkStatusMap[row.LinkStatus]?.type as any) || 'info'">
-          {{ linkStatusMap[row.LinkStatus]?.text || row.LinkStatus }}
+        <el-tag :type="statusType(row.LinkStatus) as any">
+          {{ statusText(row.LinkStatus) }}
         </el-tag>
       </template>
     </DataTable>
