@@ -1,6 +1,7 @@
 // @ts-ignore
 import browser from "webextension-polyfill";
 import {saveBrowserHistoryRecently} from "./background/browser-history-backup";
+import {saveBookmarks} from "@/entrypoints/background/bookmark-backup";
 import {action} from "@/utils/request";
 
 export default defineBackground(() => {
@@ -38,9 +39,23 @@ export default defineBackground(() => {
                 console.error("saveBrowserHistoryRecently (alarm) failed:", err);
             });
         }
+        if (alarm.name === 'saveBookmarks') {
+            return saveBookmarks().catch((err) => {
+                console.error("saveBookmarks (alarm) failed:", err);
+            });
+        }
     });
 
-    // 启动即触发一次（兜底，周期由下方 alarm 保证）
+    // 备份书签树
+    saveBookmarks().catch((err) => {
+        console.error("saveBookmarks (startup) failed:", err);
+    });
+    browser.alarms.create('saveBookmarks', {
+        delayInMinutes: 0,
+        periodInMinutes: 1,
+    });
+
+    // 备份最近7天的浏览器历史记录
     saveBrowserHistoryRecently().catch((err) => {
         console.error("saveBrowserHistoryRecently (startup) failed:", err);
     });
@@ -48,7 +63,6 @@ export default defineBackground(() => {
         delayInMinutes: 0,
         periodInMinutes: 1,
     });
-
 });
 
 // 执行指令并返回结果；调用方（网页经 externally_connectable）负责 sendResponse。
