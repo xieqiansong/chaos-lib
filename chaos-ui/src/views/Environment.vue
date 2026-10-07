@@ -38,8 +38,20 @@ const filteredVariables = computed(() => {
 })
 
 async function fetchEnv() {
+  const scope = activeTab.value
   await run(async () => {
-    data.value = await getEnvVariables()
+    const resp = await getEnvVariables(scope)
+    if (!data.value) {
+      data.value = resp
+    } else {
+      // 仅更新当前作用域的数据，保留另一段已加载内容，避免切 tab 时闪烁
+      data.value.Meta = resp.Meta
+      data.value.SnapshotId = resp.SnapshotId
+      data.value.SnapshotTime = resp.SnapshotTime
+      data.value.Warnings = resp.Warnings
+      if (scope === 'system') data.value.System = resp.System
+      else data.value.User = resp.User
+    }
   }, {error: '获取环境变量失败'})
 }
 
@@ -56,12 +68,13 @@ const editValue = ref('')
 const editArrayItems = ref<string[]>([])
 const editMode = ref<'text' | 'array'>('array')
 
-// 切换 tab 时关闭正在进行的编辑，避免编辑框残留到另一段
+// 切换 tab 时关闭正在进行的编辑，并独立加载该段数据（按作用域请求，互不干扰）
 watch(activeTab, () => {
   editingKey.value = ''
   editValue.value = ''
   editArrayItems.value = []
   editMode.value = 'array'
+  fetchEnv()
 })
 
 function startEdit(key: string, value: string) {

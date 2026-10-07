@@ -55,6 +55,11 @@ type EnvPutRequest struct {
 	User   *EnvSection
 }
 
+// EnvGetRequest GET 请求；Scope 为空时返回 system + user 两段，为 system / user 时仅返回对应段。
+type EnvGetRequest struct {
+	Scope EnvScope `json:"scope,omitempty"`
+}
+
 type EnvGetResponse struct {
 	Meta         EnvMeta
 	System       EnvSection

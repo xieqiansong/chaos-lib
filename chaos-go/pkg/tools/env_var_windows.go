@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 // validScope 校验作用域是否合法，非法时返回错误。
@@ -37,10 +40,10 @@ $val = [Environment]::GetEnvironmentVariable($env:CHAOS_ENV_NAME, $env:CHAOS_ENV
 } | ConvertTo-Json -Compress
 `
 	t0 := time.Now()
-	res, err := RunPwsh(context.Background(), script, ShellOpt{
+	res, err := RunPowershell(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_ENV_NAME=" + name, "CHAOS_ENV_SCOPE=" + string(scope)},
 	})
-	fmt.Printf("[env_var_windows] GetEnvVar RunPwsh 耗时: %v\n", time.Since(t0))
+	fmt.Printf("[env_var_windows] GetEnvVar RunPowershell 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return nil, err
 	}
@@ -75,10 +78,10 @@ if ($null -eq $found) {
 $found | ConvertTo-Json -Compress
 `
 	t0 := time.Now()
-	res, err := RunPwsh(context.Background(), script, ShellOpt{
+	res, err := RunPowershell(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_ENV_NAME=" + name},
 	})
-	fmt.Printf("[env_var_windows] GetEffectiveEnvVar RunPwsh 耗时: %v\n", time.Since(t0))
+	fmt.Printf("[env_var_windows] GetEffectiveEnvVar RunPowershell 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return nil, err
 	}
@@ -104,14 +107,14 @@ func SetEnvVar(name, value string, scope EnvScope) error {
 [Environment]::SetEnvironmentVariable($env:CHAOS_ENV_NAME, $env:CHAOS_ENV_VALUE, $env:CHAOS_ENV_SCOPE)
 `
 	t0 := time.Now()
-	res, err := RunPwsh(context.Background(), script, ShellOpt{
+	res, err := RunPowershell(context.Background(), script, ShellOpt{
 		Env: []string{
 			"CHAOS_ENV_NAME=" + name,
 			"CHAOS_ENV_VALUE=" + value,
 			"CHAOS_ENV_SCOPE=" + string(scope),
 		},
 	})
-	fmt.Printf("[env_var_windows] SetEnvVar RunPwsh 耗时: %v\n", time.Since(t0))
+	fmt.Printf("[env_var_windows] SetEnvVar RunPowershell 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return err
 	}
@@ -131,10 +134,10 @@ func RemoveEnvVar(name string, scope EnvScope) error {
 [Environment]::SetEnvironmentVariable($env:CHAOS_ENV_NAME, $null, $env:CHAOS_ENV_SCOPE)
 `
 	t0 := time.Now()
-	res, err := RunPwsh(context.Background(), script, ShellOpt{
+	res, err := RunPowershell(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_ENV_NAME=" + name, "CHAOS_ENV_SCOPE=" + string(scope)},
 	})
-	fmt.Printf("[env_var_windows] RemoveEnvVar RunPwsh 耗时: %v\n", time.Since(t0))
+	fmt.Printf("[env_var_windows] RemoveEnvVar RunPowershell 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return err
 	}
@@ -158,10 +161,10 @@ $list = $d.Keys | Sort-Object | ForEach-Object {
 [PSCustomObject]@{ Vars = $list } | ConvertTo-Json -Compress
 `
 	t0 := time.Now()
-	res, err := RunPwsh(context.Background(), script, ShellOpt{
+	res, err := RunPowershell(context.Background(), script, ShellOpt{
 		Env: []string{"CHAOS_ENV_SCOPE=" + string(scope)},
 	})
-	fmt.Printf("[env_var_windows] ListEnvVars RunPwsh 耗时: %v\n", time.Since(t0))
+	fmt.Printf("[env_var_windows] ListEnvVars RunPowershell 耗时: %v\n", time.Since(t0))
 	if err != nil {
 		return nil, err
 	}
@@ -179,4 +182,72 @@ $list = $d.Keys | Sort-Object | ForEach-Object {
 		out.Vars[i].Exists = true
 	}
 	return out.Vars, nil
+}
+
+// ── 系统级 Windows 原语（供 envvar 领域层调用）────────────────────
+
+const (
+	hwndBroadcast   = uintptr(0xFFFF)
+	wmSettingChange = uintptr(0x001A)
+	smtoAbortIfHung = 0x0002
+	smtoNormal      = 0x0000
+	tokenElevation  = 20
+)
+
+var (
+	procSendMessageTimeoutW = windows.NewLazySystemDLL("user32.dll").NewProc("SendMessageTimeoutW")
+	procGetComputerNameW    = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetComputerNameW")
+	procGetUserNameW        = windows.NewLazySystemDLL("advapi32.dll").NewProc("GetUserNameW")
+	procOpenProcessToken    = windows.NewLazySystemDLL("advapi32.dll").NewProc("OpenProcessToken")
+	procGetTokenInformation = windows.NewLazySystemDLL("advapi32.dll").NewProc("GetTokenInformation")
+	procGetCurrentProcess   = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetCurrentProcess")
+	procCloseHandle         = windows.NewLazySystemDLL("kernel32.dll").NewProc("CloseHandle")
+)
+
+// IsElevated 判断当前进程是否以管理员（提权）身份运行。
+func IsElevated() bool {
+	var token windows.Token
+	procHandle, _, _ := procGetCurrentProcess.Call()
+	r1, _, _ := procOpenProcessToken.Call(procHandle, uintptr(0x0008), uintptr(unsafe.Pointer(&token)))
+	if r1 == 0 {
+		return false
+	}
+	defer procCloseHandle.Call(uintptr(token))
+	var elevation struct{ TokenIsElevated int32 }
+	var returned uint32
+	r1, _, _ = procGetTokenInformation.Call(uintptr(token), uintptr(tokenElevation), uintptr(unsafe.Pointer(&elevation)), unsafe.Sizeof(elevation), uintptr(unsafe.Pointer(&returned)))
+	return r1 != 0 && elevation.TokenIsElevated != 0
+}
+
+// GetHostname 返回计算机名。
+func GetHostname() string {
+	buf := make([]uint16, 256)
+	size := uint32(len(buf))
+	r1, _, _ := procGetComputerNameW.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+	if r1 == 0 {
+		return ""
+	}
+	return windows.UTF16ToString(buf)
+}
+
+// GetUsername 返回当前用户名。
+func GetUsername() string {
+	buf := make([]uint16, 256)
+	size := uint32(len(buf))
+	r1, _, _ := procGetUserNameW.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)))
+	if r1 == 0 {
+		return ""
+	}
+	return windows.UTF16ToString(buf)
+}
+
+// BroadcastEnvironmentChange 广播 WM_SETTINGCHANGE（Environment），通知其它进程环境变量已变更。
+func BroadcastEnvironmentChange() error {
+	settingChangeStr, _ := windows.UTF16PtrFromString("Environment")
+	var result uintptr
+	r1, _, _ := procSendMessageTimeoutW.Call(hwndBroadcast, wmSettingChange, 0, uintptr(unsafe.Pointer(settingChangeStr)), uintptr(smtoAbortIfHung|smtoNormal), 5000, uintptr(unsafe.Pointer(&result)))
+	if r1 == 0 {
+		return fmt.Errorf("SendMessageTimeoutW 失败")
+	}
+	return nil
 }

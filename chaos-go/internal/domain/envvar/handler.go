@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"chaos-go/internal/framework/envelope"
 	renv "chaos-go/internal/framework/resp"
@@ -24,7 +25,12 @@ func init() {
 func RegisterV1(rg *gin.RouterGroup) {
 	g := rg.Group("/env-variables")
 	g.POST("/get", func(c *gin.Context) {
-		resp, err := Load()
+		var req EnvGetRequest
+		if err := envelope.Bind(c, &req); err != nil {
+			renv.Error(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		resp, err := Load(req.Scope)
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, err.Error())
 			return
@@ -32,6 +38,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		renv.Success(c, resp)
 	})
 	g.POST("/patch", func(c *gin.Context) {
+		t0 := time.Now()
 		var req EnvPatchRequest
 		if err := envelope.Bind(c, &req); err != nil {
 			renv.Error(c, http.StatusBadRequest, err.Error())
@@ -42,6 +49,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 			return
 		}
 		warnings, err := ApplyPatch(&req)
+		slog.Info("[envvar] PATCH /env-variables/patch 端到端耗时", "ms", time.Since(t0).Milliseconds(), "hasErr", err != nil)
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, err.Error())
 			return

@@ -82,3 +82,17 @@ func ListEnvVars(scope EnvScope) ([]EnvVar, error) {
 	sort.Slice(vars, func(i, j int) bool { return vars[i].Name < vars[j].Name })
 	return vars, nil
 }
+
+// ── 系统级 Windows 原语的跨平台占位（非 Windows 不提供真实实现）──
+
+// IsElevated 非 Windows 平台恒为 false。
+func IsElevated() bool { return false }
+
+// GetHostname 非 Windows 平台返回空字符串。
+func GetHostname() string { return "" }
+
+// GetUsername 非 Windows 平台返回空字符串。
+func GetUsername() string { return "" }
+
+// BroadcastEnvironmentChange 非 Windows 平台为空操作。
+func BroadcastEnvironmentChange() error { return nil }

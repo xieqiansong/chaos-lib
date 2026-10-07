@@ -12,9 +12,9 @@ export interface EnvResponse {
     Warnings: string[]
 }
 
-/** 读取全部环境变量（用户 + 系统），以及快照元信息 */
-export function getEnvVariables(): Promise<EnvResponse> {
-    return action<EnvResponse>('env-variables', 'get')
+/** 读取环境变量；scope 省略时返回用户 + 系统两段，传 'system' | 'user' 时仅返回对应段（scope 写入请求体，与后端一致） */
+export function getEnvVariables(scope?: 'system' | 'user'): Promise<EnvResponse> {
+    return action<EnvResponse>('env-variables', 'get', scope ? { scope } : {})
 }
 
 /** 将当前系统环境变量同步到快照 */
