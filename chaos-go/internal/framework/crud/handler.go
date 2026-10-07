@@ -44,8 +44,6 @@ func (h *handler[T]) runHook(hook func(row *T) error, row *T) error {
 	return hook(row)
 }
 
-// ---- 「POST + Action」风格（v1） ----
-
 // listMeta 信封 meta 中的列表查询参数（对应规范 list 动作）。
 type listMeta struct {
 	Page     int            `json:"page"`
@@ -114,7 +112,6 @@ func (h *handler[T]) listAction(c *gin.Context) {
 		}
 		base = base.Where(strings.Join(ors, " OR "), args...)
 	}
-	// 字段级模糊搜索：仅对 Searchable 列生效，与存量 GET 的「按字段 LIKE」语义一致。
 	for _, f := range h.opts.Searchable {
 		v, ok := meta.Like[f]
 		if !ok {
@@ -265,7 +262,6 @@ func (h *handler[T]) deleteAction(c *gin.Context) {
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
-	// Delete 在 soft_delete 插件下即软删：插件把语句改写为 UPDATE ... SET is_deleted = 1
 	if err := tx.Delete(&ptr).Error; err != nil {
 		tx.Rollback()
 		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())

@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// 与 Python 版 Logger 一致的终端配色。
 const (
 	colorGrey       = "\033[90;20m"
 	colorYellowBold = "\033[33;1m"
@@ -19,7 +18,6 @@ const (
 	colorReset      = "\033[0m"
 )
 
-// levelRep 把 slog 级别映射成 Python 版日志前缀里的单字母。
 func levelRep(l slog.Level) string {
 	switch {
 	case l < slog.LevelInfo:
@@ -33,9 +31,7 @@ func levelRep(l slog.Level) string {
 	}
 }
 
-// natterHandler 是自定义 slog.Handler，输出格式沿用 Python 版：
-//
-//	2026-10-03 12:34:56 [I] message key=value
+// natterHandler 自定义 slog.Handler，格式沿用 Python 版。
 type natterHandler struct {
 	mu    *sync.Mutex
 	w     io.Writer
@@ -43,10 +39,8 @@ type natterHandler struct {
 	color bool
 }
 
-// Enabled 按级别过滤。
 func (h *natterHandler) Enabled(_ context.Context, lvl slog.Level) bool { return lvl >= h.level }
 
-// Handle 输出一行日志，必要时整行着色。
 func (h *natterHandler) Handle(_ context.Context, r slog.Record) error {
 	prefix, suffix := "", ""
 	if h.color {
@@ -79,7 +73,6 @@ func (h *natterHandler) Handle(_ context.Context, r slog.Record) error {
 	return err
 }
 
-// WithAttrs / WithGroup 不需要分组能力，直接返回自身。
 func (h *natterHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
 func (h *natterHandler) WithGroup(string) slog.Handler      { return h }
 

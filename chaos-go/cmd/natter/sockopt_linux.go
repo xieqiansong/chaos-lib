@@ -4,10 +4,7 @@ package main
 
 import "golang.org/x/sys/unix"
 
-// setReuse 设置 SO_REUSEADDR + SO_REUSEPORT。
-//
-// Natter 需要让多个 socket 同时绑定同一个本地端口（保活 socket 与 STUN socket 并存），
-// 因此 Linux 下必须开 SO_REUSEPORT。
+// setReuse 设置 SO_REUSEADDR + SO_REUSEPORT（Linux 需要后者让保活与 STUN socket 共享同一本地端口）。
 func setReuse(fd uintptr) error {
 	if err := unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
 		return err

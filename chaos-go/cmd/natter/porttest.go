@@ -40,7 +40,6 @@ func (p *PortTest) TestLAN(ctx context.Context, a addr, sourceIP, iface string, 
 		return portOpen
 	}
 	if isTimeoutErr(err) {
-		// 超时无法判定：可能是防火墙丢包
 		printStatus(fmt.Sprintf("LAN > %-21s [ UNKNOWN ]", a.String()))
 		slog.Debug("cannot test port from LAN", "addr", a.String(), "err", err)
 		return portUnknown
@@ -132,8 +131,7 @@ func (p *PortTest) testTransmission(ctx context.Context, port int, sourceIP, ifa
 	return portUnknown
 }
 
-// rawHTTP 用裸 TCP 完成一次 HTTP 请求并读完整响应。
-// 因为要精确控制源地址 / 网卡绑定，所以不走 net/http。
+// rawHTTP 用裸 TCP 完成一次 HTTP 请求（精确控制源地址/网卡绑定，不走 net/http）。
 func rawHTTP(ctx context.Context, o sockOpts, target addr, req []byte) ([]byte, error) {
 	conn, err := newDialer(o).DialContext(ctx, "tcp4", target.String())
 	if err != nil {

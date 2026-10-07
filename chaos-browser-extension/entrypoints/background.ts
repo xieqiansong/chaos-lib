@@ -1,4 +1,3 @@
-// entrypoints/background.ts
 // @ts-ignore
 import browser from "webextension-polyfill";
 import {saveBrowserHistory} from "./background/browser-history-backup";
@@ -6,10 +5,7 @@ import {saveBookmarks} from "./background/bookmark-backup";
 import {action} from "@/utils/request";
 
 export default defineBackground(() => {
-    // 网页 / 内部页经 runtime.sendMessage 发来的后端代理请求。
-    // 统一收敛为「POST + Action」模式（详见《接口规范.md》），不再透传任意 HTTP 方法：
-    //   - 新契约：{ module, action, data?, meta? } → action(module, action, data, meta)
-    //   - 旧契约兼容：{ path, payload? }（path 形如 'proxy/bookmarks/save'）→ 拆为 module/action
+    // runtime.sendMessage 收敛为 action 模式：新契约 {module, action, data?, meta?}，旧契约 {path, payload?} 兼容。
     browser.runtime.onMessage.addListener(async (msg: any) => {
         if (!msg) return;
         if (msg.module && msg.action) {
@@ -25,8 +21,7 @@ export default defineBackground(() => {
         throw new Error("未知消息格式：缺少 module/action 或 path");
     });
 
-    // 网页（chaos-ui）经 externally_connectable 发来的即时指令：直接执行并回包。
-    // 该消息会自动唤醒 MV3 service worker，无需心跳/SSE 保活。
+    // 网页经 externally_connectable 发来的即时指令；自动唤醒 service worker，无需保活。
     browser.runtime.onMessageExternal.addListener(
         (msg: any, _sender: any, sendResponse: (r: any) => void) => {
             handleCommand(msg)
@@ -34,13 +29,12 @@ export default defineBackground(() => {
                 .catch((err) =>
                     sendResponse({id: msg?.id, type: msg?.type, ok: false, error: String(err?.message || err)}),
                 );
-            return true; // 保持消息通道开放，等待异步 sendResponse
+            return true; // 保持通道开放，等待异步 sendResponse
         },
     );
 
     browser.alarms.onAlarm.addListener((alarm: { name: string; }) => {
         if (alarm.name === 'saveBrowserHistory') {
-            // 返回 Promise，告知 MV3 在异步上传完成前保持 service worker 存活。
             return saveBrowserHistory().catch((err) => {
                 console.error("saveBrowserHistory (alarm) failed:", err);
             });
@@ -52,17 +46,16 @@ export default defineBackground(() => {
         }
     });
 
-    // 启动即触发一次（兜底，真正的周期任务由下方 alarm 保证）。
+    // 启动即触发一次（兜底，周期由下方 alarm 保证）
     saveBrowserHistory().catch((err) => {
         console.error("saveBrowserHistory (startup) failed:", err);
     });
-    // 使用 chrome.alarms（✅ 推荐）
     browser.alarms.create('saveBrowserHistory', {
         delayInMinutes: 0,
         periodInMinutes: 1,
     });
 
-    // 书签变更频率远低于历史，5 分钟备份一次即可。
+    // 书签变更频率低，5 分钟一次
     saveBookmarks().catch((err) => {
         console.error("saveBookmarks (startup) failed:", err);
     });
@@ -72,14 +65,13 @@ export default defineBackground(() => {
     });
 });
 
-// 执行指令并返回结果，由调用方（网页经 externally_connectable 直连）负责 sendResponse。
+// 执行指令并返回结果；调用方（网页经 externally_connectable）负责 sendResponse。
 async function handleCommand(cmd: any): Promise<any> {
     console.log("[reverse] 收到指令", cmd?.type, "nodeId=", cmd?.nodeId, "id=", cmd?.id)
     let result: any = {id: cmd.id, type: cmd.type, ok: true};
     try {
         switch (cmd.type) {
             case "hello":
-                // 通道就绪心跳，无需回传
                 return;
             case "openTab":
                 if (cmd.url) {
@@ -90,7 +82,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 result = {...result, type: "pong", echo: cmd};
                 break;
 
-            // ── 书签操作（仅操作浏览器书签，不落库）─────────────────────
             case "bookmarks:getTree": {
                 const tree = await browser.bookmarks.getTree();
                 result = {...result, type: "bookmarks:getTree", echo: tree};
@@ -102,7 +93,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 break;
             }
             case "bookmarks:create": {
-                // url 缺省则创建文件夹
                 const node = await browser.bookmarks.create({
                     parentId: cmd.parentId,
                     title: cmd.title,
@@ -120,7 +110,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 break;
             }
             case "bookmarks:remove": {
-                // nodeId 必须是字符串；undefined / 数字都直接报错，避免浏览器底层签名错误掩盖真相。
                 const targetId = cmd.nodeId
                 if (targetId === undefined || targetId === null || targetId === "") {
                     throw new Error("缺少 nodeId，无法删除（前端未传入书签节点 id）")
@@ -129,7 +118,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 if (cmd.isFolder) {
                     await browser.bookmarks.removeTree(idStr)
                 } else {
-                    // 先用 remove（普通书签）；若误判为书签而实际是文件夹，兜底 removeTree。
                     try {
                         await browser.bookmarks.remove(idStr)
                     } catch (e) {
@@ -140,7 +128,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 break;
             }
             case "bookmarks:move": {
-                // 拖拽移动：修改节点的父级（parentId），可选 index 指定同级顺序
                 const targetId = cmd.nodeId
                 if (targetId === undefined || targetId === null || targetId === "") {
                     throw new Error("缺少 nodeId，无法移动")
@@ -160,7 +147,6 @@ async function handleCommand(cmd: any): Promise<any> {
                 result = {id: cmd.id, type: cmd.type, ok: false, error: "未知指令: " + cmd.type};
         }
     } catch (err: any) {
-        // 任何执行异常都回传，避免后端傻等超时；同时把真实错误带回 UI
         result = {id: cmd.id, type: cmd.type, ok: false, error: String(err?.message || err)};
     }
     return result;

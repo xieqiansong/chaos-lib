@@ -5,8 +5,6 @@
 //   - 任务统计：/api/v1/task-plans/tasks/{contributionStats|dailyStats|activeStats}
 import {action} from '@/utils/request'
 
-// ---- DeepSeek 余额（服务端代理，透传 DeepSeek 原始响应，已包入统一信封）----
-
 export interface DeepSeekBalanceResponse {
     balance_infos?: { total_balance?: number | string }[]
     [key: string]: any
@@ -19,8 +17,6 @@ export interface DeepSeekBalanceResponse {
 export async function getDeepSeekBalance(): Promise<DeepSeekBalanceResponse> {
     return action<DeepSeekBalanceResponse>('proxy', 'balance/deepseek')
 }
-
-// ---- 任务贡献统计（GitHub 风格热力图）----
 
 export interface ContributionItem {
     id: number
@@ -40,9 +36,7 @@ export function getContributionStats(): Promise<ContributionStats> {
     return action<ContributionStats>('task-plans', 'tasks/contributionStats')
 }
 
-// ---- 每日完成任务数（折线图） / 每日待办任务数（直方图）----
 // 两个接口均返回同一形状的点数组：{ date, count }
-
 export interface TaskStatPoint {
     date: string
     count: number

@@ -1,3 +1,2 @@
-// 立即跳转到后端 Web 界面（本地服务）。
-// 单独抽出为外部脚本，避免内联脚本触发扩展默认 CSP（script-src 'self'）报错。
+// 外部脚本避免扩展 CSP 的 script-src 'self' 阻断内联脚本。
 window.location.href = 'http://localhost:30030/';

@@ -155,10 +155,6 @@ func toolAvailable(name string, verArgs []string, re *regexp.Regexp, min version
 	return v.atLeast(min)
 }
 
-//
-// iptables
-//
-
 // ForwardIptables 通过 iptables 的 DNAT（可选 SNAT）实现转发。
 type ForwardIptables struct {
 	snat    bool
@@ -174,7 +170,6 @@ func NewForwardIptables(snat, sudo bool) (*ForwardIptables, error) {
 	if !f.check() {
 		return nil, fmt.Errorf("iptables >= %s not available", iptablesMinVer)
 	}
-	// 自 iptables 1.4.20 起支持 -w 等待锁
 	if f.currVer.atLeast(iptablesWaitVer) {
 		f.cmd = append(f.cmd, "-w")
 	}
@@ -209,7 +204,6 @@ func (f *ForwardIptables) check() bool {
 	if !v.atLeast(iptablesMinVer) {
 		return false
 	}
-	// 检查 nat 表可用
 	if _, err := runCmd(concat(f.cmd, []string{"-t", "nat", "--list-rules"})); err != nil {
 		return false
 	}
@@ -303,10 +297,6 @@ func (f *ForwardIptables) StopForward() {
 	f.cleanRules()
 }
 
-//
-// nftables
-//
-
 // ForwardNftables 通过 nftables 的 dnat（可选 snat）实现转发。
 type ForwardNftables struct {
 	snat       bool
@@ -352,9 +342,7 @@ func (f *ForwardNftables) check() bool {
 	return v.atLeast(nftMinVer)
 }
 
-// initialRules 是 Natter 表与链的初始规则集。
-//
-// 优先级取值：dstnat(-100) - 5 = -105，srcnat(100) - 5 = 95。
+// initialRules Natter 表与链的初始规则集。
 const initialRules = `
 table ip natter {
     chain natter_dnat { }
@@ -465,10 +453,6 @@ func (f *ForwardNftables) clean() {
 // StopForward 删除已插入的规则。
 func (f *ForwardNftables) StopForward() { f.clean() }
 
-//
-// gost
-//
-
 // ForwardGost 通过外部 gost 进程转发。
 type ForwardGost struct {
 	proc *extProc
@@ -507,10 +491,6 @@ func (f *ForwardGost) StopForward() {
 	f.proc.stop()
 	f.proc = nil
 }
-
-//
-// socat
-//
 
 // ForwardSocat 通过外部 socat 进程转发。
 type ForwardSocat struct {

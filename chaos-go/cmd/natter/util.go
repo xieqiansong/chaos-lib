@@ -66,11 +66,7 @@ func (o sockOpts) localAddr() net.Addr {
 	return &net.TCPAddr{IP: ip, Port: o.bindPort}
 }
 
-// controlFn 生成 socket 选项回调。
-//
-// 注意：Go 的 Dialer.Control / ListenConfig.Control 都在 bind() 之前被调用
-// （见 net/sock_posix.go 的 dial / listenStream / listenDatagram），
-// 因此 SO_REUSEPORT 与 SO_BINDTODEVICE 能如期生效。
+// controlFn 生成 socket 选项回调；在 bind() 前调用，SO_REUSEPORT / SO_BINDTODEVICE 能如期生效。
 func controlFn(o sockOpts) func(network, address string, c syscall.RawConn) error {
 	if !o.reuse && o.iface == "" {
 		return nil

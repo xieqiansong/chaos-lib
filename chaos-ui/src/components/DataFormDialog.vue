@@ -37,8 +37,7 @@ function fieldVisible(f: FormField): boolean {
   return true
 }
 
-// ---- type='binary'：查看时按可读文本/中性标签展示，图片给预览，并可下载；编辑时直接编辑 base64 ----
-
+// binary 类型：查看时展示可读文本/预览+下载；编辑时直接编辑 base64
 function binaryMime(f: FormField): string {
   return mimeOf(props.form[f.binaryDataTypeField ?? 'DataType'])
 }

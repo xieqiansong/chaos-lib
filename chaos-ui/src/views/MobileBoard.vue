@@ -20,7 +20,6 @@ function goBack() {
   router.push('/dashboard')
 }
 
-// ---- 全屏切换 ----
 const isFullscreen = ref(false)
 
 function getFullscreenElement(): Element | null {
@@ -71,7 +70,6 @@ async function onScreenClick() {
   }
 }
 
-// ---- 屏幕分辨率（物理像素 + 设备像素比）----
 const screenRes = ref<string>('')
 
 function updateScreenRes() {
@@ -81,8 +79,7 @@ function updateScreenRes() {
   screenRes.value = `${sw}×${sh} @ ${dpr.toFixed(2)}x`
 }
 
-// ---- 标准时间校准（每小时一次）----
-// 以本机后端响应的 Date 头作为标准时钟，算出偏移后本地继续走秒，避免抖动/闪烁
+// 标准时间校准：以后端 Date 头算偏移，本地走秒避免抖动
 async function syncTime() {
   try {
     // 经由统一 axios 实例（带拦截器）请求 v1 接口，仅取响应 Date 头作为标准时钟。
@@ -102,8 +99,7 @@ async function syncTime() {
   }
 }
 
-// ---- 天气 ----
-// 默认位置（成都市中心），如支持地理定位则优先使用
+// 默认位置成都市中心，如支持地理定位则优先使用
 const LOC_KEY = 'chaos_board_location'
 interface SavedPos { lat: number; lon: number; name: string }
 interface GeoPos { lat: number; lon: number; name?: string }

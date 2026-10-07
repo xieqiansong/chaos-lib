@@ -1,23 +1,7 @@
-// Natter 的 Go 实现：在全锥 NAT 后打洞，把本地端口暴露到公网。
-//
-// 对应 Python 版 chaos-python/util/natter.py（Natter v2.2.1, MikeWang000000）。
-// 思路与 Python 版一致：
-//  1. 用 STUN 从「指定的本地 IP:端口」拿到 NAT 映射后的公网地址；
-//  2. 用同一个本地端口建立保活连接，维持映射；
-//  3. 把本地端口的入站流量转发到目标地址（iptables / nftables / socket / socat / gost 等）；
-//  4. 可选启用 UPnP，在路由器上再加一条端口映射。
-//
-// 用法（在 chaos-go 模块根目录）：
-//
-//	go run ./cmd/natter                           # 测试模式，直接起一个应答服务
-//	go run ./cmd/natter -t 192.168.1.10 -p 8080
-//	go run ./cmd/natter -m iptables -t 192.168.1.10 -p 8080
-//	go run ./cmd/natter -u -k 15 -s stun.miwifi.com -U
-//
-// 与 Python 版的差异：
-//   - 日志走自定义 slog.Handler，格式仍是 `[D/I/W/E]` + 时间戳；
-//   - Python 的 natterutils.reuse_port（C 扩展）由 socket 的 SO_REUSEPORT 直接替代；
-//   - `--check` 需要同目录下的 natter-check.py，由 python 解释器执行。
+// Natter Go 实现：在全锥 NAT 后打洞，把本地端口暴露到公网。
+// 对应 Python 版 chaos-python/util/natter.py（v2.2.1），流程一致：
+// STUN 拿公网地址 → 保活连接维持映射 → 转发入站流量 → 可选 UPnP。
+// 用法：go run ./cmd/natter -t 192.168.1.10 -p 8080
 package main
 
 import (
@@ -36,26 +20,24 @@ import (
 	"time"
 )
 
-// natterVersion 与 Python 版保持一致。
 const natterVersion = "2.2.1"
 
-// 退出与重试的信号错误，对应 Python 的 NatterExitException / NatterRetryException。
 var (
 	errNatterExit  = errors.New("natter exit")
 	errNatterRetry = errors.New("natter retry")
 )
 
-// exitManager 收集退出时需要执行的清理动作，对应 Python 的 NatterExit。
+// exitManager 收集退出清理动作。
 type exitManager struct {
 	fns []func()
 }
 
 var atExit = &exitManager{}
 
-// Set 注册退出时的清理动作。
+// Set 注册退出清理动作。
 func (e *exitManager) Set(fn func()) { e.fns = append(e.fns, fn) }
 
-// Run 逆序执行并清空所有清理动作，可重复调用。
+// Run 逆序执行并清空。
 func (e *exitManager) Run() {
 	for i := len(e.fns) - 1; i >= 0; i-- {
 		e.fns[i]()
@@ -63,7 +45,7 @@ func (e *exitManager) Run() {
 	e.fns = nil
 }
 
-// stringList 支持 `-s` 这类可重复出现的参数。
+// stringList 支持可重复 flag 参数。
 type stringList []string
 
 func (s *stringList) String() string { return strings.Join(*s, " ") }
@@ -72,7 +54,6 @@ func (s *stringList) Set(v string) error {
 	return nil
 }
 
-// options 汇总命令行参数。
 type options struct {
 	verbose         bool
 	exitWhenChanged bool
@@ -90,7 +71,7 @@ type options struct {
 	toPort          int
 }
 
-// defaultStunServers 是 TCP 模式下的默认 STUN 服务器列表。
+// defaultStunServers TCP 模式默认 STUN 服务器。
 var defaultStunServers = []string{
 	"fwa.lifesizecloud.com",
 	"global.turn.twilio.com",
@@ -104,7 +85,7 @@ var defaultStunServers = []string{
 	"stun.telnyx.com",
 }
 
-// defaultUDPStunServers 是 UDP 模式下额外前置的 STUN 服务器列表。
+// defaultUDPStunServers UDP 模式额外前置的 STUN 服务器。
 var defaultUDPStunServers = []string{
 	"stun.miwifi.com",
 	"stun.chat.bilibili.com",
@@ -113,7 +94,6 @@ var defaultUDPStunServers = []string{
 	"stun.douyucdn.cn:18000",
 }
 
-// printUsage 输出帮助信息。
 func printUsage() {
 	fmt.Fprint(os.Stderr, `Natter (Go) - Expose your port behind full-cone NAT to the Internet.
 
@@ -148,7 +128,6 @@ func printUsage() {
 `)
 }
 
-// runNatterCheck 执行同目录下的 natter-check.py。
 func runNatterCheck() error {
 	const script = "natter-check.py"
 	if _, err := os.Stat(script); err != nil {
@@ -168,7 +147,6 @@ func runNatterCheck() error {
 	return cmd.Run()
 }
 
-// parseFlags 解析命令行参数。
 func parseFlags() (*options, error) {
 	opt := &options{}
 	fs := flag.NewFlagSet("natter", flag.ContinueOnError)
@@ -214,8 +192,7 @@ func parseFlags() (*options, error) {
 	return opt, nil
 }
 
-// runOnce 完整跑一遍 Natter：打洞、保活、转发、主循环。
-// 返回 errNatterRetry 表示需要重来一次，errNatterExit 表示正常退出。
+// runOnce 跑一遍 Natter 全流程；返回 errNatterRetry 重试、errNatterExit 正常退出。
 func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	defer atExit.Run()
 
@@ -246,7 +223,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	}
 	toPort := opt.toPort
 
-	// STUN 服务器列表
 	stunList := []string(opt.stunList)
 	if len(stunList) == 0 {
 		stunList = append([]string{}, defaultStunServers...)
@@ -262,7 +238,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		srvList = append(srvList, addr{host, port})
 	}
 
-	// 保活服务器
 	keepaliveSrv := opt.keepaliveSrv
 	if keepaliveSrv == "" {
 		if udp {
@@ -277,7 +252,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	}
 	keepaliveHost, keepalivePort := splitHostPort(keepaliveSrv, defKeepalivePort)
 
-	// 转发方法默认值
 	method := opt.method
 	if method == "" {
 		switch {
@@ -295,7 +269,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	}
 	portTest := &PortTest{}
 
-	// 1. 打洞：从 bindIP:bindPort 拿到映射后的公网地址
 	stun, err := NewStunClient(srvList, bindIP, bindPort, bindIface, udp)
 	if err != nil {
 		return err
@@ -304,17 +277,14 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	if err != nil {
 		return err
 	}
-	// 保活 socket 需要绑定实际的 IP 与端口，而不是通配和 0
 	bindIP, bindPort = natterAddr.Host, natterAddr.Port
 
-	// 2. 保活
 	keepAlive := NewKeepAlive(keepaliveHost, keepalivePort, bindIP, bindPort, bindIface, udp)
 	defer keepAlive.Disconnect()
 	if err := keepAlive.KeepAlive(ctx); err != nil {
 		return err
 	}
 
-	// 3. 保活连接建立后再取一次映射，验证网络是否稳定
 	outerPrev := outerAddr
 	natterAddr, outerAddr, err = stun.GetMapping(ctx)
 	if err != nil {
@@ -324,7 +294,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		slog.Warn("Network is unstable, or not full cone")
 	}
 
-	// 4. 修正转发目标：本机地址用实际内网 IP，端口缺省取公网端口
 	if ip, err := inetAton(toIP); err == nil {
 		if ip.IsLoopback() || ip.IsUnspecified() {
 			toIP = natterAddr.Host
@@ -333,7 +302,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	if toPort == 0 {
 		toPort = outerAddr.Port
 	}
-	// none / test 不是真实转发，目标地址直接取 Natter 自身地址
 	if isNoopForwarder(forwarder) {
 		toIP, toPort = natterAddr.Host, natterAddr.Port
 	}
@@ -344,7 +312,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	}
 	atExit.Set(forwarder.StopForward)
 
-	// 5. UPnP
 	var upnp *UPnPClient
 	upnpReady := false
 	if opt.upnpEnabled {
@@ -366,7 +333,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		}
 	}
 
-	// 6. 路由信息
 	slog.Info("")
 	routeStr := ""
 	if !isNoopForwarder(forwarder) {
@@ -376,7 +342,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	slog.Info(routeStr)
 	slog.Info("")
 
-	// 7. 测试模式提示
 	if method == "test" {
 		scheme := "http"
 		if udp {
@@ -387,7 +352,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		slog.Info("")
 	}
 
-	// 8. 通知脚本
 	if opt.notifySh != "" {
 		protocol := "tcp"
 		if udp {
@@ -407,7 +371,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		}
 	}
 
-	// 9. 端口检测（仅 TCP）
 	if !udp {
 		ret1 := portTest.TestLAN(ctx, toAddr, "", "", true)
 		_ = portTest.TestLAN(ctx, natterAddr, "", "", true)
@@ -433,7 +396,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 		}
 	}
 
-	// 10. 主循环
 	needRecheck := false
 	cnt := 0
 	for {
@@ -491,7 +453,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	}
 }
 
-// validateOptions 校验命令行参数。
 func validateOptions(opt *options) error {
 	if err := validatePositive(opt.interval); err != nil {
 		return err
@@ -537,7 +498,6 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	// 收到退出信号时执行清理（停止转发、关闭保活连接）
 	go func() {
 		<-ctx.Done()
 		atExit.Run()

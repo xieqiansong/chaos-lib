@@ -40,8 +40,6 @@ func ScanVault(full bool) (*ScanResult, error) {
 	return scanVault(full)
 }
 
-// ---------- 写方向用例（P1）----------
-
 // SaveResult 保存成功后的回执。
 type SaveResult struct {
 	ContentHash string    `json:"contentHash"`
@@ -229,8 +227,6 @@ func validateName(name string) error {
 	}
 	return nil
 }
-
-// ---------- 目录树构建（P0 既有）----------
 
 // buildTree 把扁平的笔记列表聚合成嵌套目录树。
 func buildTree(notes []Note) []*TreeNode {

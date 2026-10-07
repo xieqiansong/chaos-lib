@@ -1,8 +1,5 @@
 import {action} from '@/utils/request'
 
-
-// ---- SDK 版本切换 ----
-
 export interface SdkInfo {
     CurrentVersion: string
     VersionList: string[]
@@ -15,8 +12,6 @@ export function getSdkVersions(): Promise<Record<string, SdkInfo>> {
 export function updateSdkVersion(type: string, version: string): Promise<any> {
     return action('sdks', 'switch', {type, version})
 }
-
-// ---- SDK 类型 / 来源管理 (defs) ----
 
 export interface SdkSourceItem {
     kind: 'repo' | 'single'
@@ -62,13 +57,9 @@ export function deleteSdkDef(name: string): Promise<any> {
     return action('sdks', 'deleteSource', {name})
 }
 
-// ---- 待办任务 ----
-
 export function batchPostponeTasks(ids: number[], days: number): Promise<any> {
     return action('task-plans', 'tasks/batchPostpone', {ids, days})
 }
-
-// ---- 浏览器历史（由扩展周期性备份到 DB）----
 
 export interface BrowserHistoryItem {
     ID: string
@@ -91,8 +82,6 @@ export function getBrowserHistories(page_size?: number): Promise<BrowserHistoryI
 export function searchBrowserHistories(q: string): Promise<BrowserHistoryItem[]> {
     return action<any>('proxy', 'browserHistories/list', {}, {page: 1, page_size: 200, search: q}).then((res: any) => res?.list ?? [])
 }
-
-// ---- 常用书签（独立接口：书签 ∪ 历史访问次数，按访问频率降序，分页）----
 
 export interface FrequentBookmarkItem {
     id: string
@@ -124,8 +113,6 @@ export function getFrequentBookmarks(page = 1, page_size = 20, search?: any): Pr
     return action<any>('proxy', 'bookmarks/frequent', {}, meta)
 }
 
-// ---- 主机名（用作浏览器标签标题） ----
-
 export interface HostnameInfo {
     hostname: string
     username: string
@@ -134,8 +121,6 @@ export interface HostnameInfo {
 export function getHostname(): Promise<HostnameInfo> {
     return action<HostnameInfo>('proxy', 'hostname')
 }
-
-// ---- 浏览器扩展直连通道（externally_connectable）----
 
 /** 扩展连接状态：mode 固定为 external（网页直连），connected 反映直连是否可用 */
 export interface ExtStatus {

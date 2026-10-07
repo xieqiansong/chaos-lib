@@ -1,6 +1,4 @@
-// 浏览器书签树扁平化备份：把树形结构展平为节点列表上报后端 /bookmarks，
-// 供「常用书签」接口按 url 关联浏览器历史的访问次数。
-// 与 history 备份一致：必须为 async 且全程 await，避免 MV3 service worker 提前被杀。
+// 浏览器书签扁平化备份；async + await 避免 MV3 service worker 提前被杀。
 import {action} from "@/utils/request";
 
 interface BookmarkNode {
@@ -13,7 +11,6 @@ interface BookmarkNode {
     children?: BookmarkNode[];
 }
 
-// 深度优先展平：每个节点一行（叶子带 url，文件夹 url 为空）。
 function flatten(nodes: BookmarkNode[], parentId: string | null, out: any[]): any[] {
     for (const n of nodes || []) {
         out.push({
@@ -40,7 +37,6 @@ const saveBookmarks = async () => {
 
         const batchSize = 256;
         for (let i = 0; i < flat.length; i += batchSize) {
-            // 统一「POST + Action」信封：module=proxy, action=bookmarks/save，负载放 data。
             await action("proxy", "bookmarks/save", flat.slice(i, i + batchSize));
         }
     } catch (err) {

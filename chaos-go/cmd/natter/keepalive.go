@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// keepAliveTimeout 是保活 socket 的连接与读写超时。
 const keepAliveTimeout = 3 * time.Second
 
 // KeepAlive 维持 NAT 映射：周期性向保活服务器发包并读取响应。
@@ -47,7 +46,6 @@ func (k *KeepAlive) Disconnect() {
 	}
 }
 
-// connect 从指定源地址建立保活连接。
 func (k *KeepAlive) connect(ctx context.Context) error {
 	o := sockOpts{
 		reuse:    true,
@@ -92,7 +90,6 @@ func (k *KeepAlive) KeepAlive(ctx context.Context) error {
 	return nil
 }
 
-// keepAliveTCP 发送一个 HTTP HEAD 请求，读到超时为止。
 func (k *KeepAlive) keepAliveTCP() error {
 	req := fmt.Sprintf(
 		"HEAD /natter-keep-alive HTTP/1.1\r\n"+

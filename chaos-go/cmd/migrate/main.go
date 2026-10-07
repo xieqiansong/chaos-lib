@@ -1,20 +1,6 @@
-// Command migrate 负责把 Postgres（源库）的数据全量迁移到 SQLite（目标库）。
-//
-// 设计要点：
-//   - 复用全仓统一的 GORM 模型清单（与 internal/app/app.go 的 AutoMigrate 完全一致），
-//     保证「建表结构」与「线上运行时」一致；
-//   - 源库读取使用 Unscoped()，连同已被软删除（IsDeleted=1）的行一并搬走，保证数据完整性；
-//   - 目标写入使用 SkipHooks 会话，避免任何钩子/插件干扰，原样落盘（含主键、软删标记、时间戳）；
-//   - 迁移前默认清空目标表（硬删除，Unscoped），重复运行可安全幂等；
-//   - 全仓模型不建真实外键约束，故无需按父子顺序写入。
-//
-// 用法示例：
-//
-//	# 用 configs/config.yaml 的 db 段拼接 Postgres DSN，目标写 chaos.db
-//	go run ./cmd/migrate
-//
-//	# 显式指定源与目标
-//	go run ./cmd/migrate --src "host=127.0.0.1 user=postgres password=secret dbname=chaos port=5432 sslmode=disable" --dst data/chaos.db
+// Command migrate 把 Postgres 全量迁移到 SQLite。
+// 要点：复用 app.go 的 AutoMigrate 模型清单；读用 Unscoped（含软删行）；写用 SkipHooks（原样落盘）；
+// 迁移前硬删目标表，幂等重复运行。用法见原注释或 --help。
 package main
 
 import (

@@ -10,32 +10,26 @@ import (
 	"time"
 )
 
-// 转发实现共用的参数。
 const (
 	fwdBufferSize    = 8192
 	fwdUDPTimeout    = 60 * time.Second
 	fwdMaxConcurrent = 128
 )
 
-// Forwarder 是端口转发实现的统一接口，对应 Python 版各 Forward* 类。
+// Forwarder 端口转发统一接口。
 type Forwarder interface {
-	// StartForward 把 ip:port 的入站流量转发到 toIP:toPort。
 	StartForward(ip string, port int, toIP string, toPort int, udp bool) error
-	// StopForward 清理转发规则或停止子进程，必须可重复调用。
 	StopForward()
 }
 
-// noopForwarder 标记「非真实转发」的实现（none / test）：
-// 这两者的目标地址直接取 Natter 自身地址，路由展示时也跳过。
+// noopForwarder 标记非真实转发（none / test）。
 type noopForwarder interface{ isNoop() }
 
-// isNoopForwarder 判断是否为非真实转发实现。
 func isNoopForwarder(f Forwarder) bool {
 	_, ok := f.(noopForwarder)
 	return ok
 }
 
-// checkForwardTarget 校验转发入口与目标不同。
 func checkForwardTarget(ip string, port int, toIP string, toPort int) error {
 	from := addr{ip, port}
 	if from.equal(addr{toIP, toPort}) {
@@ -44,7 +38,7 @@ func checkForwardTarget(ip string, port int, toIP string, toPort int) error {
 	return nil
 }
 
-// ForwardNone 什么都不做，不转发。
+// ForwardNone 空实现。
 type ForwardNone struct{}
 
 func (*ForwardNone) isNoop() {}
@@ -53,7 +47,7 @@ func (*ForwardNone) StartForward(string, int, string, int, bool) error {
 }
 func (*ForwardNone) StopForward() {}
 
-// ForwardTestServer 启动一个用于测试的应答服务，忽略转发目标。
+// ForwardTestServer 启动测试应答服务。
 type ForwardTestServer struct {
 	mu     sync.Mutex
 	closer io.Closer
@@ -61,7 +55,7 @@ type ForwardTestServer struct {
 
 func (*ForwardTestServer) isNoop() {}
 
-// StartForward 在 port 上启动测试服务（TCP 返回 HTML，UDP 回显文本）。
+// StartForward 启动测试服务（TCP HTML / UDP 回显）。
 func (f *ForwardTestServer) StartForward(ip string, port int, _ string, _ int, udp bool) error {
 	lc := newListenConfig(sockOpts{reuse: true})
 	bind := listenAddr("", port)
@@ -90,7 +84,6 @@ func (f *ForwardTestServer) StartForward(ip string, port int, _ string, _ int, u
 	return nil
 }
 
-// serveHTTP 对每个连接读一次请求然后返回固定 HTML。
 func (f *ForwardTestServer) serveHTTP(ln net.Listener) {
 	for {
 		conn, err := ln.Accept()
@@ -121,7 +114,6 @@ func (f *ForwardTestServer) serveHTTP(ln net.Listener) {
 	}
 }
 
-// serveUDP 对每个来源回一句固定文本。
 func (f *ForwardTestServer) serveUDP(pc net.PacketConn) {
 	buf := make([]byte, fwdBufferSize)
 	for {
@@ -137,7 +129,6 @@ func (f *ForwardTestServer) serveUDP(pc net.PacketConn) {
 	}
 }
 
-// StopForward 关闭测试服务。
 func (f *ForwardTestServer) StopForward() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -148,7 +139,7 @@ func (f *ForwardTestServer) StopForward() {
 	}
 }
 
-// ForwardSocket 用纯 Go 实现的 TCP / UDP 转发。
+// ForwardSocket 纯 Go TCP/UDP 转发。
 type ForwardSocket struct {
 	mu       sync.Mutex
 	closer   io.Closer
@@ -156,12 +147,10 @@ type ForwardSocket struct {
 	sem      chan struct{}
 }
 
-// NewForwardSocket 创建 socket 转发器。
 func NewForwardSocket() *ForwardSocket {
 	return &ForwardSocket{sem: make(chan struct{}, fwdMaxConcurrent)}
 }
 
-// StartForward 监听 port 并把流量转交到 toIP:toPort。
 func (f *ForwardSocket) StartForward(ip string, port int, toIP string, toPort int, udp bool) error {
 	if err := checkForwardTarget(ip, port, toIP, toPort); err != nil {
 		return err
@@ -198,7 +187,6 @@ func (f *ForwardSocket) StartForward(ip string, port int, toIP string, toPort in
 	return nil
 }
 
-// tcpListen 接受连接并拨号到目标，成功后双向转发。
 func (f *ForwardSocket) tcpListen(ln net.Listener) {
 	for {
 		inbound, err := ln.Accept()
@@ -233,7 +221,6 @@ func (f *ForwardSocket) tcpListen(ln net.Listener) {
 	}
 }
 
-// udpRecvFrom 为每个客户端维护一个到目标的外连 socket，并回送响应。
 func (f *ForwardSocket) udpRecvFrom(pc net.PacketConn) {
 	var mu sync.Mutex
 	socks := map[string]*net.UDPConn{}
@@ -317,7 +304,6 @@ func (f *ForwardSocket) udpRecvFrom(pc net.PacketConn) {
 	}
 }
 
-// StopForward 关闭监听 socket。
 func (f *ForwardSocket) StopForward() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -328,7 +314,7 @@ func (f *ForwardSocket) StopForward() {
 	}
 }
 
-// relay 双向搬运两条连接，任一端结束即关闭双方。
+// relay 双向搬运两条连接。
 func relay(a, b net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)

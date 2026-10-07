@@ -147,7 +147,6 @@ const finalColumns = computed<DataTableColumn[]>(() => {
   ]
 })
 
-// ---- 内置 查看 / 编辑 / 删除 ----
 const dialogMode = ref<'create' | 'edit'>('create')
 const showDialog = ref(false)
 const showView = ref(false)

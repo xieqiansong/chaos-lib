@@ -9,14 +9,8 @@ const props = defineProps<{
 
 
 const handleNodeClick = (data: BookmarkTreeNode) => {
-  if (data.children && data.children.length > 0) {
-    // 点击的是目录
-  } else {
-    // 点击的是书签 跳转
-    if (data.url) {
-      browser.tabs.create({url: data.url})
-    }
-  }
+  if (data.children?.length) return
+  if (data.url) browser.tabs.create({url: data.url})
 }
 
 const browserBookmarks = ref<BookmarkTreeNode[]>([])
