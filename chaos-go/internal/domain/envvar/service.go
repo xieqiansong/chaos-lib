@@ -108,6 +108,19 @@ func EnsureVirtualFile() (int, error) {
 	return created.ID, nil
 }
 
+// commitSnapshot 把快照序列化为 TOML 并落一条快照，返回过程中的非致命告警。
+// 序列化失败时返回 error（阻断调用方）；落快照失败仅作为 warning 累加。
+func commitSnapshot(fileID int, snap *EnvSnapshot) ([]string, error) {
+	content, err := MarshalEnvToTOML(snap)
+	if err != nil {
+		return nil, err
+	}
+	if _, snapErr := takeSnapshot(fileID, content); snapErr != nil {
+		return []string{fmt.Sprintf("快照失败: %v", snapErr)}, nil
+	}
+	return nil, nil
+}
+
 // Load 读取当前系统环境变量，并附最近一次快照的 id 与时间。
 func Load() (*EnvGetResponse, error) {
 	fileID, err := EnsureVirtualFile()
@@ -144,14 +157,10 @@ func Sync() ([]string, error) {
 	if snap == nil {
 		snap = &EnvSnapshot{}
 	}
-	content, err := MarshalEnvToTOML(snap)
-	if err != nil {
-		return nil, err
+	warnings, commitErr := commitSnapshot(fileID, snap)
+	if commitErr != nil {
+		return nil, commitErr
 	}
-	if _, err := takeSnapshot(fileID, content); err != nil {
-		return nil, fmt.Errorf("快照失败: %w", err)
-	}
-	warnings := []string{}
 	if readErr != nil {
 		warnings = append(warnings, fmt.Sprintf("读取部分失败: %v", readErr))
 	}
@@ -179,13 +188,11 @@ func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
 	if writeErr != nil {
 		warnings = append(warnings, fmt.Sprintf("写入异常: %v", writeErr))
 	}
-	content, err := MarshalEnvToTOML(snap)
-	if err != nil {
-		return warnings, err
+	snapWarnings, commitErr := commitSnapshot(fileID, snap)
+	if commitErr != nil {
+		return warnings, commitErr
 	}
-	if _, snapErr := takeSnapshot(fileID, content); snapErr != nil {
-		warnings = append(warnings, fmt.Sprintf("快照失败: %v", snapErr))
-	}
+	warnings = append(warnings, snapWarnings...)
 	return warnings, nil
 }
 
@@ -216,13 +223,11 @@ func ReplaceAll(req *EnvPutRequest) ([]string, error) {
 	if writeErr != nil {
 		warnings = append(warnings, fmt.Sprintf("写入异常: %v", writeErr))
 	}
-	content, err := MarshalEnvToTOML(current)
-	if err != nil {
-		return warnings, err
+	snapWarnings, commitErr := commitSnapshot(fileID, current)
+	if commitErr != nil {
+		return warnings, commitErr
 	}
-	if _, snapErr := takeSnapshot(fileID, content); snapErr != nil {
-		warnings = append(warnings, fmt.Sprintf("快照失败: %v", snapErr))
-	}
+	warnings = append(warnings, snapWarnings...)
 	return warnings, nil
 }
 

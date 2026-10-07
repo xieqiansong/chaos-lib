@@ -1,11 +1,12 @@
+//go:build windows
+
 package envvar
 
 import (
 	"fmt"
-	"strings"
-	"syscall"
 	"unsafe"
 
+	"chaos-go/pkg/tools"
 	"golang.org/x/sys/windows"
 )
 
@@ -14,26 +15,10 @@ const (
 	wmSettingChange = uintptr(0x001A)
 	smtoAbortIfHung = 0x0002
 	smtoNormal      = 0x0000
-	regSz           = 1
-	regExpandSz     = 2
-
-	hkeyCurrentUser  = uintptr(0x80000001)
-	hkeyLocalMachine = uintptr(0x80000002)
-	keyRead          = 0x20019
-	keyWrite         = 0x20006
-
-	envSubKeySystem = `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`
-	envSubKeyUser   = `Environment`
 	tokenElevation  = 20
 )
 
 var (
-	procRegOpenKeyExW       = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegOpenKeyExW")
-	procRegQueryValueExW    = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegQueryValueExW")
-	procRegSetValueExW      = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegSetValueExW")
-	procRegEnumValueW       = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegEnumValueW")
-	procRegDeleteValueW     = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegDeleteValueW")
-	procRegCloseKey         = windows.NewLazySystemDLL("advapi32.dll").NewProc("RegCloseKey")
 	procSendMessageTimeoutW = windows.NewLazySystemDLL("user32.dll").NewProc("SendMessageTimeoutW")
 	procGetComputerNameW    = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetComputerNameW")
 	procGetUserNameW        = windows.NewLazySystemDLL("advapi32.dll").NewProc("GetUserNameW")
@@ -42,6 +27,20 @@ var (
 	procGetCurrentProcess   = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetCurrentProcess")
 	procCloseHandle         = windows.NewLazySystemDLL("kernel32.dll").NewProc("CloseHandle")
 )
+
+// domainScopeToTools 将领域层作用域（system/user）映射为 tools 包的作用域（Machine/User）。
+// 领域层的 system 对应用户变量注册表项 HKLM\...\Environment，即 .NET 的 Machine 作用域；
+// user 对应 HKCU\Environment，即 .NET 的 User 作用域。
+func domainScopeToTools(scope EnvScope) (tools.EnvScope, bool) {
+	switch scope {
+	case EnvScopeSystem:
+		return tools.EnvScopeMachine, true
+	case EnvScopeUser:
+		return tools.EnvScopeUser, true
+	default:
+		return "", false
+	}
+}
 
 func isElevated() bool {
 	var token windows.Token
@@ -77,137 +76,47 @@ func getUsername() string {
 	return windows.UTF16ToString(buf)
 }
 
-func regOpenKey(hKey uintptr, subKey string, access uint32) (uintptr, error) {
-	subKey16, err := windows.UTF16PtrFromString(subKey)
+// readScopeViaTools 通过 tools 包读取某一作用域下的全部环境变量，转为 map。
+func readScopeViaTools(scope EnvScope) (map[string]string, error) {
+	ts, ok := domainScopeToTools(scope)
+	if !ok {
+		return nil, fmt.Errorf("未知作用域: %s", string(scope))
+	}
+	vars, err := tools.ListEnvVars(ts)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	var result uintptr
-	r1, _, _ := procRegOpenKeyExW.Call(hKey, uintptr(unsafe.Pointer(subKey16)), 0, uintptr(access), uintptr(unsafe.Pointer(&result)))
-	if r1 != 0 {
-		return 0, fmt.Errorf("RegOpenKeyExW 失败: 代码=%d", r1)
+	out := make(map[string]string, len(vars))
+	for _, v := range vars {
+		out[v.Name] = v.Value
 	}
-	return result, nil
+	return out, nil
 }
 
-func regCloseKey(hKey uintptr) {
-	procRegCloseKey.Call(hKey)
-}
-
-func regReadAllValues(hKey uintptr) (map[string]string, error) {
-	result := make(map[string]string)
-	var nameBuf [256]uint16
-	var valueBuf [32768]uint16
-	for i := uint32(0); ; i++ {
-		nameLen := uint32(len(nameBuf))
-		valueLen := uint32(len(valueBuf) * 2)
-		var valueType uint32
-		r1, _, _ := procRegEnumValueW.Call(hKey, uintptr(i), uintptr(unsafe.Pointer(&nameBuf[0])), uintptr(unsafe.Pointer(&nameLen)), 0, uintptr(unsafe.Pointer(&valueType)), uintptr(unsafe.Pointer(&valueBuf[0])), uintptr(unsafe.Pointer(&valueLen)))
-		if r1 != 0 {
-			break
-		}
-		name := windows.UTF16ToString(nameBuf[:nameLen])
-		if valueType == regSz || valueType == regExpandSz {
-			value := windows.UTF16ToString(valueBuf[:valueLen/2])
-			result[name] = value
-		}
+// applyScope 将期望变量集合落盘到指定作用域：仅对变化项做 Set，对删除项做 Remove。
+// 返回本次作用域内的警告（非致命错误）列表。
+func applyScope(scope EnvScope, desired, current map[string]string) []string {
+	ts, ok := domainScopeToTools(scope)
+	if !ok {
+		return []string{fmt.Sprintf("未知作用域: %s", string(scope))}
 	}
-	return result, nil
-}
-
-func regSetValue(hKey uintptr, name, value string, expandable bool) error {
-	name16, err := windows.UTF16PtrFromString(name)
-	if err != nil {
-		return err
-	}
-	value16, err := windows.UTF16PtrFromString(value)
-	if err != nil {
-		return err
-	}
-	byteLen := uint32((len(value) + 1) * 2)
-	valueType := uint32(regSz)
-	if expandable || strings.Contains(value, "%") {
-		valueType = regExpandSz
-	}
-	r1, _, _ := procRegSetValueExW.Call(hKey, uintptr(unsafe.Pointer(name16)), 0, uintptr(valueType), uintptr(unsafe.Pointer(value16)), uintptr(byteLen))
-	if r1 != 0 {
-		return fmt.Errorf("RegSetValueExW 失败: 代码=%d, name=%s", r1, name)
-	}
-	return nil
-}
-
-func regDeleteValue(hKey uintptr, name string) error {
-	name16, err := windows.UTF16PtrFromString(name)
-	if err != nil {
-		return err
-	}
-	r1, _, _ := procRegDeleteValueW.Call(hKey, uintptr(unsafe.Pointer(name16)))
-	if r1 != 0 {
-		return fmt.Errorf("RegDeleteValueW 失败: 代码=%d, name=%s", r1, name)
-	}
-	return nil
-}
-
-func readScopeFromRegistry(scope EnvScope) (map[string]string, error) {
-	var root uintptr
-	var subKey string
-	switch scope {
-	case EnvScopeSystem:
-		root = hkeyLocalMachine
-		subKey = envSubKeySystem
-	case EnvScopeUser:
-		root = hkeyCurrentUser
-		subKey = envSubKeyUser
-	default:
-		return nil, fmt.Errorf("未知的 scope: %s", string(scope))
-	}
-	hKey, err := regOpenKey(root, subKey, keyRead)
-	if err != nil {
-		return nil, fmt.Errorf("打开 %s 注册表失败: %w", scope, err)
-	}
-	defer regCloseKey(hKey)
-	return regReadAllValues(hKey)
-}
-
-func writeScopeToRegistry(scope EnvScope, desired, current map[string]string) error {
-	var root uintptr
-	var subKey string
-	switch scope {
-	case EnvScopeSystem:
-		root = hkeyLocalMachine
-		subKey = envSubKeySystem
-	case EnvScopeUser:
-		root = hkeyCurrentUser
-		subKey = envSubKeyUser
-	default:
-		return fmt.Errorf("未知的 scope: %s", string(scope))
-	}
-	hKey, err := regOpenKey(root, subKey, keyWrite)
-	if err != nil {
-		return fmt.Errorf("写 %s 注册表失败: %w", scope, err)
-	}
-	defer regCloseKey(hKey)
-	var firstErr error
+	var warnings []string
 	for k, v := range desired {
 		if oldVal, existed := current[k]; existed && oldVal == v {
 			continue
 		}
-		if err := regSetValue(hKey, k, v, false); err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
+		if e := tools.SetEnvVar(k, v, ts); e != nil {
+			warnings = append(warnings, fmt.Sprintf("设置 %s 失败: %v", k, e))
 		}
 	}
 	for k := range current {
 		if _, ok := desired[k]; !ok {
-			if err := regDeleteValue(hKey, k); err != nil {
-				if firstErr == nil {
-					firstErr = err
-				}
+			if e := tools.RemoveEnvVar(k, ts); e != nil {
+				warnings = append(warnings, fmt.Sprintf("删除 %s 失败: %v", k, e))
 			}
 		}
 	}
-	return firstErr
+	return warnings
 }
 
 func broadcastEnvironmentChange() error {
@@ -221,12 +130,12 @@ func broadcastEnvironmentChange() error {
 }
 
 func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
-	sysVars, err := readScopeFromRegistry(EnvScopeSystem)
-	if err != nil {
+	sysVars, errSys := readScopeViaTools(EnvScopeSystem)
+	if errSys != nil {
 		sysVars = map[string]string{}
 	}
-	userVars, err2 := readScopeFromRegistry(EnvScopeUser)
-	if err2 != nil {
+	userVars, errUser := readScopeViaTools(EnvScopeUser)
+	if errUser != nil {
 		userVars = map[string]string{}
 	}
 	snap := &EnvSnapshot{
@@ -240,12 +149,12 @@ func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
 	if snap.User == nil {
 		snap.User = map[string]string{}
 	}
-	if err != nil || err2 != nil {
+	if errSys != nil || errUser != nil {
 		var combined error
-		if err != nil {
-			combined = err
+		if errSys != nil {
+			combined = errSys
 		} else {
-			combined = err2
+			combined = errUser
 		}
 		return snap, combined
 	}
@@ -254,28 +163,26 @@ func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
 
 func WriteAllEnvToSystem(snap *EnvSnapshot) (warnings []string, err error) {
 	warnings = []string{}
-	originalSystem, _ := readScopeFromRegistry(EnvScopeSystem)
+	originalSystem, _ := readScopeViaTools(EnvScopeSystem)
 	if originalSystem == nil {
 		originalSystem = map[string]string{}
 	}
-	originalUser, _ := readScopeFromRegistry(EnvScopeUser)
+	originalUser, _ := readScopeViaTools(EnvScopeUser)
 	if originalUser == nil {
 		originalUser = map[string]string{}
 	}
 	if isElevated() {
-		if err := writeScopeToRegistry(EnvScopeSystem, cloneMap(snap.System), originalSystem); err != nil {
-			warnings = append(warnings, fmt.Sprintf("系统级变量部分写入失败: %v", err))
+		if w := applyScope(EnvScopeSystem, cloneMap(snap.System), originalSystem); len(w) > 0 {
+			warnings = append(warnings, fmt.Sprintf("系统级变量部分写入失败: %v", w))
 		}
 	} else {
 		warnings = append(warnings, "未以管理员身份运行，系统级变量未写入")
 	}
-	if err := writeScopeToRegistry(EnvScopeUser, cloneMap(snap.User), originalUser); err != nil {
-		warnings = append(warnings, fmt.Sprintf("用户级变量写入失败: %v", err))
+	if w := applyScope(EnvScopeUser, cloneMap(snap.User), originalUser); len(w) > 0 {
+		warnings = append(warnings, fmt.Sprintf("用户级变量写入失败: %v", w))
 	}
 	if bcErr := broadcastEnvironmentChange(); bcErr != nil {
 		warnings = append(warnings, fmt.Sprintf("广播环境变更失败: %v", bcErr))
 	}
 	return warnings, nil
 }
-
-var _ = syscall.Errno(0)

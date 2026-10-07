@@ -33,3 +33,11 @@ export interface EnvPatchPayload {
 export function patchEnvVariables(payload: EnvPatchPayload): Promise<EnvResponse | null> {
     return action<EnvResponse | null>('env-variables', 'patch', payload)
 }
+
+/** 构造一个作用域补丁负载（set 新增/覆盖，unset 删除）；未提供的段不出现。 */
+export function buildPatch(scope: 'system' | 'user', set?: Record<string, string>, unset?: string[]): EnvPatchPayload {
+    const section: { set?: Record<string, string>; unset?: string[] } = {}
+    if (set) section.set = set
+    if (unset) section.unset = unset
+    return {[scope]: section}
+}

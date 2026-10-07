@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import {computed, onMounted, ref} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {showSuccess, showError, showWarning} from '@/utils/message'
-import {getEnvVariables, syncEnvVariables, patchEnvVariables, type EnvResponse} from '@/api/environment'
+import {Rank, Close} from '@element-plus/icons-vue'
+import {getEnvVariables, syncEnvVariables, patchEnvVariables, buildPatch, type EnvResponse} from '@/api/environment'
 
 const props = defineProps<{
   searchText: string
@@ -19,8 +20,6 @@ const data = ref<EnvResponse | null>(null)
 const activeTab = ref<'system' | 'user'>('user')
 
 const filteredVariables = computed(() => {
-  // 关闭编辑 否则切换tab时会编辑框不会关闭
-  editingKey.value = ''
   const section = activeTab.value === 'system' ? data.value?.System : data.value?.User
   if (!section) return []
   const q = props.searchText.trim().toLowerCase()
@@ -55,6 +54,15 @@ async function syncEnv() {
 const editingKey = ref('')
 const editValue = ref('')
 const editArrayItems = ref<string[]>([])
+const editMode = ref<'text' | 'array'>('array')
+
+// 切换 tab 时关闭正在进行的编辑，避免编辑框残留到另一段
+watch(activeTab, () => {
+  editingKey.value = ''
+  editValue.value = ''
+  editArrayItems.value = []
+  editMode.value = 'array'
+})
 
 function startEdit(key: string, value: string) {
   editingKey.value = key
@@ -126,7 +134,7 @@ async function saveEdit() {
   if (!data.value) return
   const scope = activeTab.value
   const value = editMode.value === 'array' ? editArrayItems.value.join(';') : editValue.value
-  const payload = {[scope]: {set: {[editingKey.value]: value}}}
+  const payload = buildPatch(scope, {[editingKey.value]: value})
   await runEdit(async () => {
     const result = await patchEnvVariables(payload)
     if (result?.Warnings?.length) showWarning(result.Warnings.join('; '))
@@ -139,7 +147,7 @@ async function saveEdit() {
 async function deleteVar(key: string) {
   if (!data.value) return
   const scope = activeTab.value
-  const payload = {[scope]: {unset: [key]}}
+  const payload = buildPatch(scope, undefined, [key])
   await run(async () => {
     await patchEnvVariables(payload)
     showSuccess(`已删除 ${key}`)
@@ -154,7 +162,7 @@ const newValue = ref('')
 async function addVariable() {
   if (!newKey.value.trim()) return
   const scope = activeTab.value
-  const payload = {[scope]: {set: {[newKey.value.trim()]: newValue.value}}}
+  const payload = buildPatch(scope, {[newKey.value.trim()]: newValue.value})
   await runAdd(async () => {
     await patchEnvVariables(payload)
     showSuccess(`已添加 ${newKey.value}`)
@@ -164,8 +172,6 @@ async function addVariable() {
     await fetchEnv()
   }, {error: '添加失败'})
 }
-
-const editMode = ref<'text' | 'array'>('array')
 
 onMounted(() => {
   fetchEnv()
@@ -247,18 +253,11 @@ onMounted(() => {
                           @dragend="onArrayDragEnd"
                       >
                       <span class="array-drag-handle">
-                        <el-icon><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5"
-                                                                                                                                            r="1.5"/><circle
-                            cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19"
-                                                                                                                             r="1.5"/></svg></el-icon>
+                        <el-icon><Rank/></el-icon>
                       </span>
                         <el-input v-model="editArrayItems[idx]" size="small"/>
                         <el-button size="small" type="danger" @click="removeArrayItem(idx)" circle text>
-                          <el-icon>
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                            </svg>
-                          </el-icon>
+                          <el-icon><Close/></el-icon>
                         </el-button>
                       </div>
                       <el-button size="small" @click="addArrayItem" class="array-add-btn">+ 添加条目</el-button>
