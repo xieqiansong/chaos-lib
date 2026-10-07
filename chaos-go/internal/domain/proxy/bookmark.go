@@ -33,6 +33,19 @@ type FrequentBookmark struct {
 	LastVisitTime float64 `json:"last"`
 }
 
+// BookmarkNode 是书签树的嵌套节点，用于前端展示。
+// 结构与 Chrome extensions.bookmarks.getTree() 对齐，便于前端复用现有逻辑。
+type BookmarkNode struct {
+	ID        string         `json:"id"`
+	ParentID  string         `json:"parentId,omitempty"`
+	Title     string         `json:"title"`
+	URL       string         `json:"url,omitempty"`
+	IsFolder  bool           `json:"isFolder"`
+	SortIndex int            `json:"sortIndex"`
+	DateAdded int64          `json:"dateAdded"`
+	Children  []*BookmarkNode `json:"children,omitempty"`
+}
+
 // ── Handlers ──────────────────────────────────────────────────────
 
 // SaveBookmarks 批量 upsert 书签扁平快照（由扩展备份调用）。
@@ -83,4 +96,41 @@ func GetFrequentBookmarks(c *gin.Context) {
 	}
 	// 响应统一为 { items, total, page, size }
 	renv.Success(c, pagination.New(items, total, q))
+}
+
+// GetBookmarkTree 返回完整书签树（从扁平 bookmarks 表按 parent_id 组装）。
+// 顶层节点的 parent_id 为空串或不在表中时视为根。
+func GetBookmarkTree(c *gin.Context) {
+	var flat []Bookmark
+	if err := config.GetDB().Order("sort_index ASC").Find(&flat).Error; err != nil {
+		renv.Error(c, 500, "查询书签失败: "+err.Error())
+		return
+	}
+
+	// id → 节点 映射，便于按 parent_id 快速定位父节点
+	nodeMap := make(map[string]*BookmarkNode, len(flat))
+	for i := range flat {
+		b := &flat[i]
+		nodeMap[b.ID] = &BookmarkNode{
+			ID:        b.ID,
+			ParentID:  b.ParentID,
+			Title:     b.Title,
+			URL:       b.URL,
+			IsFolder:  b.IsFolder,
+			SortIndex: b.SortIndex,
+			DateAdded: b.DateAdded,
+		}
+	}
+
+	// 组装树：子节点挂到父节点的 Children 下；父节点不存在的进入根层
+	// Children 用指针切片，避免 map 迭代顺序随机导致拷贝后子节点的嵌套不完整
+	var roots []*BookmarkNode
+	for _, node := range nodeMap {
+		if parent, ok := nodeMap[node.ParentID]; ok {
+			parent.Children = append(parent.Children, node)
+		} else {
+			roots = append(roots, node)
+		}
+	}
+	renv.Success(c, roots)
 }

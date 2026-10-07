@@ -113,6 +113,22 @@ export function getFrequentBookmarks(page = 1, page_size = 20, search?: any): Pr
     return action<any>('proxy', 'bookmarks/frequent', {}, meta)
 }
 
+export interface BookmarkTreeNode {
+    id: string
+    parentId?: string
+    title: string
+    url?: string
+    isFolder: boolean
+    sortIndex: number
+    dateAdded: number
+    children?: BookmarkTreeNode[]
+}
+
+/** 从后端数据库拉取完整书签树（嵌套结构）。 */
+export function getBookmarkTree(): Promise<BookmarkTreeNode[]> {
+    return action<BookmarkTreeNode[]>('proxy', 'bookmarks/getTree')
+}
+
 export interface HostnameInfo {
     hostname: string
     username: string

@@ -5,13 +5,10 @@ import {Folder, Refresh, Setting} from '@element-plus/icons-vue'
 import BookmarkMenu from '@/components/BookmarkMenu.vue'
 import {favicon, hostnameOf} from '@/utils/url'
 import {
-  refreshExtStatus,
-  pushExtCommand,
-  getExtensionId,
   getBrowserHistories,
   searchBrowserHistories,
   getFrequentBookmarks,
-  type ExtStatus,
+  getBookmarkTree,
   type BrowserHistoryItem,
   type FrequentBookmarkItem,
 } from '@/utils/api'
@@ -24,10 +21,8 @@ const props = defineProps<{
 const search = computed(() => (props.searchText || '').trim().toLowerCase())
 
 // ── 书签栏：浏览器书签栏直接子节点，横向展示（文件夹点击竖向下拉）──
-const status = ref<ExtStatus | null>(null)
 const bookmarksLoading = ref(false)
 const bookmarksBarChildren = ref<any[]>([])
-const extId = ref(getExtensionId())
 // 当前在书签栏上打开下拉的文件夹 id（同一时刻仅一个）
 const openFolderId = ref<string | null>(null)
 
@@ -41,32 +36,12 @@ function findBookmarksBar(tree: any[]): any {
   return nodes.find((n: any) => n.id === '1') || nodes[0]
 }
 
-function saveExtId() {
-  try {
-    localStorage.setItem('chaos_ext_id', (extId.value || '').trim())
-  } catch {
-    /* ignore */
-  }
-  loadBookmarks()
-}
-
 async function loadBookmarks() {
-  const st = await refreshExtStatus().catch(() => null)
-  status.value = st
   openFolderId.value = null
-  if ((st?.connected ?? 0) <= 0) {
-    bookmarksBarChildren.value = []
-    return
-  }
   bookmarksLoading.value = true
   try {
-    const res = await pushExtCommand({type: 'bookmarks:getTree', id: `home-tree-${Date.now()}`})
-    const hit = res.response
-    if (!hit || !hit.ok) {
-      bookmarksBarChildren.value = []
-      return
-    }
-    const bar = findBookmarksBar(hit.echo || [])
+    const tree = await getBookmarkTree()
+    const bar = findBookmarksBar(tree)
     bookmarksBarChildren.value = bar?.children || []
   } catch (e) {
     bookmarksBarChildren.value = []

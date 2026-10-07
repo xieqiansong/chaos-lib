@@ -35,6 +35,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 	bh.POST("/saveVisits", SaveBrowserHistoryVisits)
 
 	bm := g.Group("/bookmarks")
+	bm.POST("/getTree", GetBookmarkTree)
 	bm.POST("/frequent", func(c *gin.Context) { metaToQuery(c); GetFrequentBookmarks(c) })
 	bm.POST("/save", SaveBookmarks)
 
