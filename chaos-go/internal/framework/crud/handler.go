@@ -44,156 +44,6 @@ func (h *handler[T]) runHook(hook func(row *T) error, row *T) error {
 	return hook(row)
 }
 
-// list 列表：分页 + 搜索 + 排序 + 软删过滤。
-func (h *handler[T]) list(c *gin.Context) {
-	q := pagination.Parse(c)
-	// 软删过滤由 soft_delete 插件自动追加，此处不再手写 is_deleted 条件
-	base := config.GetDB().Model(new(T))
-
-	for _, f := range h.opts.Searchable {
-		if v := strings.TrimSpace(c.Query(f)); v != "" {
-			base = base.Where(f+" LIKE ?", "%"+v+"%")
-		}
-	}
-
-	if sf := c.Query("sort"); sf != "" && h.sortable(sf) {
-		dir := "ASC"
-		if c.Query("order") == "desc" {
-			dir = "DESC"
-		}
-		base = base.Order(sf + " " + dir)
-	} else {
-		base = base.Order("id DESC")
-	}
-
-	var list []*T
-	total, err := pagination.Paginate[*T](base, &list, q)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "查询失败: "+err.Error())
-		return
-	}
-	// ToResponse 未配置时直接返回原始切片，避免无谓转换。
-	var items any = list
-	if h.opts.ToResponse != nil {
-		items = h.opts.ToResponse(list)
-	}
-	renv.Success(c, pagination.New(items, total, q))
-}
-
-// get 单条（含软删过滤）。
-func (h *handler[T]) get(c *gin.Context) {
-	var row T
-	if err := config.GetDB().First(&row, "id = ?", c.Param("id")).Error; err != nil {
-		fail(c, http.StatusNotFound, "记录不存在")
-		return
-	}
-	renv.Success(c, h.viewOne(&row))
-}
-
-// create 创建（事务内执行 AfterCreate，钩子失败即回滚）。
-func (h *handler[T]) create(c *gin.Context) {
-	ptr := new(T)
-	if err := c.ShouldBindJSON(ptr); err != nil {
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	if err := h.runHook(h.opts.BeforeCreate, ptr); err != nil {
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	tx := config.GetDB().Begin()
-	if err := tx.Create(ptr).Error; err != nil {
-		tx.Rollback()
-		fail(c, http.StatusInternalServerError, "创建失败: "+err.Error())
-		return
-	}
-	if err := h.runHook(h.opts.AfterCreate, ptr); err != nil {
-		tx.Rollback()
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	if err := tx.Commit().Error; err != nil {
-		fail(c, http.StatusInternalServerError, "创建失败: "+err.Error())
-		return
-	}
-	renv.Success(c, h.viewOne(ptr))
-}
-
-// update 部分字段更新（PATCH，事务内执行 AfterUpdate，钩子失败即回滚）。
-func (h *handler[T]) update(c *gin.Context) {
-	tx := config.GetDB().Begin()
-	var ptr T
-	if err := tx.First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
-		tx.Rollback()
-		fail(c, http.StatusNotFound, "记录不存在")
-		return
-	}
-	var patch map[string]any
-	if err := c.ShouldBindJSON(&patch); err != nil {
-		tx.Rollback()
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	// 基字段不可经 PATCH 直接改写
-	for _, k := range []string{"ID", "id", "CreatedAt", "created_at", "UpdatedAt", "updated_at", "IsDeleted", "is_deleted"} {
-		delete(patch, k)
-	}
-	// 受保护字段只能走带副作用的专属路由。
-	// 前端透传的是驼峰字段名（如 Status），而 Opts 通常写列名（status），故统一转 snake 后比较。
-	for key := range patch {
-		lk := camelToSnake(key)
-		for _, p := range h.opts.Protected {
-			if lk == camelToSnake(p) {
-				delete(patch, key)
-				break
-			}
-		}
-	}
-	if err := tx.Model(&ptr).Updates(patch).Error; err != nil {
-		tx.Rollback()
-		fail(c, http.StatusInternalServerError, "更新失败: "+err.Error())
-		return
-	}
-	tx.First(&ptr, "id = ?", c.Param("id"))
-	if err := h.runHook(h.opts.AfterUpdate, &ptr); err != nil {
-		tx.Rollback()
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	if err := tx.Commit().Error; err != nil {
-		fail(c, http.StatusInternalServerError, "更新失败: "+err.Error())
-		return
-	}
-	renv.Success(c, h.viewOne(&ptr))
-}
-
-// delete 软删除（事务内执行 AfterDelete，钩子失败即回滚）。
-func (h *handler[T]) delete(c *gin.Context) {
-	tx := config.GetDB().Begin()
-	var ptr T
-	if err := tx.First(&ptr, "id = ?", c.Param("id")).Error; err != nil {
-		tx.Rollback()
-		fail(c, http.StatusNotFound, "记录不存在")
-		return
-	}
-	// Delete 在 soft_delete 插件下即软删：插件把语句改写为 UPDATE ... SET is_deleted = 1
-	if err := tx.Delete(&ptr).Error; err != nil {
-		tx.Rollback()
-		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
-		return
-	}
-	if err := h.runHook(h.opts.AfterDelete, &ptr); err != nil {
-		tx.Rollback()
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	if err := tx.Commit().Error; err != nil {
-		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
-		return
-	}
-	renv.Success(c, nil)
-}
-
 // ---- 「POST + Action」风格（v1） ----
 
 // listMeta 信封 meta 中的列表查询参数（对应规范 list 动作）。
@@ -212,7 +62,7 @@ type listMeta struct {
 // RegisterActions 在路由组 rg 下为 prefix 注册「POST + Action」风格路由（详见《接口规范.md》），
 // 复用同一套 handler[T] 业务逻辑。动作集：list / get / create / update / delete /
 // batchCreate / batchDelete / status（status 需提供 toggle）。
-// 与 Register 的 RESTful 路由并存，用于接口重构的双轨迁移。
+// Register 已随接口重构下线，此处只保留「POST + Action」单一风格路由。
 func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], toggle *ToggleOpts) *gin.RouterGroup {
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
@@ -415,6 +265,7 @@ func (h *handler[T]) deleteAction(c *gin.Context) {
 		fail(c, http.StatusNotFound, "记录不存在")
 		return
 	}
+	// Delete 在 soft_delete 插件下即软删：插件把语句改写为 UPDATE ... SET is_deleted = 1
 	if err := tx.Delete(&ptr).Error; err != nil {
 		tx.Rollback()
 		fail(c, http.StatusInternalServerError, "删除失败: "+err.Error())
