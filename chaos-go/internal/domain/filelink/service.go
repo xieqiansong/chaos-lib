@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"chaos-go/pkg/tools"
 )
 
 // 启停用法的失败原因（调用方据此区分 400 与 500）。
@@ -17,21 +19,6 @@ var (
 )
 
 // ── 派生状态 ────────────────────────────────────────────────────
-
-// normalizeLinkPath 去掉 os.Readlink 返回的卷命名空间前缀（\??\ 或 \\?\），
-// 还原为普通盘符路径，便于与源路径比较。
-func normalizeLinkPath(p string) string {
-	if strings.HasPrefix(p, `\\?\UNC\`) {
-		return `\\` + p[len(`\\?\UNC\`):]
-	}
-	if strings.HasPrefix(p, `\??\UNC\`) {
-		return `\\` + p[len(`\??\UNC\`):]
-	}
-	if strings.HasPrefix(p, `\??\`) || strings.HasPrefix(p, `\\?\`) {
-		return p[4:]
-	}
-	return p
-}
 
 // checkLinkStatus 按文件系统真实状态推导连接状态（不落库、每次读时重算）：
 // normal 正常 / missing 目标缺失 / none 未启用 / invalid 无效 / conflict 冲突。
@@ -46,9 +33,10 @@ func checkLinkStatus(sourcePath, targetPath string, enabled bool) string {
 	if !enabled {
 		return "invalid"
 	}
-	actualTarget, err := os.Readlink(targetPath)
-	if err == nil {
-		absActual, _ := filepath.Abs(normalizeLinkPath(actualTarget))
+	// 直接取联接点真实指向（tools.GetLinkInfo.Target 已规范化，无需再脱 \??\ 前缀）。
+	info, err := tools.GetLinkInfo(targetPath)
+	if err == nil && info.Target != "" {
+		absActual, _ := filepath.Abs(info.Target)
 		absSource, _ := filepath.Abs(sourcePath)
 		if strings.EqualFold(absActual, absSource) {
 			return "normal"
@@ -95,7 +83,9 @@ func SetStatus(l *FileLink, enable bool) error {
 		if _, err := os.Lstat(l.TargetPath); err == nil {
 			return ErrTargetExists
 		}
-		if err := CreateJunction(l.SourcePath, l.TargetPath); err != nil {
+		// tools.CreateJunction 的参数为 (linkPath, targetPath)，与 domain 历史的
+		// (target, junction) 顺序相反，此处对调：TargetPath 是新建联接点，SourcePath 是真实目录。
+		if err := tools.CreateJunction(l.TargetPath, l.SourcePath); err != nil {
 			return fmt.Errorf("创建目录联接点失败: %w", err)
 		}
 		if err := updateStatus(l.ID, true); err != nil {
