@@ -7,7 +7,7 @@
       </div>
     </div>
 
-    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 1rem"/>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px"/>
 
     <el-row :gutter="12">
       <el-col v-for="(info, type) in sdkList" :key="type" :xs="24" :sm="12" :md="8" :lg="6">
@@ -48,7 +48,7 @@
     </el-row>
 
     <!-- 管理来源对话框 -->
-    <el-dialog v-model="manageVisible" title="SDK 来源管理" width="45rem">
+    <el-dialog v-model="manageVisible" title="SDK 来源管理" width="720px">
       <div class="manage-toolbar">
         <el-button type="primary" :icon="Plus" @click="addDef">新增 SDK 类型</el-button>
       </div>
@@ -85,9 +85,9 @@
     <el-dialog
         v-model="formVisible"
         :title="editingDef ? '编辑 ' + form.Name : '新增 SDK 类型'"
-        width="40rem"
+        width="640px"
     >
-      <el-form :model="form" label-width="5.625rem">
+      <el-form :model="form" label-width="90px">
         <el-form-item label="类型名" required>
           <el-input v-model="form.Name" :disabled="!!editingDef" placeholder="如 jdk / maven"/>
         </el-form-item>
@@ -99,7 +99,7 @@
         <el-form-item label="来源">
           <div class="source-form-list">
             <div v-for="(s, i) in form.Sources" :key="i" class="source-form-item">
-              <el-select v-model="s.kind" style="width: 6.875rem">
+              <el-select v-model="s.kind" style="width: 110px">
                 <el-option label="仓库 repo" value="repo"/>
                 <el-option label="单版本 single" value="single"/>
               </el-select>

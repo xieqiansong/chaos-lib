@@ -56,7 +56,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 顶栏「待办任务」按钮：与 ⌘K / 主题 / 横屏按钮同尺寸同风格（PX 固定，不随根字号缩放），
+/* 顶栏「待办任务」按钮：与 ⌘K / 主题 / 横屏按钮同尺寸同风格，
    按钮间距由 App.vue 的 .header-actions gap 统一控制，不再单独留 margin */
 .pending-badge-btn {
   position: relative;
@@ -71,8 +71,8 @@ onUnmounted(() => {
   font-size: var(--font-sm);
   padding: var(--space-sm);
   cursor: pointer;
-  border-radius: 0.5rem;
-  height: 2.1rem;
+  border-radius: 8px;
+  height: 28px;
 }
 
 .pending-badge-btn:hover {

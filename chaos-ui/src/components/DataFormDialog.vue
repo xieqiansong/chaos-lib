@@ -59,8 +59,8 @@ function downloadBinary(f: FormField) {
 </script>
 
 <template>
-  <el-dialog v-model="visible" :title="title" width="50rem">
-    <el-form :model="form" label-width="6.25rem">
+  <el-dialog v-model="visible" :title="title" width="800px">
+    <el-form :model="form" label-width="100px">
       <el-row :gutter="16">
         <el-col v-for="f in fields" v-show="fieldVisible(f)" :key="f.field" :span="f.span ?? 24">
           <el-form-item
@@ -163,7 +163,7 @@ function downloadBinary(f: FormField) {
 <style scoped>
 .binary-preview {
   width: 100%;
-  max-height: 14rem;
+  max-height: 224px;
   margin-bottom: var(--space-sm);
   border: 1px solid var(--border-color, #d9d9d9);
   border-radius: 4px;

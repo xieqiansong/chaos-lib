@@ -415,7 +415,7 @@ defineExpose({refresh: reload})
         @submit="submitRatingDialog"
     />
 
-    <el-dialog v-model="showPostponeDialog" :title="postponeDialogTitle" width="26.25rem">
+    <el-dialog v-model="showPostponeDialog" :title="postponeDialogTitle" width="420px">
       <div class="postpone-content">
         <p class="text-secondary mb-sm">选择延期天数，任务开始时间将向后顺延。</p>
         <div class="postpone-presets">
@@ -432,7 +432,7 @@ defineExpose({refresh: reload})
               :min="1"
               :max="365"
               placeholder="自定义"
-              style="width: 7.5rem"
+              style="width: 120px"
           />
         </div>
       </div>
@@ -450,7 +450,7 @@ defineExpose({refresh: reload})
 }
 
 .plan-filter {
-  width: 14rem;
+  width: 224px;
   margin-left: var(--space-sm);
 }
 
@@ -465,7 +465,7 @@ defineExpose({refresh: reload})
 
 .selected-count {
   color: var(--el-text-color-secondary);
-  font-size: 0.85rem;
+  font-size: 13.6px;
   margin-left: var(--space-sm);
 }
 

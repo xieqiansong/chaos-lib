@@ -87,25 +87,28 @@ onUnmounted(() => {
               unique-opened
           >
             <template v-for="item in menuItems" :key="item.path">
-              <el-sub-menu v-if="item.children.length" :index="item.path">
+              <el-sub-menu v-if="item.children.length" :index="item.path" :title="item.title">
                 <template #title>
                   <el-icon v-if="item.icon">
                     <component :is="item.icon"/>
                   </el-icon>
-                  <span>{{ item.title }}</span>
                 </template>
-                <el-menu-item v-for="child in item.children" :key="child.path" :index="child.path">
+                <el-menu-item
+                    v-for="child in item.children"
+                    :key="child.path"
+                    :index="child.path"
+                    :title="child.title"
+                >
                   <el-icon v-if="child.icon">
                     <component :is="child.icon"/>
                   </el-icon>
                   <span>{{ child.title }}</span>
                 </el-menu-item>
               </el-sub-menu>
-              <el-menu-item v-else :index="item.path">
+              <el-menu-item v-else :index="item.path" :title="item.title">
                 <el-icon v-if="item.icon">
                   <component :is="item.icon"/>
                 </el-icon>
-                <span>{{ item.title }}</span>
               </el-menu-item>
             </template>
           </el-menu>
@@ -192,7 +195,7 @@ onUnmounted(() => {
 }
 
 .app-sidebar {
-  width: 10rem;
+  width: 36px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -214,7 +217,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.2rem;
+  height: 30px;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -224,7 +227,7 @@ onUnmounted(() => {
 .sidebar-menu {
   flex: 1;
   overflow-y: auto;
-  padding: 0;
+  padding: 4px 0;
   border-right: none;
   background: transparent;
   /* 终端风格：覆盖 Element Plus 菜单变量，随主题自动切换 */
@@ -233,22 +236,57 @@ onUnmounted(() => {
   --el-menu-active-color: var(--term-green);
   --el-menu-hover-bg-color: var(--term-active-bg);
   --el-menu-hover-text-color: var(--term-green);
-  --el-menu-item-height: 2.2rem;
-  --el-menu-sub-item-height: 2.2rem;
-  --el-menu-base-level-padding: var(--space-sm);
-  --el-menu-level-padding: var(--space-sm);
+  --el-menu-item-height: auto;
+  --el-menu-sub-item-height: auto;
+  --el-menu-base-level-padding: 0;
+  --el-menu-level-padding: 0;
+  /* 隐藏滚动条但保留滚动能力 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
+.sidebar-menu::-webkit-scrollbar {
+  display: none;
+}
+
+/* 菜单项：只显示图标，hover 时 title 属性弹原生 tooltip */
 .sidebar-menu :deep(.el-menu-item),
 .sidebar-menu :deep(.el-sub-menu__title) {
-  border-left: 2px solid transparent;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  padding: 6px 0;
+  margin: 2px;
+  border-radius: 4px;
+  border-left: none;
+}
+
+.sidebar-menu :deep(.el-menu-item .el-icon),
+.sidebar-menu :deep(.el-sub-menu__title .el-icon) {
+  font-size: 16px;
+  margin-right: 0;
+}
+
+/* 隐藏所有 span 文字 */
+.sidebar-menu :deep(.el-menu-item span),
+.sidebar-menu :deep(.el-sub-menu__title span) {
+  display: none;
+}
+
+/* 子菜单展开箭头：恢复显示，让用户知道哪些项有子菜单 */
+.sidebar-menu :deep(.el-sub-menu__title .el-sub-menu__icon-arrow) {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
 }
 
 /* 当前路由高亮 */
 .sidebar-menu :deep(.el-menu-item.is-active) {
   color: var(--term-green);
   background: var(--term-active-bg);
-  border-left-color: var(--term-green);
 }
 
 .app-main {
@@ -274,7 +312,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 2.2rem;
+  height: 30px;
   padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
@@ -291,8 +329,8 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 30px;
+  height: 30px;
   background: transparent;
   border: 1px solid var(--term-border);
   color: var(--term-green-faint);
@@ -323,8 +361,6 @@ onUnmounted(() => {
   align-items: center;
 }
 
-/* 顶栏右侧按钮组：统一收进容器，用固定 gap 控制按钮间距，
-   避免 .app-header 的 space-between 把剩余宽度均摊到按钮之间产生大空隙 */
 .header-actions {
   flex-shrink: 0;
   display: flex;
@@ -333,10 +369,6 @@ onUnmounted(() => {
   margin-left: var(--space-lg);
 }
 
-/* 顶栏按钮（主题 / 横屏 / ⌘K）：字号与内边距用大写 PX 绕过 px->rem 转换——
-   手机竖屏时根字号按 100vw/120 缩到 ~3px，rem 字号会小到不可读；
-   固定 PX 后与待办按钮（16px 固定图标）视觉同高。
-   桌面端根字号恰为 16px，这些 PX 值与原 rem 值相等，外观零变化。 */
 .cmdpalette-hint {
   flex-shrink: 0;
   display: inline-flex;
@@ -349,8 +381,8 @@ onUnmounted(() => {
   font-size: var(--font-sm);
   padding: var(--space-sm);
   cursor: pointer;
-  border-radius: 0.5rem;
-  height: 2.1rem;
+  border-radius: 8px;
+  height: 28px;
 }
 
 .cmdpalette-hint:hover {

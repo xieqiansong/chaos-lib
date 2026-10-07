@@ -419,8 +419,8 @@ onMounted(() => {
       </el-col>
     </el-row>
 
-    <el-dialog v-model="showCreateModal" title="登记文件" width="37.5rem">
-      <el-form :model="newFile" label-width="6.25rem">
+    <el-dialog v-model="showCreateModal" title="登记文件" width="600px">
+      <el-form :model="newFile" label-width="100px">
         <el-form-item label="文件路径" required>
           <el-input
               v-model="newFile.FilePath"

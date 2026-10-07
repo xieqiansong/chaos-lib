@@ -1,23 +1,6 @@
-/* ===== 根字号：1920px 设计稿基准 =====
- * 1rem = 16px（与下方 --space-* / --font-* 刻度一致）。
- * 自适应策略：视口 < 1920px 时根字号等比缩小；视口 ≥ 1920px 时锁定在 16px，
- * 避免大屏/高分辨率下布局被无限放大而溢出（与 1920 体验一致，不再继续放大）。
- */
+/* ===== 根字号：固定 16px（全局响应式已关闭） ===== */
 html {
-  font-size: min(100vw / 120, 16px);
-}
-
-/* ===== 横屏全屏模式（useLandscape 锁定横屏时给 html 加 fs-landscape） =====
-   手机横屏视口仅 ~780-920px，100vw/120 会把根字号压到 7px 上下，整页变成
-   「微缩模型」；且 Element Plus 样式不参与 px->rem 转换（postcss exclude
-   node_modules），其 14px 文字会溢出按 rem 收缩的菜单项造成重叠。
-   此处抬高根字号下限保证可读，代价是按 1920 设计稿书写的内容需横向滚动。 */
-html.fs-landscape {
-  font-size: max(100vw / 120, 12px);
-}
-
-html.fs-landscape .app-content {
-  overflow: auto; /* 窄视口下宽表格 / 看板可横向滚动 */
+  font-size: 16px;
 }
 
 /* ===== 暗色主题（GitHub） ===== */

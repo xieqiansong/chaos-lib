@@ -707,7 +707,7 @@ watch(taskPlansVersion, () => {
             <el-button size="small" type="primary" text @click="openAddChild(row)">添加</el-button>
             <el-button v-if="row.Status === 'created' && isLeaf(row)" size="small" type="success" text @click="startPlan(row)">开启</el-button>
             <el-button v-if="row.HasLink" size="small" text @click="openLink(row.ID)">跳转</el-button>
-            <el-dropdown trigger="click" style="margin-left: 0.25rem">
+            <el-dropdown trigger="click" style="margin-left: 4px">
               <el-button size="small" text>更多</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -731,7 +731,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showPlanDialog"
         :title="planDialogTitle"
-        width="31.25rem"
+        width="500px"
     >
       <TaskPlanForm
           :form-data="formData"
@@ -757,7 +757,7 @@ watch(taskPlansVersion, () => {
     <el-dialog
         v-model="showPriorityDialog"
         :title="`设置优先级 — ${priorityTargetPlan?.Name || ''}`"
-        width="26.25rem"
+        width="420px"
     >
       <div class="postpone-content">
         <p class="text-secondary mb-sm">将递归应用到该计划及其所有子任务计划。</p>

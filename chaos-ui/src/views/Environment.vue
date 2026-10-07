@@ -297,7 +297,7 @@ onMounted(() => {
       </div>
     </template>
 
-    <el-dialog v-model="showAddDialog" title="添加环境变量" width="30rem">
+    <el-dialog v-model="showAddDialog" title="添加环境变量" width="480px">
       <el-form label-position="top">
         <el-form-item label="变量名">
           <el-input v-model="newKey" placeholder="例如: JAVA_HOME"/>

@@ -51,7 +51,7 @@ function onConfirm() {
   <el-dialog
     v-model="visible"
     :title="targetName ? `${title} — ${targetName}` : title"
-    width="30rem"
+    width="480px"
   >
     <el-alert
       type="info"

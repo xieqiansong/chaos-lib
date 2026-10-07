@@ -205,7 +205,7 @@ function actionSummary(row: CronJob): string {
       </template>
     </DataTable>
 
-    <el-dialog v-model="showHistory" :title="`运行历史 — ${historyJobName}`" width="46rem">
+    <el-dialog v-model="showHistory" :title="`运行历史 — ${historyJobName}`" width="736px">
       <el-table :data="runs" v-loading="runsLoading" border stripe size="small" max-height="50vh">
         <el-table-column label="开始时间" width="170">
           <template #default="{ row }">{{ fmtTime(row.StartedAt) }}</template>
@@ -237,7 +237,7 @@ function actionSummary(row: CronJob): string {
 }
 
 .cron-check .el-input {
-  width: 16rem;
+  width: 256px;
 }
 
 .run-output {

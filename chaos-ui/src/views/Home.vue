@@ -279,7 +279,7 @@ onMounted(() => {
 }
 
 .panel-col {
-  flex: 1 1 22rem;
+  flex: 1 1 352px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -291,7 +291,7 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-xs);
-  min-height: 1.75rem;
+  min-height: 28px;
 }
 
 .bm-chip {
@@ -306,7 +306,7 @@ onMounted(() => {
   text-decoration: none;
   color: var(--el-text-color-regular);
   font-size: var(--el-font-size-small);
-  max-width: 12rem;
+  max-width: 192px;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -344,8 +344,8 @@ onMounted(() => {
   top: calc(100% + 4px);
   left: 0;
   z-index: 20;
-  min-width: 14rem;
-  max-height: 40rem;
+  min-width: 224px;
+  max-height: 640px;
   overflow-y: auto;
   padding: var(--space-05);
   background: var(--el-bg-color-overlay);
@@ -365,7 +365,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 40rem;
+  max-height: 640px;
   overflow-y: auto;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;

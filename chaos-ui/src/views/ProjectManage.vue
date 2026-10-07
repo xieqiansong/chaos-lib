@@ -371,8 +371,8 @@ onMounted(async () => {
     </DataFormDialog>
 
     <!-- 移动 -->
-    <el-dialog v-model="showMove" title="移动项目" width="37.5rem">
-      <el-form :model="moveForm" label-width="6.25rem">
+    <el-dialog v-model="showMove" title="移动项目" width="600px">
+      <el-form :model="moveForm" label-width="100px">
         <el-form-item label="目标项目组">
           <el-select v-model="moveForm.TargetGroupID" placeholder="选择目标项目组" style="width: 100%">
             <el-option v-for="g in groupsForMove" :key="g.ID" :label="g.Name" :value="g.ID"/>
