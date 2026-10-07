@@ -10,10 +10,9 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
     return result;
 }
 
-// 必须 async + 全程 await，否则 MV3 service worker 会提前被杀。
-const saveBrowserHistory = async () => {
+async function extracted(days: number) {
     try {
-        const startTime = subDays(new Date(), 360).getTime();
+        const startTime = subDays(new Date(), days).getTime();
         const maxResults = 50000; // 上限避免内存与 getVisits 调用量失控
         const batchSize = 256;
 
@@ -48,6 +47,17 @@ const saveBrowserHistory = async () => {
     }
 }
 
+// 必须 async + 全程 await，否则 MV3 service worker 会提前被杀。
+const saveBrowserHistory = async () => {
+    await extracted(365);
+}
+
+const saveBrowserHistoryRecently = async () => {
+    await extracted(7);
+}
+
+
 export {
-    saveBrowserHistory
+    saveBrowserHistory,
+    saveBrowserHistoryRecently
 }

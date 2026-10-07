@@ -1,7 +1,6 @@
 // @ts-ignore
 import browser from "webextension-polyfill";
-import {saveBrowserHistory} from "./background/browser-history-backup";
-import {saveBookmarks} from "./background/bookmark-backup";
+import {saveBrowserHistoryRecently} from "./background/browser-history-backup";
 import {action} from "@/utils/request";
 
 export default defineBackground(() => {
@@ -34,35 +33,22 @@ export default defineBackground(() => {
     );
 
     browser.alarms.onAlarm.addListener((alarm: { name: string; }) => {
-        if (alarm.name === 'saveBrowserHistory') {
-            return saveBrowserHistory().catch((err) => {
-                console.error("saveBrowserHistory (alarm) failed:", err);
-            });
-        }
-        if (alarm.name === 'saveBookmarks') {
-            return saveBookmarks().catch((err) => {
-                console.error("saveBookmarks (alarm) failed:", err);
+        if (alarm.name === 'saveBrowserHistoryRecently') {
+            return saveBrowserHistoryRecently().catch((err) => {
+                console.error("saveBrowserHistoryRecently (alarm) failed:", err);
             });
         }
     });
 
     // 启动即触发一次（兜底，周期由下方 alarm 保证）
-    saveBrowserHistory().catch((err) => {
-        console.error("saveBrowserHistory (startup) failed:", err);
+    saveBrowserHistoryRecently().catch((err) => {
+        console.error("saveBrowserHistoryRecently (startup) failed:", err);
     });
-    browser.alarms.create('saveBrowserHistory', {
+    browser.alarms.create('saveBrowserHistoryRecently', {
         delayInMinutes: 0,
         periodInMinutes: 1,
     });
 
-    // 书签变更频率低，5 分钟一次
-    saveBookmarks().catch((err) => {
-        console.error("saveBookmarks (startup) failed:", err);
-    });
-    browser.alarms.create('saveBookmarks', {
-        delayInMinutes: 0,
-        periodInMinutes: 5,
-    });
 });
 
 // 执行指令并返回结果；调用方（网页经 externally_connectable）负责 sendResponse。

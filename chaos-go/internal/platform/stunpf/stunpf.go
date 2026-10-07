@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"chaos-go/internal/domain/portfwd"
 	"chaos-go/internal/framework/config"
 	"chaos-go/internal/platform/mqttsync"
-	"chaos-go/internal/domain/portfwd"
 )
 
 // stunTopicPrefix 是 STUN 消息 channel 的前缀，与 stunsync 发布时一致。
@@ -62,7 +62,7 @@ func lastColon(s string) int {
 // 未启用（需 MQTT 已启用）时直接跳过。
 func RunSync() {
 	if !enabled() {
-		slog.Info("stun 端口转发同步跳过", "reason", "未启用（需 MQTT 已启用）")
+		slog.Debug("stun 端口转发同步跳过", "reason", "未启用（需 MQTT 已启用）")
 		return
 	}
 	run()
