@@ -218,7 +218,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   height: 30px;
-  padding: 0 var(--space-lg);
+  padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
@@ -313,7 +313,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   height: 30px;
-  padding: 0 var(--space-lg);
+  padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--term-border);
   background: var(--el-bg-color);
   flex-shrink: 0;
@@ -356,7 +356,7 @@ onUnmounted(() => {
   flex: 1;
   max-width: 50%;
   min-width: 0;
-  margin-left: var(--space-lg);
+  margin-left: var(--space-sm);
   display: flex;
   align-items: center;
 }
@@ -366,7 +366,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  margin-left: var(--space-lg);
+  margin-left: var(--space-sm);
 }
 
 .cmdpalette-hint {
@@ -393,7 +393,7 @@ onUnmounted(() => {
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-lg);
+  padding: var(--space-sm);
 }
 </style>
 

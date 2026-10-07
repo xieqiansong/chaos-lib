@@ -275,7 +275,7 @@ onMounted(() => {
 .panels-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-lg);
+  gap: var(--space-sm);
 }
 
 .panel-col {

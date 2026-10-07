@@ -110,7 +110,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .engine-group {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
 
   &:last-child {
     margin-bottom: 0;
@@ -125,7 +125,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 .engine-item {
   display: flex;
   align-items: center;
-  padding: var(--space-sm) var(--space-lg);
+  padding: var(--space-sm) var(--space-sm);
   cursor: pointer;
 }
 </style>

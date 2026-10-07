@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: var(--space-lg);
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
   overflow-x: auto;
 }

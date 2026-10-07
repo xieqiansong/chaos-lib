@@ -120,7 +120,7 @@ function onKey(e: KeyboardEvent) {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md) var(--space-sm);
   border-bottom: 1px solid var(--term-border);
 }
 
@@ -148,8 +148,8 @@ function onKey(e: KeyboardEvent) {
 .cmdpalette__item {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
-  padding: var(--space-sm) var(--space-lg);
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-sm);
   cursor: pointer;
   color: var(--term-green-faint);
 }
@@ -170,12 +170,12 @@ function onKey(e: KeyboardEvent) {
 }
 
 .cmdpalette__empty {
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md) var(--space-sm);
   color: var(--term-red);
 }
 
 .cmdpalette__hint {
-  padding: var(--space-xs) var(--space-lg);
+  padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-xs);
   color: var(--term-green-faint);
   opacity: 0.6;

@@ -78,7 +78,7 @@ onMounted(() => {
     </el-row>
 
 
-    <el-row :gutter="16" class="mb-lg">
+    <el-row :gutter="8" class="mb-sm">
       <el-col :span="12">
         <div class="chart-section">
           <DailyStatsChart/>
@@ -90,7 +90,7 @@ onMounted(() => {
         </div>
       </el-col>
     </el-row>
-    <el-row :gutter="16" class="mb-lg">
+    <el-row :gutter="8" class="mb-sm">
       <el-col :span="12">
         <div class="chart-section">
           <div v-if="contributionLoading" class="contrib-placeholder">加载中...</div>
@@ -107,12 +107,12 @@ onMounted(() => {
 }
 
 .api-balance {
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
   font-size: var(--el-font-size-base);
 }
 
 .clock-jump-btn {
-  margin-left: var(--space-lg);
+  margin-left: var(--space-sm);
 }
 
 .balance-amount {
@@ -123,7 +123,7 @@ onMounted(() => {
 .chart-section {
   background: var(--el-bg-color);
   border-radius: var(--el-border-radius-base);
-  padding: var(--space-lg);
+  padding: var(--space-sm);
   border: 1px solid var(--el-border-color-lighter);
 }
 
