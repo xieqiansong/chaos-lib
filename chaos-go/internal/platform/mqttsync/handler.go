@@ -28,18 +28,6 @@ var mqttSyncOpts = crud.Opts[MqttSyncMessage]{
 	AfterCreate:  BroadcastMessage,
 }
 
-// Register 在路由组 rg 下挂载 MQTT 同步的全部接口：
-//   - 标准 CRUD（list/get/create/update/delete）交给通用 crud，驱动前端 DataTable；
-//     新建消息经 BeforeCreate 补齐标识、AfterCreate 广播到集群，即「发送」语义。
-//   - 扩展能力（状态查询、按主题删除）由本包自实现并挂载到 /mqtt-syncs 子路由。
-func Register(rg *gin.RouterGroup) {
-	crud.Register[MqttSyncMessage](rg, "mqtt-syncs", mqttSyncOpts)
-
-	g := rg.Group("/mqtt-syncs")
-	g.GET("/status", status)
-	g.DELETE("/channel", deleteChannel)
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // CRUD 走通用 crud（list/get/create/update/delete/batchCreate/batchDelete）；
 // 自定义动作：status（状态查询）、deleteChannel（按主题删除）亦迁移为 POST 动作。

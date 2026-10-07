@@ -4,7 +4,7 @@ import {format} from 'date-fns'
 import {zhCN} from 'date-fns/locale'
 import {showError, prompt} from '@/utils/message'
 import {useRouter} from 'vue-router'
-import {action, default as request} from '@/utils/request'
+import {action, buildEnvelope, default as request} from '@/utils/request'
 
 const router = useRouter()
 
@@ -88,11 +88,7 @@ async function syncTime() {
     // 经由统一 axios 实例（带拦截器）请求 v1 接口，仅取响应 Date 头作为标准时钟。
     const resp = await request.post(
         '/v1/task-plans/tasks/activeStats',
-        {
-          requestId: crypto.randomUUID(),
-          action: 'task-plans.tasks.activeStats',
-          data: {}, meta: {}, timestamp: Date.now(),
-        },
+        buildEnvelope('task-plans', 'tasks/activeStats', {}, {}),
         {headers: {'cache': 'no-store'}},
     )
     const dateStr = resp.headers['date']

@@ -21,12 +21,6 @@ var dataCacheOpts = crud.Opts[DataCache]{
 	Sortable:   []string{"id", "value_len", "created_at"},
 }
 
-// Register 把本资源的标准 CRUD 路由挂载到给定路由组。
-// 仅纯 CRUD，无扩展子路由，全部交给通用 crud 基线。
-func Register(rg *gin.RouterGroup) {
-	crud.Register[DataCache](rg, "data-caches", dataCacheOpts)
-}
-
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 func RegisterV1(rg *gin.RouterGroup) {
 	crud.RegisterActions[DataCache](rg, "data-caches", dataCacheOpts, nil)

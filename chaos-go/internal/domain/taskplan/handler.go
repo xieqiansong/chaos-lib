@@ -18,40 +18,6 @@ import (
 // 说明：本模块曾同时提供存量 /api 的 Register 与 v1 的 RegisterV1，现存量路由已下线，
 // 仅保留 v1（见 handler_v1.go）。
 
-// Register 把任务计划与待办任务全部路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
-// 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载 FSRS / 调度 / 树形等定制行为。
-func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/task-plans")
-	g.POST("/", CreateTaskPlan)
-	g.GET("/", ListTaskPlans)
-	g.GET("/tree", GetTaskPlanTree)
-	g.GET("/:id", GetTaskPlan)
-	g.PATCH("/:id", UpdateTaskPlan)
-	g.PATCH("/:id/start", StartTaskPlan)
-	g.PATCH("/:id/complete", CompleteTaskPlan)
-	g.PATCH("/:id/archive", ArchiveTaskPlan)
-	g.PATCH("/:id/suspend", SuspendTaskPlan)
-	g.PATCH("/:id/resume", ResumeTaskPlan)
-	g.PATCH("/:id/priority", SetPriorityTaskPlan)
-	g.DELETE("/:id", DeleteTaskPlan)
-	g.GET("/:id/tasks", ListPlanTasks)
-	g.GET("/:id/raw", GetTaskPlanRaw)
-	g.POST("/:id/review", ReviewTaskPlan)
-
-	ai := rg.Group("/ai")
-	ai.POST("/review-score", AiReviewScore)
-
-	tasks := rg.Group("/tasks")
-	tasks.GET("/pending", GetPendingTasks)
-	tasks.GET("/dailyStats", GetTaskDailyStats)
-	tasks.GET("/activeStats", GetTaskActiveStats)
-	tasks.GET("/contributionStats", GetTaskContributionStats)
-	tasks.PATCH("/:id/complete", CompleteTask)
-	tasks.PATCH("/:id/cancel", CancelTask)
-	tasks.PATCH("/:id/postpone", PostponeTask)
-	tasks.POST("/batch-postpone", BatchPostponeTasks)
-}
-
 // ── 计划 ────────────────────────────────────────────────────────
 
 // CreateTaskPlan 创建任务计划（待办类型须带 startedAt，并生成首条任务）。

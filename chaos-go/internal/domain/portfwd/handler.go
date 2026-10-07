@@ -56,18 +56,6 @@ var pfToggle = &crud.ToggleOpts{
 	ErrRules: ruleErrRules,
 }
 
-// Register 把 SSH 端口转发两个资源挂载到给定路由组：纯 CRUD 交给 crud（回调只做转发），扩展接口自实现。
-// Status 标记为受保护字段：仅经专用启停路由改写，通用 PATCH 无法绕过。
-func Register(rg *gin.RouterGroup) {
-	// SSH 连接信息：凭据仅后端使用，响应一律脱敏；测试接口自实现。
-	ssh := crud.Register[SshConnection](rg, "ssh-conns", sshOpts)
-	ssh.POST("/:id/test", testSshConnection)
-
-	// 端口转发规则：启停带隧道副作用，走基线的通用启停路由，本包只提供动作与错误表。
-	pf := crud.Register[PortForwarding](rg, "port-forwards", pfOpts)
-	crud.RegisterToggle(pf, *pfToggle)
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 两个资源的标准 CRUD + port-forwards 的 status 由通用 crud 生成；
 // ssh-conns 的 test 自定义动作一并迁为 POST 动作。

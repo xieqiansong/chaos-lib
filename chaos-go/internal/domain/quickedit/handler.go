@@ -20,20 +20,6 @@ func init() {
 	routehub.RegisterV1("quick-edits", RegisterV1)
 }
 
-// Register 把 quickedit 全部路由挂载到给定路由组。
-// 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载快照/虚拟文件等定制行为。
-func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/quick-edits")
-	g.GET("/", ListQuickEdits)
-	g.POST("/", CreateQuickEdit)
-	g.DELETE("/:id", DeleteQuickEdit)
-	g.GET("/:id/content", GetQuickEditContent)
-	g.PUT("/:id/content", UpdateQuickEditContent)
-	g.GET("/:id/snapshots", ListQuickEditSnapshots)
-	g.GET("/:id/snapshots/:snapshotId", GetQuickEditSnapshot)
-	g.POST("/:id/restore", RestoreQuickEdit)
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：list / create / delete / getContent / updateContent / listSnapshots / getSnapshot / restore；
 // 主键与分页取自信封，复用既有 service 函数。

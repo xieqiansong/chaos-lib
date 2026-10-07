@@ -20,27 +20,6 @@ func init() {
 	routehub.RegisterV1("system-jobs", RegisterV1)
 }
 
-// Register 挂载内部动作接口，均触发有副作用的下游动作并以标准响应返回。
-func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/system-jobs")
-	g.POST("/sweep", func(c *gin.Context) {
-		taskplan.SweepScheduledTaskPlans()
-		renv.Success(c, nil)
-	})
-	g.POST("/portForwardSelfHeal", func(c *gin.Context) {
-		portfwd.SelfHealForwards()
-		renv.Success(c, nil)
-	})
-	g.POST("/stunRuleSync", func(c *gin.Context) {
-		stunsync.RunSync()
-		renv.Success(c, nil)
-	})
-	g.POST("/stunPortForwardSync", func(c *gin.Context) {
-		stunpf.RunSync()
-		renv.Success(c, nil)
-	})
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作均无需参数，直接复用内部编排逻辑。
 func RegisterV1(rg *gin.RouterGroup) {

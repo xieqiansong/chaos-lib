@@ -70,16 +70,6 @@ type previewReq struct {
 	Count    int    `json:"count"`
 }
 
-// Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组）。
-// 标准 CRUD 由通用 crud 反射生成，扩展能力挂在同一前缀下，routes.go 只写一行 cronjob.Register(api)。
-func Register(rg *gin.RouterGroup) {
-	g := crud.Register[CronJob](rg, "cron-jobs", cronJobOpts)
-	crud.RegisterToggle(g, *cronJobToggle)
-	g.POST("/:id/run", run)     // 立即执行一次
-	g.GET("/:id/runs", runs)    // 运行历史（分页）
-	g.POST("/preview", preview) // cron 表达式校验 + 触发时间预览
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 标准 CRUD + status（启停）由通用 crud 生成；自定义动作 run / runs / preview 一并迁为 POST 动作。
 func RegisterV1(rg *gin.RouterGroup) {

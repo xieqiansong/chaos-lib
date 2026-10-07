@@ -1,5 +1,5 @@
 import {subDays} from 'date-fns';
-import {API_BASE} from "@/utils/api";
+import {action} from "@/utils/request";
 
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -8,16 +8,6 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
         result.push(arr.slice(i, i + size));
     }
     return result;
-}
-
-async function postJson(path: string, payload: unknown): Promise<Response> {
-    const res = await fetch(API_BASE + path, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload),
-    });
-    console.log(`[saveBrowserHistory] POST ${path} -> ${res.status}`);
-    return res;
 }
 
 // 关键：必须为 async 且全程 await，返回 Promise。
@@ -33,7 +23,8 @@ const saveBrowserHistory = async () => {
 
         // 1) 上传历史条目（url / title / lastVisitTime / visitCount 等）
         for (const chunk of chunkArray(histories, batchSize)) {
-            await postJson("/proxy/browserHistories/save", chunk);
+            // 统一「POST + Action」信封：module=proxy, action=browserHistories/save，负载放 data。
+            await action("proxy", "browserHistories/save", chunk);
         }
 
         // 2) 上传每条 url 的访问明细（visit）
@@ -42,7 +33,7 @@ const saveBrowserHistory = async () => {
         const flushVisits = async () => {
             if (visitsBuffer.length === 0) return;
             const batch = visitsBuffer.splice(0, visitsBuffer.length);
-            await postJson("/proxy/browserHistories/saveVisits", batch);
+            await action("proxy", "browserHistories/saveVisits", batch);
         };
 
         for (const item of histories) {

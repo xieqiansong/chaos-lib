@@ -3,27 +3,26 @@
 import browser from "webextension-polyfill";
 import {saveBrowserHistory} from "./background/browser-history-backup";
 import {saveBookmarks} from "./background/bookmark-backup";
-import {API_BASE} from "@/utils/api";
+import {action} from "@/utils/request";
 
 export default defineBackground(() => {
+    // 网页 / 内部页经 runtime.sendMessage 发来的后端代理请求。
+    // 统一收敛为「POST + Action」模式（详见《接口规范.md》），不再透传任意 HTTP 方法：
+    //   - 新契约：{ module, action, data?, meta? } → action(module, action, data, meta)
+    //   - 旧契约兼容：{ path, payload? }（path 形如 'proxy/bookmarks/save'）→ 拆为 module/action
     browser.runtime.onMessage.addListener(async (msg: any) => {
-        let url = API_BASE + "/" + msg.path;
-        const noBodyMethods = ['GET', 'HEAD', 'OPTIONS', 'TRACE'];
-
-        const fetchOptions: RequestInit = {
-            method: msg.method,
-            headers: {"Content-Type": "application/json"},
-        };
-
-        if (!noBodyMethods.includes(msg.method)) {
-            fetchOptions.body = JSON.stringify(msg.payload);
-        } else if (msg.payload && Object.keys(msg.payload).length > 0) {
-            const params = new URLSearchParams(msg.payload);
-            url += '?' + params.toString();
+        if (!msg) return;
+        if (msg.module && msg.action) {
+            return await action(msg.module, msg.action, msg.data, msg.meta);
         }
-
-        const res = await fetch(url, fetchOptions);
-        return await res.json();
+        if (msg.path) {
+            const cleaned = String(msg.path).replace(/^\/+|\/+$/g, "");
+            const slash = cleaned.indexOf("/");
+            const module = slash < 0 ? cleaned : cleaned.slice(0, slash);
+            const act = slash < 0 ? "" : cleaned.slice(slash + 1);
+            return await action(module, act, msg.payload, msg.meta);
+        }
+        throw new Error("未知消息格式：缺少 module/action 或 path");
     });
 
     // 网页（chaos-ui）经 externally_connectable 发来的即时指令：直接执行并回包。

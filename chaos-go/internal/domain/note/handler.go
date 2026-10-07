@@ -43,23 +43,8 @@ var noteOpts = crud.Opts[Note]{
 	Protected:       []string{"RelPath", "ParentRel", "Name", "Title", "Summary", "SearchText", "Format", "SizeBytes", "ContentHash", "DiskMTime", "IndexedAt", "WordCount", "TagNames"},
 	BeforeCreate:    func(*Note) error { return errors.New("请通过文件系统或 POST /notes/create 创建笔记") },
 	ToResponse:      ToNoteResponses,
-	ListHandler:     listNotes,
 	V1ListHandler:   listNotes,
 	V1CreateHandler: noteCreateV1,
-}
-
-// Register 挂载笔记模块路由：标准 CRUD 交给 crud 基线，树 / 内容 / 写操作为自定义扩展。
-func Register(rg *gin.RouterGroup) {
-	g := crud.Register[Note](rg, "notes", noteOpts)
-
-	g.GET("/tree", getTree)
-	g.GET("/:id/content", getContent)
-	g.POST("/scan", scanNotes)
-	g.POST("/create", createNote)
-	g.PUT("/:id/content", putContent)
-	g.POST("/:id/rename", renameNote)
-	g.POST("/:id/move", moveNote)
-	g.POST("/:id/delete", trashNote)
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。

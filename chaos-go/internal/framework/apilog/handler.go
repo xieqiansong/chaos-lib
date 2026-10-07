@@ -20,12 +20,6 @@ var apiLogOpts = crud.Opts[ApiLog]{
 	Sortable:   []string{"id", "created_at", "latency_ms", "status_code"},
 }
 
-// Register 把本资源的路由挂载到给定路由组（通常来自 routes.go 的 api 组），
-// 纯 CRUD 交给通用 crud，前端按路径/方法/错误信息搜索、按耗时/状态排序。
-func Register(rg *gin.RouterGroup) {
-	crud.Register[ApiLog](rg, "api-logs", apiLogOpts)
-}
-
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 func RegisterV1(rg *gin.RouterGroup) {
 	crud.RegisterActions[ApiLog](rg, "api-logs", apiLogOpts, nil)

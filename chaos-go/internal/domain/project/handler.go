@@ -36,21 +36,8 @@ var projectOpts = crud.Opts[Project]{
 	Protected:    []string{"GroupID", "AbsolutePath", "RelativePath", "LastAccessedAt", "CreatedAt"},
 	BeforeCreate: PrepareProjectForCreate,
 	AfterDelete:  RemoveProjectDir,
-	ListHandler:  listProjects,
-	// v1 列表复用同一自定义实现（合并未认领目录），与存量 /api 保持一致。
+	// v1 列表复用同一自定义实现（合并未认领目录）。
 	V1ListHandler: listProjects,
-}
-
-// Register 把项目管理两套资源的路由挂载到给定路由组。
-// 标准 CRUD 交给通用 crud（回调只做转发，实现见 service.go）；
-// 项目列表（合并未认领目录）与移动 / 访问为扩展能力，自定义挂载。
-func Register(rg *gin.RouterGroup) {
-	crud.Register[ProjectGroup](rg, "project-groups", projectGroupOpts)
-	crud.Register[Project](rg, "projects", projectOpts)
-
-	projects := rg.Group("/projects")
-	projects.PATCH("/:id/move", moveProject)
-	projects.PATCH("/:id/access", accessProject)
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。

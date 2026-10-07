@@ -19,19 +19,6 @@ func init() {
 	routehub.RegisterV1("sdk", RegisterV1)
 }
 
-// Register 把 SDK 全部路由挂载到给定路由组。
-// 注意：本模块未走通用 crud，由专用 handler 直接接线，以承载版本切换/软链等定制行为。
-func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/sdks")
-	g.GET("", GetSdkVersions)
-	g.GET("/:type", GetSdkVersion)
-	g.PATCH("/:type/switch", UpdateSdkVersion)
-	g.GET("/defs", ListSdkSources)
-	g.POST("/defs", CreateSdkSource)
-	g.PATCH("/defs/:name", UpdateSdkSource)
-	g.DELETE("/defs/:name", DeleteSdkSource)
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：list / get / switch / listSources / createSource / updateSource / deleteSource；
 // 主键（type/name）与补丁字段取自信封 data。

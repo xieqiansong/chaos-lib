@@ -95,32 +95,10 @@ request.interceptors.response.use(
     },
 )
 
-/** 泛型封装：直接返回 data 业务字段（已剥离 AxiosResponse 与统一结构外层） */
-export function get<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    let fullUrl = buildUrl(url, data);
-    return request.get<ApiResponse<T>>(fullUrl, config).then((r) => r.data.data)
-}
-
-export function post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return request.post<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
-}
-
-export function put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return request.put<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
-}
-
-export function del<T = any>(url: string, config?: AxiosRequestConfig) {
-    return request.delete<ApiResponse<T>>(url, config).then((r) => r.data.data)
-}
-
-export function patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig) {
-    return request.patch<ApiResponse<T>>(url, data, config).then((r) => r.data.data)
-}
-
 /**
  * action 调用：新接口「POST + Action」统一入口（详见《接口规范.md》）。
  * 向 POST /api/v1/{module}/{action} 发送带信封的请求体，自动注入 requestId 与 timestamp。
- * 语义与 get/post 等保持一致——成功时只返回 data 业务字段（信封外层已在拦截器处理）。
+ * 成功时只返回 data 业务字段（信封外层、错误判定已在拦截器处理）。
  *
  * 示例：await action('user', 'create', { username: 'zhangsan' })
  * 对应后端：POST /api/v1/user/create，body 为 { requestId, action: 'user.create', data: {...}, timestamp }
@@ -144,21 +122,23 @@ export function action<T = any>(
         .then((r) => r.data.data)
 }
 
-function buildUrl(path: string, query?: Record<string, any>): string {
-    let url = path
-    if (query && Object.keys(query).length > 0) {
-        const params = new URLSearchParams()
-        for (const key of Object.keys(query)) {
-            if (query[key] !== undefined && query[key] !== null) {
-                params.append(key, String(query[key]))
-            }
-        }
-        const queryString = params.toString()
-        if (queryString) {
-            url += (url.includes('?') ? '&' : '?') + queryString
-        }
+/**
+ * buildEnvelope 构造统一请求信封，供需要读取响应头 / 自定义 axios 配置的特殊场景复用，
+ * 避免各处手写 requestId / timestamp / action 拼接（如 MobileBoard 的时钟校准需读 Date 头）。
+ */
+export function buildEnvelope(
+    module: string,
+    act: string,
+    data?: unknown,
+    meta?: unknown,
+): ActionEnvelope {
+    return {
+        requestId: genRequestId(),
+        action: `${module}.${act}`,
+        data: data ?? {},
+        meta,
+        timestamp: Date.now(),
     }
-    return url
 }
 
 export default request

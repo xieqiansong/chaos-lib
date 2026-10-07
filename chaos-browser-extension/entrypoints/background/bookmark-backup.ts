@@ -1,7 +1,7 @@
 // 浏览器书签树扁平化备份：把树形结构展平为节点列表上报后端 /bookmarks，
 // 供「常用书签」接口按 url 关联浏览器历史的访问次数。
 // 与 history 备份一致：必须为 async 且全程 await，避免 MV3 service worker 提前被杀。
-import {API_BASE} from "@/utils/api";
+import {action} from "@/utils/request";
 
 interface BookmarkNode {
     id: string;
@@ -32,16 +32,6 @@ function flatten(nodes: BookmarkNode[], parentId: string | null, out: any[]): an
     return out;
 }
 
-async function postJson(path: string, payload: unknown): Promise<Response> {
-    const res = await fetch(API_BASE + path, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload),
-    });
-    console.log(`[saveBookmarks] POST ${path} -> ${res.status}`);
-    return res;
-}
-
 const saveBookmarks = async () => {
     try {
         const tree = await browser.bookmarks.getTree();
@@ -50,7 +40,8 @@ const saveBookmarks = async () => {
 
         const batchSize = 256;
         for (let i = 0; i < flat.length; i += batchSize) {
-            await postJson("/proxy/bookmarks/save", flat.slice(i, i + batchSize));
+            // 统一「POST + Action」信封：module=proxy, action=bookmarks/save，负载放 data。
+            await action("proxy", "bookmarks/save", flat.slice(i, i + batchSize));
         }
     } catch (err) {
         console.error("saveBookmarks failed.", err);

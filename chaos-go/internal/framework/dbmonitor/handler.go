@@ -19,17 +19,6 @@ func init() {
 	routehub.RegisterV1("db-monitors", RegisterV1)
 }
 
-// Register 把数据库监控（只读自省）的路由挂载到给定路由组（通常来自 routes.go 的 api 组），
-// 使本资源的接口自包含、按业务分离：搜索本业务只需看 internal/dbmonitor，搜索本路由只需看这里。
-func Register(rg *gin.RouterGroup) {
-	g := rg.Group("/db-monitors")
-	{
-		g.GET("/overview", GetOverview)
-		g.GET("/tables", ListTables)
-		g.GET("/tables/:name", GetTableDetail)
-	}
-}
-
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：overview（库级总览）、listTables（表分页，参数来自信封 meta）、getTable（单表详情，表名来自 data.name）。
 func RegisterV1(rg *gin.RouterGroup) {

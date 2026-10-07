@@ -41,13 +41,6 @@ var fileLinkToggle = &crud.ToggleOpts{
 	ErrRules: linkErrRules,
 }
 
-// Register 把本资源的路由挂载到给定路由组。
-// 纯 CRUD 交给通用 crud；状态切换走基线的通用启停路由，本包只提供切换动作与错误表。
-func Register(rg *gin.RouterGroup) {
-	g := crud.Register[FileLink](rg, "file-links", fileLinkOpts)
-	crud.RegisterToggle(g, *fileLinkToggle)
-}
-
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // CRUD + status（启停）由通用 crud 生成，动作名：list/get/create/update/delete/batchCreate/batchDelete/status。
 func RegisterV1(rg *gin.RouterGroup) {

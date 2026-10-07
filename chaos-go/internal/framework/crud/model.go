@@ -1,21 +1,25 @@
-// Package crud 提供「配置即接口」的通用 REST 处理能力，作为所有简单表的标准基线。
+// Package crud 提供「配置即接口」的通用 CRUD 处理能力，作为所有简单表的标准基线。
+// 基线只生成「POST + Action」风格路由（详见仓库根《接口规范.md》），不再提供 Restful 路由。
 //
 // 设计目标：对一个只含「列表/详情/创建/更新/删除(软删)」的普通表，
-// 只需在业务包里定义模型并调用 crud.Register[Model]，无需手写任何 handler。
+// 只需在业务包里定义模型并调用 crud.RegisterActions[Model]，无需手写任何 handler。
 // 业务特有的派生字段与副作用通过 Opts[T] 的回调（ToResponse / AfterXxx）注入，基线不感知具体业务。
 //
-// 约定（与前端 useRestApi 严格对应）：
-//   - 列表 GET  /<prefix>           query: page, size, sort, order, <可搜字段>
-//   - 详情 GET  /<prefix>/:id
-//   - 创建 POST /<prefix>           body: 创建字段
-//   - 更新 PATCH /<prefix>/:id      body: 部分字段
-//   - 删除 DELETE /<prefix>/:id     软删除（is_deleted = true）
+// 约定（与前端 useRestApi 严格对应，统一「POST + Action」）：
+//   - 列表 POST /<prefix>/list        meta: page, pageSize, sort, order, keyword, filter, like
+//   - 详情 POST /<prefix>/get         data: { id }
+//   - 创建 POST /<prefix>/create      data: 创建字段
+//   - 更新 POST /<prefix>/update      data: 部分字段（含 id）
+//   - 删除 POST /<prefix>/delete      data: { id }（软删除）
+//   - 批量创建 POST /<prefix>/batchCreate     data: { items }
+//   - 批量删除 POST /<prefix>/batchDelete     data: { ids }
+//   - 状态切换 POST /<prefix>/status  data: { id, status }（带副作用，见 ToggleOpts）
 //
-// 状态切换等扩展能力不内置在基线里，而是由业务包按需以「自定义路由」自行实现并挂载
-// （见各业务包的 Register）。这样基线只负责纯 CRUD，扩展能力下沉到业务包，互不污染。
+// 状态切换等扩展能力不内置在基线里，而是由业务包按需以「自定义动作」自行实现并挂载
+// （见各业务包的 RegisterV1）。这样基线只负责纯 CRUD，扩展能力下沉到业务包，互不污染。
 //
-// 列表响应统一为分页结构 { items, total, page, size }；单条/创建/更新返回
-// { message, data }；删除返回 { message }；错误返回 { error }。
+// 列表响应统一为分页结构 { list, pagination }；单条/创建/更新返回 data；删除返回空 data；
+// 错误统一由 resp 信封以 code 区分（HTTP 恒为 200）。
 package crud
 
 import (
@@ -51,8 +55,8 @@ type Opts[T any] struct {
 	Searchable []string
 	// Sortable: 允许排序的「列名」白名单（snake_case），未列出则忽略 sort 参数。
 	Sortable []string
-	// Protected: PATCH 更新时剔除的业务字段（如 status）。
-	// 用于「只能通过带副作用的专属路由改写」的字段，避免通用 PATCH 绕过副作用。
+	// Protected: update 动作更新时剔除的业务字段（如 status）。
+	// 用于「只能通过带副作用的专属路由改写」的字段，避免通用 update 绕过副作用。
 	Protected []string
 
 	// ToResponse: 读方向回调，把 []*T 整批转换为响应形态（通常 DTO 切片）。
@@ -69,14 +73,12 @@ type Opts[T any] struct {
 	AfterUpdate func(row *T) error
 	AfterDelete func(row *T) error
 
-	// ListHandler: 可选列表处理器覆盖。设置后，GET /<prefix> 走该自定义实现而非基线 list，
-	// 用于列表需要「派生数据 / 外部副作用（如扫描磁盘）」的场景（如项目管理：合并已认领 + 未认领目录）。
-	// 自定义实现须自行处理分页/搜索/软删过滤，并返回统一分页结构 { items, total, page, size }。
-	ListHandler func(c *gin.Context)
-
 	// V1ListHandler: 可选列表处理器覆盖（仅 v1 动作路由生效）。设置后，POST /<prefix>/list 走该
-	// 自定义实现而非基线 listAction，用于 v1 下列表需要派生数据 / 外部副作用的场景。
-	// 与 ListHandler 对称：Restful 侧用 ListHandler，v1 侧用 V1ListHandler。
+	// 自定义实现而非基线 listAction，用于 v1 下列表需要派生数据 / 外部副作用（如扫描磁盘）的场景
+	// （如项目管理：合并已认领 + 未认领目录）。自定义实现须自行处理分页/搜索/软删过滤，
+	// 并返回统一分页结构 { list, pagination }。
+	//
+	// 注：原 Restful 侧的 ListHandler 已随 crud.Register 下线移除，仅保留 v1 的 V1ListHandler。
 	V1ListHandler func(c *gin.Context)
 
 	// V1CreateHandler: 可选创建处理器覆盖（仅 v1 动作路由生效）。设置后，POST /<prefix>/create 走该
