@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 const deepseekBalanceURL = "https://api.deepseek.com/user/balance"
 
-func GetDeepSeekBalance(c *gin.Context) {
+func GetDeepSeekBalance(c *web.Context) {
 	apiKey := config.GetConfig().DeepSeek.APIKey
 	if apiKey == "" {
 		renv.Error(c, http.StatusServiceUnavailable, "未配置 DeepSeek API Key，请在服务端 configs/config.yaml 中设置")

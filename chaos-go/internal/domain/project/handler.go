@@ -11,7 +11,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -43,7 +43,7 @@ var projectOpts = crud.Opts[Project]{
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 两套资源的标准 CRUD 由通用 crud 生成；自定义列表（合并未认领目录）经 V1ListHandler 复用；
 // move / access 以动作形式补齐（v1 下已完备，可安全删除存量 /api 路由）。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[ProjectGroup](rg, "project-groups", projectGroupOpts, nil)
 	projects := crud.RegisterActions[Project](rg, "projects", projectOpts, nil)
 	projects.POST("/move", projectMoveV1)
@@ -53,7 +53,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 // ── 自定义列表 ──────────────────────────────────────────────────
 
 // listProjects 自定义列表：按 groupId 过滤，合并磁盘扫描出的未认领子目录（合并逻辑在 service）。
-func listProjects(c *gin.Context) {
+func listProjects(c *web.Context) {
 	q := pagination.Parse(c)
 	var groupID *int
 	if gid := c.Query("groupId"); gid != "" {
@@ -89,7 +89,7 @@ func listProjects(c *gin.Context) {
 // ── 扩展动作 ────────────────────────────────────────────────────
 
 // moveProject 移动项目文件夹并同步路径字段（PATCH /projects/:id/move）。
-func moveProject(c *gin.Context) {
+func moveProject(c *web.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, "无效的项目ID")
@@ -121,7 +121,7 @@ func moveProject(c *gin.Context) {
 }
 
 // accessProject 记录项目访问时间（PATCH /projects/:id/access）。
-func accessProject(c *gin.Context) {
+func accessProject(c *web.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, "无效的项目ID")
@@ -141,7 +141,7 @@ func accessProject(c *gin.Context) {
 // ── v1 动作（POST + Action）─────────────────────────────────────────
 
 // projectMoveV1 移动项目（POST /api/v1/projects/move）。v1 路径不带 :id，主键取自信封 data.id。
-func projectMoveV1(c *gin.Context) {
+func projectMoveV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -172,7 +172,7 @@ func projectMoveV1(c *gin.Context) {
 }
 
 // projectAccessV1 记录项目访问时间（POST /api/v1/projects/access）。
-func projectAccessV1(c *gin.Context) {
+func projectAccessV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return

@@ -13,17 +13,16 @@ import (
 	"strconv"
 
 	renv "chaos-go/internal/framework/resp"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // ParseID 解析路径参数 :id 为整数；失败时直接写 400 并返回 false，调用方据此 return。
-func ParseID(c *gin.Context) (int, bool) {
+func ParseID(c *web.Context) (int, bool) {
 	return ParseParam(c, "id")
 }
 
 // ParseParam 解析指定路径参数为整数；失败时直接写 400 并返回 false，调用方据此 return。
-func ParseParam(c *gin.Context, name string) (int, bool) {
+func ParseParam(c *web.Context, name string) (int, bool) {
 	id, err := strconv.Atoi(c.Param(name))
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -40,7 +39,7 @@ type ErrRule struct {
 }
 
 // MapError 按规则表把领域错误映射为响应；未命中任何规则时以 fallback 状态（默认 500）返回。
-func MapError(c *gin.Context, err error, rules []ErrRule, fallback ...int) {
+func MapError(c *web.Context, err error, rules []ErrRule, fallback ...int) {
 	for _, r := range rules {
 		if r.Err != nil && errors.Is(err, r.Err) {
 			msg := r.Msg

@@ -9,7 +9,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -59,7 +59,7 @@ var pfToggle = &crud.ToggleOpts{
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 两个资源的标准 CRUD + port-forwards 的 status 由通用 crud 生成；
 // ssh-conns 的 test 自定义动作一并迁为 POST 动作。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	ssh := crud.RegisterActions[SshConnection](rg, "ssh-conns", sshOpts, nil)
 	ssh.POST("/test", testSshV1)
 	crud.RegisterActions[PortForwarding](rg, "port-forwards", pfOpts, pfToggle)
@@ -68,7 +68,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 // ── 自定义路由 ──────────────────────────────────────────────────
 
 // testSshConnection 测试 SSH 连接可达性与凭据有效性（POST /ssh-conns/:id/test）。
-func testSshConnection(c *gin.Context) {
+func testSshConnection(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -77,7 +77,7 @@ func testSshConnection(c *gin.Context) {
 }
 
 // testSshV1 是 testSshConnection 的「POST + Action」版（POST /api/v1/ssh-conns/test，body {id}）。
-func testSshV1(c *gin.Context) {
+func testSshV1(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`
 	}
@@ -88,7 +88,7 @@ func testSshV1(c *gin.Context) {
 	doTestSsh(c, req.ID)
 }
 
-func doTestSsh(c *gin.Context, id int) {
+func doTestSsh(c *web.Context, id int) {
 	result, err := TestSshConn(id)
 	if err != nil {
 		httpx.MapError(c, err, connErrRules, http.StatusBadRequest)

@@ -9,7 +9,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -22,9 +22,9 @@ func init() {
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：list / get / switch / listSources / createSource / updateSource / deleteSource；
 // 主键（type/name）与补丁字段取自信封 data。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/sdks")
-	g.POST("/list", func(c *gin.Context) {
+	g.POST("/list", func(c *web.Context) {
 		result, err := SdkVersions()
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, err.Error())
@@ -32,7 +32,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, result)
 	})
-	g.POST("/get", func(c *gin.Context) {
+	g.POST("/get", func(c *web.Context) {
 		var req struct {
 			Type string `json:"type"`
 		}
@@ -44,7 +44,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, info)
 	})
-	g.POST("/switch", func(c *gin.Context) {
+	g.POST("/switch", func(c *web.Context) {
 		var req struct {
 			Type    string `json:"type"`
 			Version string `json:"version"`
@@ -60,7 +60,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, nil)
 	})
-	g.POST("/listSources", func(c *gin.Context) {
+	g.POST("/listSources", func(c *web.Context) {
 		srcs, err := ListSources()
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, err.Error())
@@ -68,7 +68,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, srcs)
 	})
-	g.POST("/createSource", func(c *gin.Context) {
+	g.POST("/createSource", func(c *web.Context) {
 		var req SdkSource
 		if err := envelope.Bind(c, &req); err != nil {
 			renv.Error(c, http.StatusBadRequest, err.Error())
@@ -84,7 +84,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, req)
 	})
-	g.POST("/updateSource", func(c *gin.Context) {
+	g.POST("/updateSource", func(c *web.Context) {
 		var req struct {
 			Name        string `json:"name"`
 			SourcePatch SourcePatch
@@ -100,7 +100,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, updated)
 	})
-	g.POST("/deleteSource", func(c *gin.Context) {
+	g.POST("/deleteSource", func(c *web.Context) {
 		var req struct {
 			Name string `json:"name"`
 		}
@@ -114,7 +114,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 }
 
 // GetSdkVersions 返回所有启用 SDK 类型的版本信息，map key = 类型 Name。
-func GetSdkVersions(c *gin.Context) {
+func GetSdkVersions(c *web.Context) {
 	result, err := SdkVersions()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
@@ -124,7 +124,7 @@ func GetSdkVersions(c *gin.Context) {
 }
 
 // GetSdkVersion 返回指定类型的版本信息。
-func GetSdkVersion(c *gin.Context) {
+func GetSdkVersion(c *web.Context) {
 	info, err := SdkVersion(c.Param("type"))
 	if err != nil {
 		httpx.MapError(c, err, sdkErrRules)
@@ -134,11 +134,11 @@ func GetSdkVersion(c *gin.Context) {
 }
 
 // UpdateSdkVersion 切换版本：仅对 repo 来源生效。
-func UpdateSdkVersion(c *gin.Context) {
+func UpdateSdkVersion(c *web.Context) {
 	var req struct {
 		Version string
 	}
-	if err := c.BindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, "Invalid JSON body")
 		return
 	}
@@ -156,7 +156,7 @@ func UpdateSdkVersion(c *gin.Context) {
 // ── SDK 类型 CRUD ──
 
 // ListSdkSources 列出所有未删除的 SDK 类型。
-func ListSdkSources(c *gin.Context) {
+func ListSdkSources(c *web.Context) {
 	srcs, err := ListSources()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, err.Error())
@@ -166,7 +166,7 @@ func ListSdkSources(c *gin.Context) {
 }
 
 // CreateSdkSource 新增 SDK 类型。
-func CreateSdkSource(c *gin.Context) {
+func CreateSdkSource(c *web.Context) {
 	var req SdkSource
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -184,7 +184,7 @@ func CreateSdkSource(c *gin.Context) {
 }
 
 // UpdateSdkSource 编辑 SDK 类型（Sources/Current/Enabled/Note）。
-func UpdateSdkSource(c *gin.Context) {
+func UpdateSdkSource(c *web.Context) {
 	var patch SourcePatch
 	if err := c.ShouldBindJSON(&patch); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -199,7 +199,7 @@ func UpdateSdkSource(c *gin.Context) {
 }
 
 // DeleteSdkSource 软删除 SDK 类型。
-func DeleteSdkSource(c *gin.Context) {
+func DeleteSdkSource(c *web.Context) {
 	if err := DeleteSource(c.Param("name")); err != nil {
 		httpx.MapError(c, err, sdkErrRules)
 		return

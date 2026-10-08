@@ -16,12 +16,12 @@ import (
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // RegisterNoteV1Actions 在 v1 的 /notes 组下挂载笔记的自定义动作。
 // 由 RegisterV1 在 crud.RegisterActions 之后调用。
-func RegisterNoteV1Actions(g *gin.RouterGroup) {
+func RegisterNoteV1Actions(g *web.RouterGroup) {
 	g.POST("/tree", noteTreeV1)
 	g.POST("/getContent", noteGetContentV1)
 	g.POST("/scan", noteScanV1)
@@ -32,7 +32,7 @@ func RegisterNoteV1Actions(g *gin.RouterGroup) {
 }
 
 // noteTreeV1 目录树（POST /api/v1/notes/tree）。无参数，直接复用 service。
-func noteTreeV1(c *gin.Context) {
+func noteTreeV1(c *web.Context) {
 	nodes, err := Tree()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "构建目录树失败: "+err.Error())
@@ -42,7 +42,7 @@ func noteTreeV1(c *gin.Context) {
 }
 
 // noteGetContentV1 按 id 读取磁盘原文（POST /api/v1/notes/getContent）。
-func noteGetContentV1(c *gin.Context) {
+func noteGetContentV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -58,7 +58,7 @@ func noteGetContentV1(c *gin.Context) {
 		httpx.MapError(c, err, errRules, http.StatusInternalServerError)
 		return
 	}
-	renv.Success(c, gin.H{
+	renv.Success(c, map[string]any{
 		"relPath":     n.RelPath,
 		"name":        n.Name,
 		"format":      n.Format,
@@ -69,7 +69,7 @@ func noteGetContentV1(c *gin.Context) {
 }
 
 // noteScanV1 触发一次 Vault 扫描（POST /api/v1/notes/scan）。full 经 meta 传入。
-func noteScanV1(c *gin.Context) {
+func noteScanV1(c *web.Context) {
 	var m struct {
 		Full bool `json:"full"`
 	}
@@ -84,7 +84,7 @@ func noteScanV1(c *gin.Context) {
 
 // noteSaveContentV1 保存正文（带 baseHash 乐观锁，POST /api/v1/notes/saveContent）。
 // 冲突时返回真实 HTTP 409 + conflict 详情（前端据此做「覆盖 / 重载」），与存量一致。
-func noteSaveContentV1(c *gin.Context) {
+func noteSaveContentV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -99,7 +99,7 @@ func noteSaveContentV1(c *gin.Context) {
 	if err != nil {
 		if conflict != nil {
 			// 冲突是唯一需要真实 409 的场景：前端从 axios 错误的 response.data.conflict 读取详情。
-			c.JSON(http.StatusConflict, gin.H{
+			c.JSON(http.StatusConflict, map[string]any{
 				"code":     http.StatusConflict,
 				"message":  ErrConflict.Error(),
 				"conflict": conflict,
@@ -113,7 +113,7 @@ func noteSaveContentV1(c *gin.Context) {
 }
 
 // noteRenameV1 重命名笔记文件（仅改文件名，POST /api/v1/notes/rename）。
-func noteRenameV1(c *gin.Context) {
+func noteRenameV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -133,7 +133,7 @@ func noteRenameV1(c *gin.Context) {
 }
 
 // noteMoveV1 移动笔记到目标目录（根级传空串，POST /api/v1/notes/move）。
-func noteMoveV1(c *gin.Context) {
+func noteMoveV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -153,7 +153,7 @@ func noteMoveV1(c *gin.Context) {
 }
 
 // noteTrashV1 移入回收站（POST /api/v1/notes/trash）。
-func noteTrashV1(c *gin.Context) {
+func noteTrashV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		renv.Error(c, http.StatusBadRequest, "无效的ID")
@@ -163,12 +163,12 @@ func noteTrashV1(c *gin.Context) {
 		httpx.MapError(c, err, errRules, http.StatusInternalServerError)
 		return
 	}
-	renv.Success(c, gin.H{"ok": true})
+	renv.Success(c, map[string]any{"ok": true})
 }
 
 // noteCreateV1 新建空笔记文件并建索引（POST /api/v1/notes/create）。
 // 作为 V1CreateHandler 覆盖基线 createAction（基线 BeforeCreate 已禁掉通用插库）。
-func noteCreateV1(c *gin.Context) {
+func noteCreateV1(c *web.Context) {
 	var req CreateRequest
 	if err := envelope.Bind(c, &req); err != nil {
 		renv.Error(c, http.StatusBadRequest, "请求格式错误")

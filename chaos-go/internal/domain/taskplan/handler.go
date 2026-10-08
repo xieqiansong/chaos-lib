@@ -11,7 +11,7 @@ import (
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 登记 v1 路由挂载函数到 routehub（使 internal/app 导入该包即自动生效）。
@@ -21,7 +21,7 @@ import (
 // ── 计划 ────────────────────────────────────────────────────────
 
 // CreateTaskPlan 创建任务计划（待办类型须带 startedAt，并生成首条任务）。
-func CreateTaskPlan(c *gin.Context) {
+func CreateTaskPlan(c *web.Context) {
 	var req CreatePlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -36,7 +36,7 @@ func CreateTaskPlan(c *gin.Context) {
 }
 
 // ListTaskPlans 按类型 / 状态列出计划。
-func ListTaskPlans(c *gin.Context) {
+func ListTaskPlans(c *web.Context) {
 	plans, err := ListPlans(c.Query("planType"), c.Query("status"))
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -46,7 +46,7 @@ func ListTaskPlans(c *gin.Context) {
 }
 
 // GetTaskPlanTree 返回计划树；?search= 按名称 / 备注过滤并保留祖先链。
-func GetTaskPlanTree(c *gin.Context) {
+func GetTaskPlanTree(c *web.Context) {
 	tree, err := PlanTree(c.Query("search"))
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -56,7 +56,7 @@ func GetTaskPlanTree(c *gin.Context) {
 }
 
 // GetTaskPlan 返回单个计划。
-func GetTaskPlan(c *gin.Context) {
+func GetTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -70,7 +70,7 @@ func GetTaskPlan(c *gin.Context) {
 }
 
 // UpdateTaskPlan 按字段更新计划。
-func UpdateTaskPlan(c *gin.Context) {
+func UpdateTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -89,7 +89,7 @@ func UpdateTaskPlan(c *gin.Context) {
 }
 
 // StartTaskPlan 开启计划（必要时生成首条任务）。
-func StartTaskPlan(c *gin.Context) {
+func StartTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -103,7 +103,7 @@ func StartTaskPlan(c *gin.Context) {
 }
 
 // CompleteTaskPlan 完成计划并结束其进行中的任务。
-func CompleteTaskPlan(c *gin.Context) {
+func CompleteTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -117,7 +117,7 @@ func CompleteTaskPlan(c *gin.Context) {
 }
 
 // ArchiveTaskPlan 归档计划。
-func ArchiveTaskPlan(c *gin.Context) {
+func ArchiveTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -131,7 +131,7 @@ func ArchiveTaskPlan(c *gin.Context) {
 }
 
 // DeleteTaskPlan 删除计划；?cascade=true 时连同子孙计划与任务一起删除。
-func DeleteTaskPlan(c *gin.Context) {
+func DeleteTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -145,7 +145,7 @@ func DeleteTaskPlan(c *gin.Context) {
 }
 
 // SuspendTaskPlan 挂起计划及其子孙。
-func SuspendTaskPlan(c *gin.Context) {
+func SuspendTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -158,7 +158,7 @@ func SuspendTaskPlan(c *gin.Context) {
 }
 
 // ResumeTaskPlan 恢复计划及其子孙。
-func ResumeTaskPlan(c *gin.Context) {
+func ResumeTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -171,7 +171,7 @@ func ResumeTaskPlan(c *gin.Context) {
 }
 
 // SetPriorityTaskPlan 设置计划及其子孙的优先级。
-func SetPriorityTaskPlan(c *gin.Context) {
+func SetPriorityTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -195,7 +195,7 @@ func SetPriorityTaskPlan(c *gin.Context) {
 }
 
 // ListPlanTasks 列出某计划下的任务。
-func ListPlanTasks(c *gin.Context) {
+func ListPlanTasks(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -211,7 +211,7 @@ func ListPlanTasks(c *gin.Context) {
 // ── 任务 ────────────────────────────────────────────────────────
 
 // GetPendingTasks 待处理任务列表（分页）。
-func GetPendingTasks(c *gin.Context) {
+func GetPendingTasks(c *web.Context) {
 	now := time.Now()
 	early := c.Query("early") == "1"
 
@@ -233,7 +233,7 @@ func GetPendingTasks(c *gin.Context) {
 }
 
 // CompleteTask 完成任务（interval 类型须带 rating）。
-func CompleteTask(c *gin.Context) {
+func CompleteTask(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -254,7 +254,7 @@ func CompleteTask(c *gin.Context) {
 }
 
 // PostponeTask 单条任务延期（body {days}）。
-func PostponeTask(c *gin.Context) {
+func PostponeTask(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -274,7 +274,7 @@ func PostponeTask(c *gin.Context) {
 }
 
 // BatchPostponeTasks 批量延期（body {ids, days}），返回逐项结果与汇总。
-func BatchPostponeTasks(c *gin.Context) {
+func BatchPostponeTasks(c *web.Context) {
 	var req struct {
 		IDs  []int `json:"ids"`
 		Days int   `json:"days"`
@@ -296,7 +296,7 @@ func BatchPostponeTasks(c *gin.Context) {
 }
 
 // CancelTask 取消任务（仅 cron / interval 支持），并生成下一条。
-func CancelTask(c *gin.Context) {
+func CancelTask(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return

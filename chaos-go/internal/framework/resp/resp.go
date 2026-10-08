@@ -20,24 +20,23 @@ import (
 	"net/http"
 
 	renv "chaos-go/internal/framework/envelope"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // Success 返回成功信封，data 可为任意载荷（分页时为 pagination.PageData）。
-func Success(c *gin.Context, data interface{}) {
+func Success(c *web.Context, data interface{}) {
 	c.JSON(http.StatusOK, envelope(c, CodeOK, "ok", data))
 }
 
 // SuccessMsg 与 Success 类似，但允许自定义成功 message（极少数场景使用）。
-func SuccessMsg(c *gin.Context, message string, data interface{}) {
+func SuccessMsg(c *web.Context, message string, data interface{}) {
 	c.JSON(http.StatusOK, envelope(c, CodeOK, message, data))
 }
 
 // Error 返回错误信封。HTTP 状态统一为 200，code 由 status 经 statusToCode 映射为
 // 规范业务错误码（见 code.go）。存量调用 renv.Error(c, http.StatusXxx, msg) 无需改动即可
 // 获得业务码；新增代码建议直接用 ErrorCode 显式传业务码。
-func Error(c *gin.Context, status int, message string) {
+func Error(c *web.Context, status int, message string) {
 	if status < 400 {
 		status = 400
 	}
@@ -46,7 +45,7 @@ func Error(c *gin.Context, status int, message string) {
 
 // ErrorCode 返回错误信封并直接指定业务错误码（如 resp.CodeUnauthorized = 40100），
 // HTTP 状态统一为 200。用于需要精确业务码的场景（如鉴权中间件）。
-func ErrorCode(c *gin.Context, code int, message string) {
+func ErrorCode(c *web.Context, code int, message string) {
 	if code < 0 {
 		code = CodeSystemError
 	}
@@ -54,7 +53,7 @@ func ErrorCode(c *gin.Context, code int, message string) {
 }
 
 // envelope 组装统一响应信封，自动填充 requestId 与 timestamp。
-func envelope(c *gin.Context, code int, message string, data interface{}) renv.Response {
+func envelope(c *web.Context, code int, message string, data interface{}) renv.Response {
 	return renv.Response{
 		Code:      code,
 		Message:   message,

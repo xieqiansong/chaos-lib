@@ -25,7 +25,7 @@ package crud
 import (
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 	"gorm.io/plugin/soft_delete"
 )
 
@@ -79,11 +79,11 @@ type Opts[T any] struct {
 	// 并返回统一分页结构 { list, pagination }。
 	//
 	// 注：原 Restful 侧的 ListHandler 已随 crud.Register 下线移除，仅保留 v1 的 V1ListHandler。
-	V1ListHandler func(c *gin.Context)
+	V1ListHandler func(c *web.Context)
 
 	// V1CreateHandler: 可选创建处理器覆盖（仅 v1 动作路由生效）。设置后，POST /<prefix>/create 走该
 	// 自定义实现而非基线 createAction。用于「创建不走通用插库」的模型（如笔记：文件优先模型，
 	// 须由专用 create 走文件系统创建，基线 BeforeCreate 已将其禁掉）。此时基线 createAction
 	// 及其 BeforeCreate 校验均被跳过，由自定义实现自行绑定与返回。
-	V1CreateHandler func(c *gin.Context)
+	V1CreateHandler func(c *web.Context)
 }

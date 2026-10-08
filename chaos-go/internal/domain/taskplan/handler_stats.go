@@ -10,11 +10,11 @@ import (
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // GetTaskDailyStats 每日完成任务数（默认最近 30 天，可用 ?days= 指定）。
-func GetTaskDailyStats(c *gin.Context) {
+func GetTaskDailyStats(c *web.Context) {
 	days, err := parseDaysParam(c, 29)
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -29,7 +29,7 @@ func GetTaskDailyStats(c *gin.Context) {
 }
 
 // GetTaskActiveStats 区间内每日「任务开始」数（?start / ?end，YYYY-MM-DD）。
-func GetTaskActiveStats(c *gin.Context) {
+func GetTaskActiveStats(c *web.Context) {
 	start, end, err := parseRange(c, todayStart())
 	if err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -45,7 +45,7 @@ func GetTaskActiveStats(c *gin.Context) {
 
 // GetTaskContributionStats 近一年每日完成任务数（GitHub 风格贡献热力图）。
 // 可用 ?planId= 指定根计划，或用 ?rootName= 指定根计划名（默认「每日任务」）。
-func GetTaskContributionStats(c *gin.Context) {
+func GetTaskContributionStats(c *web.Context) {
 	planID := 0
 	if pid := strings.TrimSpace(c.Query("planId")); pid != "" {
 		id, err := strconv.Atoi(pid)
@@ -66,7 +66,7 @@ func GetTaskContributionStats(c *gin.Context) {
 // ── 参数解析 ────────────────────────────────────────────────────
 
 // parseDaysParam 解析前端传入的 days（正整数），缺省时回退到默认值。
-func parseDaysParam(c *gin.Context, def int) (int, error) {
+func parseDaysParam(c *web.Context, def int) (int, error) {
 	v := c.Query("days")
 	if v == "" {
 		return def, nil
@@ -80,7 +80,7 @@ func parseDaysParam(c *gin.Context, def int) (int, error) {
 
 // parseRange 解析前端传入的 start/end（YYYY-MM-DD），缺省时回退到默认范围
 // （今天-6 天到今天+24 天），保持改动前的展示效果。
-func parseRange(c *gin.Context, today time.Time) (start, end time.Time, err error) {
+func parseRange(c *web.Context, today time.Time) (start, end time.Time, err error) {
 	defaultStart := today.AddDate(0, 0, -6)
 	defaultEnd := today.AddDate(0, 0, 24)
 
@@ -98,7 +98,7 @@ func parseRange(c *gin.Context, today time.Time) (start, end time.Time, err erro
 	return start, end, nil
 }
 
-func parseDateParam(c *gin.Context, name string, def time.Time) (time.Time, error) {
+func parseDateParam(c *web.Context, name string, def time.Time) (time.Time, error) {
 	v := c.Query(name)
 	if v == "" {
 		return def, nil

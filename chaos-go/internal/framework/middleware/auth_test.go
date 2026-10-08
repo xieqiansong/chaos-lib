@@ -10,12 +10,12 @@ import (
 	renv "chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // newTestRouter 构造只含 v1 + 信封 + 鉴权中间件的测试路由。
-func newTestRouter(t *testing.T, token, deny string) *gin.Engine {
-	gin.SetMode(gin.TestMode)
+func newTestRouter(t *testing.T, token, deny string) *web.Router {
+	
 	if token != "" {
 		t.Setenv("CHAOS_API_TOKEN", token)
 	} else {
@@ -26,17 +26,17 @@ func newTestRouter(t *testing.T, token, deny string) *gin.Engine {
 	} else {
 		t.Setenv("CHAOS_API_DENY_ACTIONS", "")
 	}
-	r := gin.New()
+	r := web.NewRouter()
 	v1 := r.Group("/api/v1")
 	v1.Use(renv.Middleware())
 	v1.Use(AuthMiddleware())
-	v1.POST("/demo/ping", func(c *gin.Context) {
-		resp.Success(c, gin.H{"ok": true})
+	v1.POST("/demo/ping", func(c *web.Context) {
+		resp.Success(c, map[string]any{"ok": true})
 	})
 	return r
 }
 
-func doPost(r *gin.Engine, path, token string) *httptest.ResponseRecorder {
+func doPost(r *web.Router, path, token string) *httptest.ResponseRecorder {
 	payload := renv.Request{Action: "demo.ping", Data: json.RawMessage(`{}`)}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))

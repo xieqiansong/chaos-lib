@@ -10,7 +10,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -23,9 +23,9 @@ func init() {
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：list / create / delete / getContent / updateContent / listSnapshots / getSnapshot / restore；
 // 主键与分页取自信封，复用既有 service 函数。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/quick-edits")
-	g.POST("/list", func(c *gin.Context) {
+	g.POST("/list", func(c *web.Context) {
 		items, err := ListFilesWithSnapshot()
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -33,7 +33,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, items)
 	})
-	g.POST("/create", func(c *gin.Context) {
+	g.POST("/create", func(c *web.Context) {
 		var req struct {
 			Name     string `json:"name"`
 			FilePath string `json:"filePath"`
@@ -49,9 +49,9 @@ func RegisterV1(rg *gin.RouterGroup) {
 			return
 		}
 		resp := buildFileResponse(*file)
-		renv.Success(c, gin.H{"message": "创建成功", "data": resp, "firstSnapshotId": snapshot.ID})
+		renv.Success(c, map[string]any{"message": "创建成功", "data": resp, "firstSnapshotId": snapshot.ID})
 	})
-	g.POST("/delete", func(c *gin.Context) {
+	g.POST("/delete", func(c *web.Context) {
 		id, ok := envelope.ID(c)
 		if !ok {
 			renv.Error(c, http.StatusBadRequest, "缺少 id")
@@ -63,7 +63,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, nil)
 	})
-	g.POST("/getContent", func(c *gin.Context) {
+	g.POST("/getContent", func(c *web.Context) {
 		id, ok := envelope.ID(c)
 		if !ok {
 			renv.Error(c, http.StatusBadRequest, "缺少 id")
@@ -76,7 +76,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, view)
 	})
-	g.POST("/updateContent", func(c *gin.Context) {
+	g.POST("/updateContent", func(c *web.Context) {
 		id, ok := envelope.ID(c)
 		if !ok {
 			renv.Error(c, http.StatusBadRequest, "缺少 id")
@@ -93,7 +93,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, saveResultToMap(res, false))
 	})
-	g.POST("/listSnapshots", func(c *gin.Context) {
+	g.POST("/listSnapshots", func(c *web.Context) {
 		id, ok := envelope.ID(c)
 		if !ok {
 			renv.Error(c, http.StatusBadRequest, "缺少 id")
@@ -118,7 +118,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, pagination.New(items, total, q))
 	})
-	g.POST("/getSnapshot", func(c *gin.Context) {
+	g.POST("/getSnapshot", func(c *web.Context) {
 		var req struct {
 			FileID     int `json:"fileId"`
 			SnapshotID int `json:"snapshotId"`
@@ -132,7 +132,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 			httpx.MapError(c, err, errRules)
 			return
 		}
-		renv.Success(c, gin.H{
+		renv.Success(c, map[string]any{
 			"id":        snap.ID,
 			"fileId":    snap.FileID,
 			"content":   snap.Content,
@@ -140,7 +140,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 			"createdAt": snap.CreatedAt,
 		})
 	})
-	g.POST("/restore", func(c *gin.Context) {
+	g.POST("/restore", func(c *web.Context) {
 		var req struct {
 			FileID     int `json:"fileId"`
 			SnapshotID int `json:"snapshotId"`
@@ -159,7 +159,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 }
 
 // quickEditErr 把受管控文件相关的领域错误映射为 HTTP 状态码（与存量 CreateQuickEdit 一致）。
-func quickEditErr(c *gin.Context, err error) {
+func quickEditErr(c *web.Context, err error) {
 	switch {
 	case errors.Is(err, ErrFileExists), errors.Is(err, ErrPathNotFound),
 		errors.Is(err, ErrInvalidPath), errors.Is(err, ErrContentTooLarge):
@@ -170,7 +170,7 @@ func quickEditErr(c *gin.Context, err error) {
 }
 
 // ListQuickEdits 列出受管控文件（含最近一次快照信息）。
-func ListQuickEdits(c *gin.Context) {
+func ListQuickEdits(c *web.Context) {
 	items, err := ListFilesWithSnapshot()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -180,7 +180,7 @@ func ListQuickEdits(c *gin.Context) {
 }
 
 // CreateQuickEdit 登记一个受管控文件并落首条快照。
-func CreateQuickEdit(c *gin.Context) {
+func CreateQuickEdit(c *web.Context) {
 	var req struct {
 		Name     string
 		FilePath string
@@ -202,7 +202,7 @@ func CreateQuickEdit(c *gin.Context) {
 		return
 	}
 	resp := buildFileResponse(*file)
-	renv.Success(c, gin.H{
+	renv.Success(c, map[string]any{
 		"message":         "创建成功",
 		"data":            resp,
 		"firstSnapshotId": snapshot.ID,
@@ -210,7 +210,7 @@ func CreateQuickEdit(c *gin.Context) {
 }
 
 // DeleteQuickEdit 删除受管控文件记录（不动磁盘文件）。
-func DeleteQuickEdit(c *gin.Context) {
+func DeleteQuickEdit(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -227,7 +227,7 @@ func DeleteQuickEdit(c *gin.Context) {
 }
 
 // GetQuickEditContent 读取文件当前内容（虚拟文件走 envvar 回调）。
-func GetQuickEditContent(c *gin.Context) {
+func GetQuickEditContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -241,7 +241,7 @@ func GetQuickEditContent(c *gin.Context) {
 }
 
 // UpdateQuickEditContent 保存内容并追加一条快照。
-func UpdateQuickEditContent(c *gin.Context) {
+func UpdateQuickEditContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -260,7 +260,7 @@ func UpdateQuickEditContent(c *gin.Context) {
 }
 
 // ListQuickEditSnapshots 分页列出某文件的历史快照。
-func ListQuickEditSnapshots(c *gin.Context) {
+func ListQuickEditSnapshots(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -275,7 +275,7 @@ func ListQuickEditSnapshots(c *gin.Context) {
 }
 
 // GetQuickEditSnapshot 读取单条快照内容。
-func GetQuickEditSnapshot(c *gin.Context) {
+func GetQuickEditSnapshot(c *web.Context) {
 	fileID, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -289,7 +289,7 @@ func GetQuickEditSnapshot(c *gin.Context) {
 		httpx.MapError(c, err, errRules)
 		return
 	}
-	renv.Success(c, gin.H{
+	renv.Success(c, map[string]any{
 		"id":        snap.ID,
 		"fileId":    snap.FileID,
 		"content":   snap.Content,
@@ -299,7 +299,7 @@ func GetQuickEditSnapshot(c *gin.Context) {
 }
 
 // RestoreQuickEdit 回滚到指定快照，并追加一条新快照。
-func RestoreQuickEdit(c *gin.Context) {
+func RestoreQuickEdit(c *web.Context) {
 	fileID, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -328,8 +328,8 @@ var errRules = []httpx.ErrRule{
 }
 
 // saveResultToMap 把保存 / 回滚结果转为响应体；withFrom 时附带来源快照 id。
-func saveResultToMap(res *SaveResult, withFrom bool) gin.H {
-	out := gin.H{
+func saveResultToMap(res *SaveResult, withFrom bool) map[string]any {
+	out := map[string]any{
 		"message":      res.Message,
 		"data":         res.Data,
 		"snapshotId":   res.SnapshotID,

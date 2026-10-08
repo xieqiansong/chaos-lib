@@ -9,7 +9,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的 v1 路由挂载函数登记到 routehub（与存量 /api 并存，双轨迁移）。
@@ -19,12 +19,12 @@ func init() {
 
 // metaToQuery 把信封 meta 桥接为查询参数，使既有的 query 解析逻辑（分页 / 过滤 / 排序）在 v1 下复用。
 // 实现已上收到 framework/envelope.MetaToQuery，本处仅为路由注册处的可读性保留薄封装。
-func metaToQuery(c *gin.Context) {
+func metaToQuery(c *web.Context) {
 	envelope.MetaToQuery(c)
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/task-plans")
 
 	// 仅用 id 的动作：复用既有 handler（已支持信封 data.id）。
@@ -34,19 +34,19 @@ func RegisterV1(rg *gin.RouterGroup) {
 	g.POST("/archive", ArchiveTaskPlan)
 	g.POST("/suspend", SuspendTaskPlan)
 	g.POST("/resume", ResumeTaskPlan)
-	g.POST("/delete", func(c *gin.Context) { metaToQuery(c); DeleteTaskPlan(c) })
+	g.POST("/delete", func(c *web.Context) { metaToQuery(c); DeleteTaskPlan(c) })
 	g.POST("/listTasks", ListPlanTasks)
 	g.POST("/getRaw", GetTaskPlanRaw)
 
 	// 查询类动作：注入 meta 为查询参数后复用既有 handler。
-	g.POST("/list", func(c *gin.Context) { metaToQuery(c); ListTaskPlans(c) })
-	g.POST("/tree", func(c *gin.Context) { metaToQuery(c); GetTaskPlanTree(c) })
+	g.POST("/list", func(c *web.Context) { metaToQuery(c); ListTaskPlans(c) })
+	g.POST("/tree", func(c *web.Context) { metaToQuery(c); GetTaskPlanTree(c) })
 
 	tasks := g.Group("/tasks")
-	tasks.POST("/pending", func(c *gin.Context) { metaToQuery(c); GetPendingTasks(c) })
-	tasks.POST("/dailyStats", func(c *gin.Context) { metaToQuery(c); GetTaskDailyStats(c) })
-	tasks.POST("/activeStats", func(c *gin.Context) { metaToQuery(c); GetTaskActiveStats(c) })
-	tasks.POST("/contributionStats", func(c *gin.Context) { metaToQuery(c); GetTaskContributionStats(c) })
+	tasks.POST("/pending", func(c *web.Context) { metaToQuery(c); GetPendingTasks(c) })
+	tasks.POST("/dailyStats", func(c *web.Context) { metaToQuery(c); GetTaskDailyStats(c) })
+	tasks.POST("/activeStats", func(c *web.Context) { metaToQuery(c); GetTaskActiveStats(c) })
+	tasks.POST("/contributionStats", func(c *web.Context) { metaToQuery(c); GetTaskContributionStats(c) })
 	tasks.POST("/cancel", CancelTask)
 	tasks.POST("/complete", taskCompleteV1)
 	tasks.POST("/postpone", taskPostponeV1)
@@ -64,7 +64,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 
 // ── 带 body 的 v1 动作 ──────────────────────────────────────────
 
-func planCreateV1(c *gin.Context) {
+func planCreateV1(c *web.Context) {
 	var req CreatePlanRequest
 	if err := envelope.Bind(c, &req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -78,7 +78,7 @@ func planCreateV1(c *gin.Context) {
 	renv.Success(c, resp)
 }
 
-func planUpdateV1(c *gin.Context) {
+func planUpdateV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -96,7 +96,7 @@ func planUpdateV1(c *gin.Context) {
 	renv.Success(c, plan)
 }
 
-func planSetPriorityV1(c *gin.Context) {
+func planSetPriorityV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -119,7 +119,7 @@ func planSetPriorityV1(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-func planReviewV1(c *gin.Context) {
+func planReviewV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -137,7 +137,7 @@ func planReviewV1(c *gin.Context) {
 	renv.Success(c, resp)
 }
 
-func taskCompleteV1(c *gin.Context) {
+func taskCompleteV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -154,7 +154,7 @@ func taskCompleteV1(c *gin.Context) {
 	renv.Success(c, resp)
 }
 
-func taskPostponeV1(c *gin.Context) {
+func taskPostponeV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -173,7 +173,7 @@ func taskPostponeV1(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-func taskBatchPostponeV1(c *gin.Context) {
+func taskBatchPostponeV1(c *web.Context) {
 	var req struct {
 		IDs  []int `json:"ids"`
 		Days int   `json:"days"`
@@ -194,7 +194,7 @@ func taskBatchPostponeV1(c *gin.Context) {
 	renv.Success(c, resp)
 }
 
-func aiReviewScoreV1(c *gin.Context) {
+func aiReviewScoreV1(c *web.Context) {
 	var req struct {
 		Original string `json:"original"`
 		Answer   string `json:"answer"`

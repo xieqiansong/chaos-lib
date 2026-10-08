@@ -7,8 +7,7 @@ import (
 
 	renv "chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/resp"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // AuthMiddleware 返回一个鉴权中间件：校验请求携带的访问令牌（token），
@@ -20,8 +19,8 @@ import (
 // 本地 UI 隔离在统一契约下。
 //
 // 令牌缺失 / 错误：40100；action 在 CHAOS_API_DENY_ACTIONS（逗号分隔，形如 "project.delete"）内：40300。
-func AuthMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func AuthMiddleware() web.HandlerFunc {
+	return func(c *web.Context) {
 		expected := os.Getenv("CHAOS_API_TOKEN")
 		if expected == "" {
 			c.Next()
@@ -49,7 +48,7 @@ func AuthMiddleware() gin.HandlerFunc {
 }
 
 // extractToken 依次从 Authorization: Bearer、X-Access-Token 头、信封 meta.token 提取令牌。
-func extractToken(c *gin.Context) string {
+func extractToken(c *web.Context) string {
 	if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
 		return strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
 	}
@@ -65,7 +64,7 @@ func extractToken(c *gin.Context) string {
 }
 
 // actionName 取动作名：优先信封 action 字段（形如 module.act），退回 URL 末段（如 "delete"）。
-func actionName(c *gin.Context) string {
+func actionName(c *web.Context) string {
 	if a := renv.GetAction(c); a != "" {
 		return a
 	}

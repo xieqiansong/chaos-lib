@@ -10,8 +10,7 @@ import (
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // handler[T] 持有资源选项，按方法分发。
@@ -61,13 +60,13 @@ type listMeta struct {
 // 复用同一套 handler[T] 业务逻辑。动作集：list / get / create / update / delete /
 // batchCreate / batchDelete / status（status 需提供 toggle）。
 // Register 已随接口重构下线，此处只保留「POST + Action」单一风格路由。
-func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], toggle *ToggleOpts) *gin.RouterGroup {
+func RegisterActions[T any](rg *web.RouterGroup, prefix string, opts Opts[T], toggle *ToggleOpts) *web.RouterGroup {
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
 	if opts.V1ListHandler != nil {
 		// 自定义列表实现通常沿用「从 query 读分页 / 过滤」的既有逻辑（如 projects / notes），
 		// 故先用 envelope.MetaToQuery 把信封 meta 桥接为查询参数，再交给它，保证 v1 语义与存量一致。
-		g.POST("/list", func(c *gin.Context) {
+		g.POST("/list", func(c *web.Context) {
 			envelope.MetaToQuery(c)
 			opts.V1ListHandler(c)
 		})
@@ -91,7 +90,7 @@ func RegisterActions[T any](rg *gin.RouterGroup, prefix string, opts Opts[T], to
 	return g
 }
 
-func (h *handler[T]) listAction(c *gin.Context) {
+func (h *handler[T]) listAction(c *web.Context) {
 	var meta listMeta
 	envelope.GetMeta(c, &meta)
 	q := pagination.Query{Page: meta.Page, PageSize: meta.PageSize}
@@ -150,7 +149,7 @@ func (h *handler[T]) listAction(c *gin.Context) {
 	renv.Success(c, pagination.New(items, total, q))
 }
 
-func (h *handler[T]) getAction(c *gin.Context) {
+func (h *handler[T]) getAction(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`
 	}
@@ -166,7 +165,7 @@ func (h *handler[T]) getAction(c *gin.Context) {
 	renv.Success(c, h.viewOne(&row))
 }
 
-func (h *handler[T]) createAction(c *gin.Context) {
+func (h *handler[T]) createAction(c *web.Context) {
 	ptr := new(T)
 	if err := envelope.Bind(c, ptr); err != nil {
 		fail(c, http.StatusBadRequest, err)
@@ -195,7 +194,7 @@ func (h *handler[T]) createAction(c *gin.Context) {
 	renv.Success(c, h.viewOne(ptr))
 }
 
-func (h *handler[T]) updateAction(c *gin.Context) {
+func (h *handler[T]) updateAction(c *web.Context) {
 	var idReq struct {
 		ID int `json:"id"`
 	}
@@ -247,7 +246,7 @@ func (h *handler[T]) updateAction(c *gin.Context) {
 	renv.Success(c, h.viewOne(&ptr))
 }
 
-func (h *handler[T]) deleteAction(c *gin.Context) {
+func (h *handler[T]) deleteAction(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`
 	}
@@ -280,7 +279,7 @@ func (h *handler[T]) deleteAction(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-func (h *handler[T]) batchCreateAction(c *gin.Context) {
+func (h *handler[T]) batchCreateAction(c *web.Context) {
 	var req struct {
 		Items []T `json:"items"`
 	}
@@ -314,7 +313,7 @@ func (h *handler[T]) batchCreateAction(c *gin.Context) {
 	renv.Success(c, items)
 }
 
-func (h *handler[T]) batchDeleteAction(c *gin.Context) {
+func (h *handler[T]) batchDeleteAction(c *web.Context) {
 	var req struct {
 		IDs []int `json:"ids"`
 	}
@@ -340,8 +339,8 @@ func (h *handler[T]) batchDeleteAction(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-func (h *handler[T]) statusAction(toggle *ToggleOpts) gin.HandlerFunc {
-	return func(c *gin.Context) {
+func (h *handler[T]) statusAction(toggle *ToggleOpts) web.HandlerFunc {
+	return func(c *web.Context) {
 		var req struct {
 			ID     int  `json:"id"`
 			Status bool `json:"status"`

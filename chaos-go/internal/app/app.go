@@ -104,7 +104,7 @@ func Run(webFS fs.FS) error {
 	if cfg.Server.EnableHTTP3 {
 		return runHTTP3(r, &cfg.Server)
 	}
-	return r.Run(cfg.Server.GetAddress())
+	return http.ListenAndServe(cfg.Server.GetAddress(), r)
 }
 
 // runHTTP3 在启用 HTTP/3 时同时拉起 HTTPS(TCP) 与 HTTP/3(UDP/QUIC) 两个服务，

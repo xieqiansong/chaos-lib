@@ -16,7 +16,7 @@ package pagination
 import (
 	"strconv"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 	"gorm.io/gorm"
 )
 
@@ -32,8 +32,8 @@ type Query struct {
 	PageSize int
 }
 
-// Parse 从 gin 上下文读取 page/page_size，套用默认值与边界约束。
-func Parse(c *gin.Context) Query {
+// Parse 从 web 上下文读取 page/page_size，套用默认值与边界约束。
+func Parse(c *web.Context) Query {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	if page < 1 {

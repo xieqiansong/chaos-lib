@@ -10,17 +10,17 @@ import (
 	renv "chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // setup 构造一个仅用于验证信封行为的测试路由：挂载 envelope.Middleware，
 // handler 从信封取 data/meta/action 并原样回显。
-func setup() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+func setup() *web.Router {
+	
+	r := web.NewRouter()
 	g := r.Group("/api/v1/echo")
 	g.Use(renv.Middleware())
-	g.POST("/bind", func(c *gin.Context) {
+	g.POST("/bind", func(c *web.Context) {
 		var body map[string]any
 		if err := renv.Bind(c, &body); err != nil {
 			resp.Error(c, http.StatusBadRequest, err.Error())
@@ -28,7 +28,7 @@ func setup() *gin.Engine {
 		}
 		meta := map[string]any{}
 		renv.GetMeta(c, &meta)
-		resp.Success(c, gin.H{
+		resp.Success(c, map[string]any{
 			"data":   body,
 			"meta":   meta,
 			"action": renv.GetAction(c),

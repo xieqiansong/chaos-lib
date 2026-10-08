@@ -19,10 +19,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
-// contextKey 用于在 gin.Context 中暂存信封解析结果。
+// contextKey 用于在 web.Context 中暂存信封解析结果。
 type contextKey string
 
 const (
@@ -62,14 +62,14 @@ type Response struct {
 	Timestamp int64       `json:"timestamp,omitempty"`
 }
 
-// Middleware 解析请求信封，把 data/meta/action/requestId 暂存到 gin.Context，
+// Middleware 解析请求信封，把 data/meta/action/requestId 暂存到 web.Context，
 // 供 Bind / GetMeta / GetAction / RequestID 读取。仅作用于挂载了本中间件的路由组
 // （即新的 /api/v1 组），存量 /api 路由不受影响。
 //
 // 若请求体不是合法信封（无 data 字段），则按存量请求处理：把原始 body 还原，
 // 留由 handler 自行 ShouldBindJSON，同时生成 requestId 以便响应回填。
-func Middleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func Middleware() web.HandlerFunc {
+	return func(c *web.Context) {
 		if c.Request.Method == http.MethodPost {
 			ct := c.GetHeader("Content-Type")
 			if strings.Contains(ct, "application/json") {
@@ -96,7 +96,7 @@ func Middleware() gin.HandlerFunc {
 
 // Bind 把请求体绑定到 dst：优先解析信封内的 data，否则按存量写法直接绑定整个 body。
 // handler 无论新旧请求都能用同一行代码收参。
-func Bind(c *gin.Context, dst interface{}) error {
+func Bind(c *web.Context, dst interface{}) error {
 	if raw, ok := c.Get(string(ctxData)); ok {
 		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
 			return json.Unmarshal(rawMsg, dst)
@@ -106,7 +106,7 @@ func Bind(c *gin.Context, dst interface{}) error {
 }
 
 // GetMeta 把信封 meta 绑定到 dst（如分页、排序、来源）。非信封请求返回 false。
-func GetMeta(c *gin.Context, dst interface{}) bool {
+func GetMeta(c *web.Context, dst interface{}) bool {
 	if raw, ok := c.Get(string(ctxMeta)); ok {
 		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
 			if err := json.Unmarshal(rawMsg, dst); err == nil {
@@ -118,7 +118,7 @@ func GetMeta(c *gin.Context, dst interface{}) bool {
 }
 
 // GetAction 返回请求中的 action（用于审计/校验），无则返回空串。
-func GetAction(c *gin.Context) string {
+func GetAction(c *web.Context) string {
 	if v, ok := c.Get(string(ctxAction)); ok {
 		if s, ok := v.(string); ok {
 			return s
@@ -129,7 +129,7 @@ func GetAction(c *gin.Context) string {
 
 // ID 从信封 data.id 取得主键；无信封（存量 /api）时回落到路径参数 id。
 // 双轨迁移期间，同一 handler 既能被 /api/:id 也能被 /api/v1/{action}（body 含 id）驱动。
-func ID(c *gin.Context) (int, bool) {
+func ID(c *web.Context) (int, bool) {
 	if raw, ok := c.Get(string(ctxData)); ok {
 		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
 			var m struct {
@@ -150,7 +150,7 @@ func ID(c *gin.Context) (int, bool) {
 
 // GetMetaMap 把信封 meta 解析为 map（分页/排序/过滤等）。非信封请求返回空 map，
 // 调用方可再回落到 c.Query 读取存量参数。
-func GetMetaMap(c *gin.Context) map[string]any {
+func GetMetaMap(c *web.Context) map[string]any {
 	out := map[string]any{}
 	if raw, ok := c.Get(string(ctxMeta)); ok {
 		if rawMsg, ok := raw.(json.RawMessage); ok && len(rawMsg) > 0 {
@@ -168,7 +168,7 @@ func GetMetaMap(c *gin.Context) map[string]any {
 //   - 已存在的查询参数不被覆盖（同 key 以先到为准）。
 //
 // 供 v1 路由包装器（如 tasks.GET 查询类、proxy 列表）在调用既有 handler 前调用。
-func MetaToQuery(c *gin.Context) {
+func MetaToQuery(c *web.Context) {
 	m := GetMetaMap(c)
 	if len(m) == 0 {
 		return
@@ -199,7 +199,7 @@ func MetaToQuery(c *gin.Context) {
 
 // RequestID 返回本次请求的 requestId：优先取信封携带值，否则生成一个并暂存到 Context，
 // 确保响应信封始终能回填 requestId（存量请求也会因此获得一个服务端生成的 id）。
-func RequestID(c *gin.Context) string {
+func RequestID(c *web.Context) string {
 	if v, ok := c.Get(string(ctxRequestID)); ok {
 		if s, ok := v.(string); ok && s != "" {
 			return s

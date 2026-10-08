@@ -7,11 +7,11 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // GetHostname 返回运行服务端的主机名与启动用户，供前端用作浏览器标签标题。
-func GetHostname(c *gin.Context) {
+func GetHostname(c *web.Context) {
 	host, err := os.Hostname()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "获取主机名失败: " + err.Error())
@@ -26,5 +26,5 @@ func GetHostname(c *gin.Context) {
 	if idx := strings.LastIndex(username, "\\"); idx >= 0 {
 		username = username[idx+1:]
 	}
-	renv.Success(c, gin.H{"hostname": host, "username": username})
+	renv.Success(c, map[string]any{"hostname": host, "username": username})
 }

@@ -26,7 +26,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -72,7 +72,7 @@ type previewReq struct {
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 标准 CRUD + status（启停）由通用 crud 生成；自定义动作 run / runs / preview 一并迁为 POST 动作。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[CronJob](rg, "cron-jobs", cronJobOpts, cronJobToggle)
 	g.POST("/run", runV1)
 	g.POST("/runs", runsV1)
@@ -82,7 +82,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 // ── 立即执行 ──────────────────────────────────────────────────────
 
 // run 立即手动触发一次（POST /cron-jobs/:id/run），返回本次运行记录。
-func run(c *gin.Context) {
+func run(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -91,7 +91,7 @@ func run(c *gin.Context) {
 }
 
 // runV1 是 run 的「POST + Action」版（POST /api/v1/cron-jobs/run，body {id}）。
-func runV1(c *gin.Context) {
+func runV1(c *web.Context) {
 	var req runReq
 	if err := envelope.Bind(c, &req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -100,7 +100,7 @@ func runV1(c *gin.Context) {
 	doRun(c, req.ID)
 }
 
-func doRun(c *gin.Context, id int) {
+func doRun(c *web.Context, id int) {
 	latest, err := ExecuteNow(id)
 	if err != nil {
 		httpx.MapError(c, err, jobErrRules)
@@ -112,7 +112,7 @@ func doRun(c *gin.Context, id int) {
 // ── 运行历史 ──────────────────────────────────────────────────────
 
 // runs 查询某任务的运行历史（GET /cron-jobs/:id/runs，分页）。
-func runs(c *gin.Context) {
+func runs(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -121,7 +121,7 @@ func runs(c *gin.Context) {
 }
 
 // runsV1 是 runs 的「POST + Action」版（POST /api/v1/cron-jobs/runs，body {id,page,pageSize}）。
-func runsV1(c *gin.Context) {
+func runsV1(c *web.Context) {
 	var req runsReq
 	if err := envelope.Bind(c, &req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -137,7 +137,7 @@ func runsV1(c *gin.Context) {
 	doRuns(c, req.ID, q)
 }
 
-func doRuns(c *gin.Context, id int, q pagination.Query) {
+func doRuns(c *web.Context, id int, q pagination.Query) {
 	list, total, err := FindRuns(id, q)
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -149,7 +149,7 @@ func doRuns(c *gin.Context, id int, q pagination.Query) {
 // ── cron 预览 ─────────────────────────────────────────────────────
 
 // preview 校验 cron 表达式并返回未来若干次触发时间（POST /cron-jobs/preview，body {cronExpr,count}）。
-func preview(c *gin.Context) {
+func preview(c *web.Context) {
 	var req previewReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -159,7 +159,7 @@ func preview(c *gin.Context) {
 }
 
 // previewV1 是 preview 的「POST + Action」版（POST /api/v1/cron-jobs/preview，信封 data 同结构）。
-func previewV1(c *gin.Context) {
+func previewV1(c *web.Context) {
 	var req previewReq
 	if err := envelope.Bind(c, &req); err != nil {
 		renv.Error(c, http.StatusBadRequest, err.Error())
@@ -168,7 +168,7 @@ func previewV1(c *gin.Context) {
 	doPreview(c, req)
 }
 
-func doPreview(c *gin.Context, req previewReq) {
+func doPreview(c *web.Context, req previewReq) {
 	if req.CronExpr == "" {
 		renv.Error(c, http.StatusBadRequest, "cron 表达式不能为空")
 		return
@@ -178,5 +178,5 @@ func doPreview(c *gin.Context, req previewReq) {
 		renv.Error(c, http.StatusOK, err.Error())
 		return
 	}
-	renv.Success(c, gin.H{"valid": true, "nextRuns": next})
+	renv.Success(c, map[string]any{"valid": true, "nextRuns": next})
 }

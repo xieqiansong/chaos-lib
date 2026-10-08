@@ -11,7 +11,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // errRules 笔记模块统一的领域错误 → HTTP 状态码映射表。
@@ -51,13 +51,13 @@ var noteOpts = crud.Opts[Note]{
 // 标准 CRUD（list/get/create/update/delete/batchCreate/batchDelete）由通用 crud 生成，
 // 其中 create 由 V1CreateHandler 覆盖为文件优先创建；树 / 内容 / 扫描 / 保存 /
 // 重命名 / 移动 / 回收等文件优先动作见 handler_v1.go。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[Note](rg, "notes", noteOpts, nil)
 	RegisterNoteV1Actions(g)
 }
 
 // listNotes 自定义列表：支持目录过滤 + 全文关键词 + 星标 + 磁盘缺失。
-func listNotes(c *gin.Context) {
+func listNotes(c *web.Context) {
 	q := pagination.Parse(c)
 	filter := filterFromRequest(c, q)
 	notes, total, err := ListNotes(filter)
@@ -81,7 +81,7 @@ func listNotes(c *gin.Context) {
 //
 // 语义约定：meta.like 中缺失的字段一律回落到 query 读取；而 dir="" 即根目录，
 // 与 query 缺失的默认值一致，故前端「空串不传」的做法无需额外处理。
-func filterFromRequest(c *gin.Context, q pagination.Query) ListFilter {
+func filterFromRequest(c *web.Context, q pagination.Query) ListFilter {
 	filter := ListFilter{
 		Dir:      c.Query("dir"),
 		Query:    c.Query("q"),
@@ -107,7 +107,7 @@ func filterFromRequest(c *gin.Context, q pagination.Query) ListFilter {
 }
 
 // getTree 返回目录树。
-func getTree(c *gin.Context) {
+func getTree(c *web.Context) {
 	nodes, err := Tree()
 	if err != nil {
 		renv.Error(c, http.StatusInternalServerError, "构建目录树失败: "+err.Error())
@@ -117,7 +117,7 @@ func getTree(c *gin.Context) {
 }
 
 // getContent 按 id 读取笔记磁盘原文（只读）。路径经 resolveSafePath 校验。
-func getContent(c *gin.Context) {
+func getContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -132,7 +132,7 @@ func getContent(c *gin.Context) {
 		httpx.MapError(c, err, errRules, http.StatusInternalServerError)
 		return
 	}
-	renv.Success(c, gin.H{
+	renv.Success(c, map[string]any{
 		"relPath":     n.RelPath,
 		"name":        n.Name,
 		"format":      n.Format,
@@ -143,7 +143,7 @@ func getContent(c *gin.Context) {
 }
 
 // scanNotes 触发一次 Vault 扫描（full=true 强制全量重算）。
-func scanNotes(c *gin.Context) {
+func scanNotes(c *web.Context) {
 	full := c.Query("full") == "true"
 	res, err := ScanVault(full)
 	if err != nil {
@@ -154,7 +154,7 @@ func scanNotes(c *gin.Context) {
 }
 
 // createNote 新建空笔记文件并建索引（走专属路由，绕过基线 POST 直接插 DB 行）。
-func createNote(c *gin.Context) {
+func createNote(c *web.Context) {
 	var req CreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		renv.Error(c, http.StatusBadRequest, "请求格式错误")
@@ -169,7 +169,7 @@ func createNote(c *gin.Context) {
 }
 
 // putContent 保存笔记正文（带 baseHash 乐观锁）；冲突时返回 409 + conflict 详情。
-func putContent(c *gin.Context) {
+func putContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -182,7 +182,7 @@ func putContent(c *gin.Context) {
 	res, conflict, err := SaveContent(id, req.Content, req.BaseHash)
 	if err != nil {
 		if conflict != nil {
-			c.JSON(http.StatusConflict, gin.H{
+			c.JSON(http.StatusConflict, map[string]any{
 				"code":     http.StatusConflict,
 				"message":  ErrConflict.Error(),
 				"conflict": conflict,
@@ -196,7 +196,7 @@ func putContent(c *gin.Context) {
 }
 
 // renameNote 重命名笔记文件（仅改文件名）。
-func renameNote(c *gin.Context) {
+func renameNote(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -215,7 +215,7 @@ func renameNote(c *gin.Context) {
 }
 
 // moveNote 把笔记移动到目标目录。
-func moveNote(c *gin.Context) {
+func moveNote(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -234,7 +234,7 @@ func moveNote(c *gin.Context) {
 }
 
 // trashNote 把笔记移入回收站（.trash），并移除索引行。
-func trashNote(c *gin.Context) {
+func trashNote(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
 		return
@@ -243,5 +243,5 @@ func trashNote(c *gin.Context) {
 		httpx.MapError(c, err, errRules, http.StatusInternalServerError)
 		return
 	}
-	renv.Success(c, gin.H{"ok": true})
+	renv.Success(c, map[string]any{"ok": true})
 }

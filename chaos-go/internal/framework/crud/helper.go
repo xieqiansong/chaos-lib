@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	renv "chaos-go/internal/framework/resp"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // firstElem 从 ToResponse 返回的切片中取出首元素（单条接口复用批量回调）。
@@ -21,7 +20,7 @@ func firstElem(v any) any {
 }
 
 // fail 统一错误响应：msg 可为 error 或任意值（字符串/拼接串），集中维护错误信封形态。
-func fail(c *gin.Context, status int, msg any) {
+func fail(c *web.Context, status int, msg any) {
 	if e, ok := msg.(error); ok {
 		renv.Error(c, status, e.Error())
 		return

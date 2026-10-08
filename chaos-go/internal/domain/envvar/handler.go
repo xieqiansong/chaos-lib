@@ -10,7 +10,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -22,9 +22,9 @@ func init() {
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：get / patch / put / sync / getSnapshot；补丁与快照 id 取自信封 data。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/env-variables")
-	g.POST("/get", func(c *gin.Context) {
+	g.POST("/get", func(c *web.Context) {
 		var req EnvGetRequest
 		if err := envelope.Bind(c, &req); err != nil {
 			renv.Error(c, http.StatusBadRequest, err.Error())
@@ -37,7 +37,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		}
 		renv.Success(c, resp)
 	})
-	g.POST("/patch", func(c *gin.Context) {
+	g.POST("/patch", func(c *web.Context) {
 		t0 := time.Now()
 		var req EnvPatchRequest
 		if err := envelope.Bind(c, &req); err != nil {
@@ -57,7 +57,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		logWarnings("局部更新环境变量", warnings)
 		renv.Success(c, nil)
 	})
-	g.POST("/put", func(c *gin.Context) {
+	g.POST("/put", func(c *web.Context) {
 		var req EnvPutRequest
 		if err := envelope.Bind(c, &req); err != nil {
 			renv.Error(c, http.StatusBadRequest, err.Error())
@@ -71,7 +71,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		logWarnings("整体替换环境变量", warnings)
 		renv.Success(c, nil)
 	})
-	g.POST("/sync", func(c *gin.Context) {
+	g.POST("/sync", func(c *web.Context) {
 		warnings, err := Sync()
 		if err != nil {
 			renv.Error(c, http.StatusInternalServerError, err.Error())
@@ -80,7 +80,7 @@ func RegisterV1(rg *gin.RouterGroup) {
 		logWarnings("同步环境变量", warnings)
 		renv.Success(c, nil)
 	})
-	g.POST("/getSnapshot", func(c *gin.Context) {
+	g.POST("/getSnapshot", func(c *web.Context) {
 		var req struct {
 			SnapshotID int `json:"snapshotId"`
 		}

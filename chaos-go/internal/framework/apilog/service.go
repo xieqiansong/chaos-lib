@@ -2,17 +2,16 @@ package apilog
 
 import (
 	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/web"
 	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Middleware 记录每个 /api 请求的元数据，投递到异步落库通道（channel 满则丢弃，避免阻塞请求链路）。
 // 非 /api 路径（静态资源、SPA 回退等）直接放行，不记录。
-func Middleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func Middleware() web.HandlerFunc {
+	return func(c *web.Context) {
 		if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			c.Next()
 			return
@@ -28,7 +27,7 @@ func Middleware() gin.HandlerFunc {
 			UserAgent:  c.Request.UserAgent(),
 			BodySize:   c.Writer.Size(),
 		}
-		if errs := c.Errors; len(errs) > 0 {
+		if errs := c.Errors(); len(errs) > 0 {
 			rec.ErrorMsg = errs[0].Error()
 		}
 		select {

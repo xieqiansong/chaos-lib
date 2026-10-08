@@ -16,7 +16,7 @@ import (
 	"chaos-go/internal/framework/datacache"
 	"chaos-go/internal/framework/memcache"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 	"golang.org/x/net/html"
 )
 
@@ -72,7 +72,7 @@ func redirectPolicy(req *http.Request, via []*http.Request) error {
 }
 
 // GetFavicon GET /api/favicon/:host —— 返回图片二进制流与识别出的 Content-Type。
-func GetFavicon(c *gin.Context) {
+func GetFavicon(c *web.Context) {
 	host := normalizeHost(c.Param("host"))
 	if host == "" {
 		c.Status(http.StatusBadRequest)

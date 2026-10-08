@@ -9,7 +9,7 @@ import (
 	"chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/routehub"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -44,14 +44,14 @@ var fileLinkToggle = &crud.ToggleOpts{
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // CRUD + status（启停）由通用 crud 生成，动作名：list/get/create/update/delete/batchCreate/batchDelete/status。
 // statusOf 为读方向自定义动作：列表加载后前端逐行并发调用，按文件系统实时计算单条 LinkStatus。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	fl := crud.RegisterActions[FileLink](rg, "file-links", fileLinkOpts, fileLinkToggle)
 	fl.POST("/statusOf", statusOfV1)
 }
 
 // statusOfV1 逐行状态刷新接口（POST /api/v1/file-links/statusOf，body {id}）。
 // 对应前端「列表加载完成后单独刷新每一行状态」的需求；返回 { LinkStatus }。
-func statusOfV1(c *gin.Context) {
+func statusOfV1(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`
 	}
@@ -64,5 +64,5 @@ func statusOfV1(c *gin.Context) {
 		httpx.MapError(c, err, linkErrRules, http.StatusBadRequest)
 		return
 	}
-	resp.Success(c, gin.H{"LinkStatus": status})
+	resp.Success(c, map[string]any{"LinkStatus": status})
 }

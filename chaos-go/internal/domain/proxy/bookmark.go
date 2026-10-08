@@ -7,7 +7,7 @@ import (
 	renv "chaos-go/internal/framework/resp"
 	"sort"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 	"gorm.io/gorm/clause"
 )
 
@@ -50,7 +50,7 @@ type BookmarkNode struct {
 // ── Handlers ──────────────────────────────────────────────────────
 
 // SaveBookmarks 批量 upsert 书签扁平快照（由扩展备份调用）。
-func SaveBookmarks(c *gin.Context) {
+func SaveBookmarks(c *web.Context) {
 	var items []Bookmark
 	if err := envelope.Bind(c, &items); err != nil {
 		renv.Error(c, 400, err.Error())
@@ -69,7 +69,7 @@ func SaveBookmarks(c *gin.Context) {
 }
 
 // GetFrequentBookmarks 返回「常用书签」：书签 ∪ 历史访问次数，按访问频率降序，统一分页（默认 20）。
-func GetFrequentBookmarks(c *gin.Context) {
+func GetFrequentBookmarks(c *web.Context) {
 	q := pagination.Parse(c)
 	search := c.Query("search")
 
@@ -101,7 +101,7 @@ func GetFrequentBookmarks(c *gin.Context) {
 
 // GetBookmarkTree 返回完整书签树（从扁平 bookmarks 表按 parent_id 组装）。
 // 顶层节点的 parent_id 为空串或不在表中时视为根。
-func GetBookmarkTree(c *gin.Context) {
+func GetBookmarkTree(c *web.Context) {
 	var flat []Bookmark
 	if err := config.GetDB().Find(&flat).Error; err != nil {
 		renv.Error(c, 500, "查询书签失败: "+err.Error())

@@ -13,7 +13,7 @@ import (
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // 路径穿越防护是整套模块的安全底线，必须守住。
@@ -167,15 +167,15 @@ func nodeNames(nodes []*TreeNode) []string {
 
 // v1ListRouter 复刻 crud.RegisterActions 中 V1ListHandler 的包装方式：
 // 先 MetaToQuery 把信封 meta 桥接成 query，再交给自定义列表 handler。
-func v1ListRouter(capture *ListFilter) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+func v1ListRouter(capture *ListFilter) *web.Router {
+	
+	r := web.NewRouter()
 	g := r.Group("/api/v1/notes")
 	g.Use(envelope.Middleware())
-	g.POST("/list", func(c *gin.Context) {
+	g.POST("/list", func(c *web.Context) {
 		envelope.MetaToQuery(c)
 		*capture = filterFromRequest(c, pagination.Parse(c))
-		renv.Success(c, gin.H{"ok": true})
+		renv.Success(c, map[string]any{"ok": true})
 	})
 	return r
 }
@@ -222,12 +222,12 @@ func TestFilterFromRequestMetaLike(t *testing.T) {
 
 // 存量 RESTful（GET /notes?dir=…）必须保持原行为：没有 meta.like 时回落到 query。
 func TestFilterFromRequestQueryFallback(t *testing.T) {
-	gin.SetMode(gin.TestMode)
+	
 	var got ListFilter
-	r := gin.New()
-	r.GET("/notes", func(c *gin.Context) {
+	r := web.NewRouter()
+	r.GET("/notes", func(c *web.Context) {
 		got = filterFromRequest(c, pagination.Parse(c))
-		renv.Success(c, gin.H{"ok": true})
+		renv.Success(c, map[string]any{"ok": true})
 	})
 
 	r.ServeHTTP(httptest.NewRecorder(),

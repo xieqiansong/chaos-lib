@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 	"gorm.io/gorm/clause"
 )
 
@@ -36,7 +36,7 @@ type BrowserHistoryVisit struct {
 
 // ── Handlers ──────────────────────────────────────────────────────
 
-func GetBrowserHistories(c *gin.Context) {
+func GetBrowserHistories(c *web.Context) {
 	q := pagination.Parse(c)
 	search := c.Query("search")
 
@@ -58,7 +58,7 @@ func GetBrowserHistories(c *gin.Context) {
 	renv.Success(c, pagination.New(histories, total, q))
 }
 
-func SaveBrowserHistory(c *gin.Context) {
+func SaveBrowserHistory(c *web.Context) {
 	var histories []BrowserHistory
 	if err := envelope.Bind(c, &histories); err != nil {
 		renv.Error(c, 400, err.Error())
@@ -82,7 +82,7 @@ func SaveBrowserHistory(c *gin.Context) {
 	renv.Success(c, nil)
 }
 
-func SaveBrowserHistoryVisits(c *gin.Context) {
+func SaveBrowserHistoryVisits(c *web.Context) {
 	var visits []BrowserHistoryVisit
 	if err := envelope.Bind(c, &visits); err != nil {
 		renv.Error(c, 400, err.Error())

@@ -8,11 +8,11 @@ import (
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // GetTaskPlanRaw 读取计划关联的 raw_link 原文内容（服务端代理拉取，规避浏览器跨域）。
-func GetTaskPlanRaw(c *gin.Context) {
+func GetTaskPlanRaw(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -32,7 +32,7 @@ func GetTaskPlanRaw(c *gin.Context) {
 
 // ReviewTaskPlan 主动回忆式复习：先在前端隐藏原文、用户填写回忆，再提交评分。
 // 评分驱动 FSRS 调度（interval 类型），并把用户的回忆内容写入任务 remark 以便后续对比。
-func ReviewTaskPlan(c *gin.Context) {
+func ReviewTaskPlan(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
 		return
@@ -53,7 +53,7 @@ func ReviewTaskPlan(c *gin.Context) {
 // AiReviewScore 用 DeepSeek 对「回忆答案」相对「原文」做覆盖度评分。
 // 入参：{ "original": 原文文本, "answer": 用户回忆文本 }（原文由前端已拉取的内容传入，密钥不出服务端）。
 // 出参：{ "points":[{text,covered,reason}], "coverage":int, "suggestedRating":1..4 }。
-func AiReviewScore(c *gin.Context) {
+func AiReviewScore(c *web.Context) {
 	var req struct {
 		Original string `json:"original"`
 		Answer   string `json:"answer"`

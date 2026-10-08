@@ -10,12 +10,12 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 const baiduWeatherURL = "https://api.map.baidu.com/weather/v1/"
 
-func GetWeather(c *gin.Context) {
+func GetWeather(c *web.Context) {
 	ak := config.GetConfig().Baidu.AK
 	if ak == "" {
 		renv.Error(c, http.StatusServiceUnavailable, "未配置百度地图 AK，请在服务端 configs/config.yaml 中设置")

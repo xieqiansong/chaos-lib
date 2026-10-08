@@ -3,8 +3,7 @@ package datacache
 import (
 	"chaos-go/internal/framework/crud"
 	"chaos-go/internal/framework/routehub"
-
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -22,6 +21,6 @@ var dataCacheOpts = crud.Opts[DataCache]{
 }
 
 // RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[DataCache](rg, "data-caches", dataCacheOpts, nil)
 }

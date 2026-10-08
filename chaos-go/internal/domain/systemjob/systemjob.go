@@ -10,7 +10,7 @@ import (
 	"chaos-go/internal/platform/stunsync"
 	"chaos-go/internal/domain/taskplan"
 
-	"github.com/gin-gonic/gin"
+	"chaos-go/internal/framework/web"
 )
 
 // init 把本模块的路由挂载函数登记到 routehub，
@@ -22,21 +22,21 @@ func init() {
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作均无需参数，直接复用内部编排逻辑。
-func RegisterV1(rg *gin.RouterGroup) {
+func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/system-jobs")
-	g.POST("/sweep", func(c *gin.Context) {
+	g.POST("/sweep", func(c *web.Context) {
 		taskplan.SweepScheduledTaskPlans()
 		renv.Success(c, nil)
 	})
-	g.POST("/portForwardSelfHeal", func(c *gin.Context) {
+	g.POST("/portForwardSelfHeal", func(c *web.Context) {
 		portfwd.SelfHealForwards()
 		renv.Success(c, nil)
 	})
-	g.POST("/stunRuleSync", func(c *gin.Context) {
+	g.POST("/stunRuleSync", func(c *web.Context) {
 		stunsync.RunSync()
 		renv.Success(c, nil)
 	})
-	g.POST("/stunPortForwardSync", func(c *gin.Context) {
+	g.POST("/stunPortForwardSync", func(c *web.Context) {
 		stunpf.RunSync()
 		renv.Success(c, nil)
 	})
