@@ -10,6 +10,7 @@ package envelope
 
 import (
 	"bytes"
+	"chaos-go/pkg/tools"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gin-gonic/gin"
 )
 
@@ -205,7 +205,7 @@ func RequestID(c *gin.Context) string {
 			return s
 		}
 	}
-	id := uuid.NewString()
+	id := tools.UUID()
 	c.Set(string(ctxRequestID), id)
 	return id
 }

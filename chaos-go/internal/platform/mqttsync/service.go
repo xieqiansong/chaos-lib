@@ -1,6 +1,7 @@
 package mqttsync
 
 import (
+	"chaos-go/pkg/tools"
 	"errors"
 	"log/slog"
 	"time"
@@ -14,7 +15,7 @@ import (
 // 与广播报文保持一致，使对端按 MsgID 去重、本机回声按 NodeID 丢弃。
 func PrepareMessage(m *MqttSyncMessage) error {
 	if m.MsgID == "" {
-		m.MsgID = newID()
+		m.MsgID = tools.UUID()
 	}
 	if m.NodeID == "" {
 		m.NodeID = NodeID()

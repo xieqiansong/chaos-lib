@@ -1,6 +1,7 @@
 package mqttsync
 
 import (
+	"chaos-go/pkg/tools"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -16,7 +17,6 @@ import (
 	"chaos-go/internal/framework/config"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/google/uuid"
 )
 
 var (
@@ -32,9 +32,6 @@ var (
 	encryptKey       []byte
 	effectiveEncrypt bool
 )
-
-// newID 生成消息/节点唯一标识。
-func newID() string { return uuid.NewString() }
 
 // NodeID 返回本机节点标识（Start 后稳定）。
 func NodeID() string {
@@ -332,7 +329,7 @@ func PublishLocal(m wireMessage) error {
 // 静默丢弃（onMessage 的回声过滤），从而不会触发「报文缺少 id」之类的告警。
 func NewWireMessage(channel, payload string) wireMessage {
 	return wireMessage{
-		ID:      newID(),
+		ID:      tools.UUID(),
 		NodeID:  NodeID(),
 		Channel: channel,
 		Payload: payload,

@@ -1,6 +1,7 @@
 package mqttsync
 
 import (
+	"chaos-go/pkg/tools"
 	"log/slog"
 
 	"chaos-go/internal/framework/config"
@@ -80,7 +81,7 @@ func GetOrCreateNodeID() (string, error) {
 	if err == nil && node.NodeID != "" {
 		return node.NodeID, nil
 	}
-	id := newID()
+	id := tools.UUID()
 	rec := MqttSyncNode{NodeID: id}
 	if err2 := db.Create(&rec).Error; err2 != nil {
 		slog.Warn("MQTT 节点标识持久化失败，使用内存态", "err", err2)

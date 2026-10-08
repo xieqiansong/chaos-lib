@@ -1,13 +1,12 @@
 package envvar
 
 import (
-	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
-	toml "github.com/pelletier/go-toml/v2"
 	"chaos-go/pkg/tools"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 // ── 编解码（领域层，纯函数）─────────────────────────────────────
@@ -87,9 +86,7 @@ func ApplySectionPatch(section *EnvSection, patch *EnvSectionPatch) {
 
 // EnsureVirtualFile 确保环境变量虚拟文件已登记；首次登记时用当前系统变量落一条初始快照。
 func EnsureVirtualFile() (int, error) {
-	tFind := time.Now()
 	file, err := findVirtualFile()
-	slog.Info("[envvar] ensureVirtualFile 耗时", "stage", "findVirtualFile", "ms", time.Since(tFind).Milliseconds(), "found", file != nil)
 	if err != nil {
 		return 0, err
 	}
@@ -97,14 +94,11 @@ func EnsureVirtualFile() (int, error) {
 		return file.ID, nil
 	}
 	// 读取失败不阻断登记：先建文件，快照内容为空快照由调用方后续同步补齐。
-	tRead := time.Now()
 	snap, _ := ReadAllEnvFromSystem()
-	slog.Info("[envvar] ensureVirtualFile 耗时", "stage", "readForInit", "ms", time.Since(tRead).Milliseconds())
 	content, err := MarshalEnvToTOML(snap)
 	if err != nil {
 		return 0, err
 	}
-	tCreate := time.Now()
 	created, err := createVirtualFile()
 	if err != nil {
 		return 0, fmt.Errorf("创建虚拟文件失败: %w", err)
@@ -112,7 +106,6 @@ func EnsureVirtualFile() (int, error) {
 	if _, err := takeSnapshot(created.ID, content); err != nil {
 		return 0, fmt.Errorf("写入初始快照失败: %w", err)
 	}
-	slog.Info("[envvar] ensureVirtualFile 耗时", "stage", "createAndSnapshot", "ms", time.Since(tCreate).Milliseconds())
 	return created.ID, nil
 }
 
@@ -192,16 +185,12 @@ func Sync() ([]string, error) {
 // ApplyPatch 按增量补丁改写系统 / 用户两段变量，并落一条快照。
 // 返回的 warnings 为写入与快照过程中的非致命告警（系统写入已生效）。
 func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
-	t0 := time.Now()
 	fileID, err := EnsureVirtualFile()
 	if err != nil {
 		return nil, err
 	}
-	slog.Info("[envvar] patch 阶段耗时", "stage", "ensureVirtualFile", "ms", time.Since(t0).Milliseconds())
 
-	tRead := time.Now()
 	snap, readErr := ReadAllEnvFromSystem()
-	slog.Info("[envvar] patch 阶段耗时", "stage", "readAllEnvFromSystem", "ms", time.Since(tRead).Milliseconds())
 	if snap == nil {
 		if readErr != nil {
 			return nil, fmt.Errorf("读取环境变量失败: %w", readErr)
@@ -212,21 +201,16 @@ func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
 	ApplySectionPatch(&snap.System, req.System)
 	ApplySectionPatch(&snap.User, req.User)
 
-	tWrite := time.Now()
 	warnings, writeErr := WriteAllEnvToSystem(snap)
-	slog.Info("[envvar] patch 阶段耗时", "stage", "writeAllEnvToSystem", "ms", time.Since(tWrite).Milliseconds())
 	if writeErr != nil {
 		warnings = append(warnings, fmt.Sprintf("写入异常: %v", writeErr))
 	}
 
-	tSnap := time.Now()
 	snapWarnings, commitErr := commitSnapshot(fileID, snap)
-	slog.Info("[envvar] patch 阶段耗时", "stage", "commitSnapshot", "ms", time.Since(tSnap).Milliseconds())
 	if commitErr != nil {
 		return warnings, commitErr
 	}
 	warnings = append(warnings, snapWarnings...)
-	slog.Info("[envvar] patch 阶段耗时", "stage", "total", "ms", time.Since(t0).Milliseconds(), "fileID", fileID)
 	return warnings, nil
 }
 
@@ -317,12 +301,6 @@ func WriteVirtualContent(content string) (warnings []string, err error) {
 	return WriteAllEnvToSystem(snap)
 }
 
-// ── JSON 辅助（避免循环引用 reflect）───────────────────────────
-
-func EnvSnapshotToJSON(snap *EnvSnapshot) ([]byte, error) {
-	return json.Marshal(snap)
-}
-
 // ── Windows 系统环境变量读写（经 tools 包原语）─────────────────
 //
 // 作用域映射与落盘编排。低层 win32 原语（提权判断、计算机名 / 用户名、
@@ -363,10 +341,8 @@ func readScopeViaTools(scope EnvScope) (map[string]string, error) {
 // applyScope 将期望变量集合落盘到指定作用域：仅对变化项做 Set，对删除项做 Remove。
 // 返回本次作用域内的警告（非致命错误）列表。
 func applyScope(scope EnvScope, desired, current map[string]string) []string {
-	t0 := time.Now()
 	ts, ok := domainScopeToTools(scope)
 	if !ok {
-		slog.Info("[envvar] applyScope 耗时", "scope", string(scope), "ms", time.Since(t0).Milliseconds(), "sets", 0, "removes", 0)
 		return []string{fmt.Sprintf("未知作用域: %s", string(scope))}
 	}
 	var warnings []string
@@ -388,28 +364,21 @@ func applyScope(scope EnvScope, desired, current map[string]string) []string {
 			}
 		}
 	}
-	slog.Info("[envvar] applyScope 耗时", "scope", string(scope), "ms", time.Since(t0).Milliseconds(), "sets", sets, "removes", removes)
 	return warnings
 }
 
 // ReadAllEnvFromSystem 读取系统 / 用户两级环境变量，组成快照。
 func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
-	tSys := time.Now()
 	sysVars, errSys := readScopeViaTools(EnvScopeSystem)
-	slog.Info("[envvar] ReadAllEnvFromSystem 耗时", "stage", "readSystem", "ms", time.Since(tSys).Milliseconds(), "count", len(sysVars))
 	if errSys != nil {
 		sysVars = map[string]string{}
 	}
-	tUser := time.Now()
 	userVars, errUser := readScopeViaTools(EnvScopeUser)
-	slog.Info("[envvar] ReadAllEnvFromSystem 耗时", "stage", "readUser", "ms", time.Since(tUser).Milliseconds(), "count", len(userVars))
 	if errUser != nil {
 		userVars = map[string]string{}
 	}
-	tMeta := time.Now()
 	host := tools.GetHostname()
 	user := tools.GetUsername()
-	slog.Info("[envvar] ReadAllEnvFromSystem 耗时", "stage", "meta", "ms", time.Since(tMeta).Milliseconds())
 	snap := &EnvSnapshot{
 		Meta:   EnvMeta{Hostname: host, Username: user},
 		System: sysVars,
@@ -436,39 +405,24 @@ func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
 // WriteAllEnvToSystem 将快照落盘：系统级需管理员；用户级始终尝试；最后广播环境变更。
 func WriteAllEnvToSystem(snap *EnvSnapshot) (warnings []string, err error) {
 	warnings = []string{}
-	tSys := time.Now()
 	originalSystem, _ := readScopeViaTools(EnvScopeSystem)
-	slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "readOriginalSystem", "ms", time.Since(tSys).Milliseconds())
 	if originalSystem == nil {
 		originalSystem = map[string]string{}
 	}
-	tUser := time.Now()
 	originalUser, _ := readScopeViaTools(EnvScopeUser)
-	slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "readOriginalUser", "ms", time.Since(tUser).Milliseconds())
 	if originalUser == nil {
 		originalUser = map[string]string{}
 	}
-	tElv := time.Now()
 	elevated := tools.IsElevated()
-	slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "isElevated", "ms", time.Since(tElv).Milliseconds(), "elevated", elevated)
 	if elevated {
-		tA := time.Now()
 		if w := applyScope(EnvScopeSystem, cloneMap(snap.System), originalSystem); len(w) > 0 {
 			warnings = append(warnings, fmt.Sprintf("系统级变量部分写入失败: %v", w))
 		}
-		slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "applySystem", "ms", time.Since(tA).Milliseconds())
 	} else {
 		warnings = append(warnings, "未以管理员身份运行，系统级变量未写入")
 	}
-	tAu := time.Now()
 	if w := applyScope(EnvScopeUser, cloneMap(snap.User), originalUser); len(w) > 0 {
 		warnings = append(warnings, fmt.Sprintf("用户级变量写入失败: %v", w))
 	}
-	slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "applyUser", "ms", time.Since(tAu).Milliseconds())
-	tBc := time.Now()
-	if bcErr := tools.BroadcastEnvironmentChange(); bcErr != nil {
-		warnings = append(warnings, fmt.Sprintf("广播环境变更失败: %v", bcErr))
-	}
-	slog.Info("[envvar] WriteAllEnvToSystem 耗时", "stage", "broadcast", "ms", time.Since(tBc).Milliseconds())
 	return warnings, nil
 }
