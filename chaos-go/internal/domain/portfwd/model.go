@@ -168,9 +168,9 @@ type SshConnection struct {
 	Port       int
 	Username   string
 	AuthType   string
-	Password   string `json:"-"`
-	PrivateKey string `json:"-"`
-	Passphrase string `json:"-"`
+	Password   string
+	PrivateKey string
+	Passphrase string
 	Remark     string
 }
 

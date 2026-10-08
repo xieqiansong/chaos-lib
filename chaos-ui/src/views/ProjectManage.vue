@@ -61,9 +61,8 @@ const projectColumns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 140, searchable: true},
   {field: 'AbsolutePath', title: '绝对路径', minWidth: 140},
   {field: 'Remark', title: '备注', minWidth: 140},
-  {field: 'LastAccessedAt', title: '上次访问', width: 160, type: 'datetime'},
   {field: 'Claimed', title: '状态', width: 80, formatter: (row: any) => (row.Claimed ? '已认领' : '未认领')},
-  {field: '__actions', title: '操作', width: 180, type: 'actions', fixed: 'right'},
+  {field: '__actions', title: '操作', width: 240, type: 'actions', fixed: 'right'},
 ]
 // 编辑弹窗字段（仅允许改名称 / Git / 备注，路径经移动流程改写）
 const projectEditFields: FormField[] = [
@@ -85,7 +84,7 @@ async function projectsFetch(params: DataTableApiParams) {
   if (selectedGroupId.value == null) return {rows: [], total: 0}
   const query: Record<string, any> = {
     page: params.page,
-    size: params.pageSize,
+    pageSize: params.pageSize,
     groupId: selectedGroupId.value,
   }
   for (const [k, v] of Object.entries(params.search ?? {})) {
@@ -270,7 +269,7 @@ onMounted(async () => {
   // 默认选中第一个组统一由 onGroupsLoaded 处理：此处 fetch 不带排序，
   // res.rows[0] 与左表展示顺序可能不一致，重复选中会覆盖成错误的行。
   try {
-    const res = await projectGroupApi.fetch({page: 1, pageSize: 200, search: {}})
+    const res = await projectGroupApi.fetch({page: 1, pageSize: 10, search: {}})
     groupsForMove.value = res.rows
   } catch (e) {
     console.error(e)
@@ -280,7 +279,7 @@ onMounted(async () => {
 
 <template>
   <div>
-    <el-row :gutter="16">
+    <el-row :gutter="8">
       <!-- 左：项目组 -->
       <el-col :span="7">
         <DataTable
@@ -315,9 +314,6 @@ onMounted(async () => {
               <template v-if="row.Claimed">
                 <el-button size="small" text @click="openDetail(row)">详情</el-button>
                 <el-button size="small" text type="primary" @click="openEditProject(row)">编辑</el-button>
-                <el-button size="small" text type="danger" @click="deleteProject(row)">删除</el-button>
-                <el-button size="small" text @click="openMove(row)">移动</el-button>
-                <el-button size="small" text @click="accessProject(row)">访问</el-button>
                 <el-button size="small" text @click="copyPath(row)">复制路径</el-button>
               </template>
               <el-button v-else size="small" type="success" text @click="claimProject(row)">认领</el-button>

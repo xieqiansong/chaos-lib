@@ -9,7 +9,7 @@
 
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px"/>
 
-    <el-row :gutter="12">
+    <el-row :gutter="8">
       <el-col v-for="(info, type) in sdkList" :key="type" :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="sdk-card" shadow="hover">
           <template #header>

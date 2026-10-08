@@ -29,6 +29,7 @@ import (
 
 	"crypto/tls"
 	"fmt"
+	"path/filepath"
 
 	"github.com/quic-go/quic-go/http3"
 	security "chaos-go/internal/framework/security"
@@ -164,15 +165,22 @@ func loadTLSConfig(srv *config.ServerConfig) (*tls.Config, error) {
 		return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
 	}
 
+	// 方案 A：自签名证书持久化——已存在且可加载则复用，避免每次启动都换证书导致需重新信任。
+	certPath := filepath.Join("certs", "chaos.crt")
+	keyPath := filepath.Join("certs", "chaos.key")
+	if cert, err := tls.LoadX509KeyPair(certPath, keyPath); err == nil {
+		slog.Info("复用已存在的自签名证书（删除 certs/ 目录可强制重新生成）", "cert", certPath)
+		return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
+	}
+
 	self, err := security.GenerateSelfSigned()
 	if err != nil {
 		return nil, err
 	}
-	certPath, keyPath, err := self.Save("certs")
-	if err != nil {
+	if _, _, err := self.Save("certs"); err != nil {
 		return nil, err
 	}
-	slog.Info("已生成自签名证书，请将 certs/chaos.crt 导入系统/浏览器信任",
+	slog.Info("已生成自签名证书，请将 certs/chaos.crt 导入系统/浏览器信任（仅首次需要）",
 		"cert", certPath, "key", keyPath)
 	return &tls.Config{Certificates: []tls.Certificate{self.Certificate}}, nil
 }

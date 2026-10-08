@@ -17,7 +17,6 @@ const columns: DataTableColumn[] = [
   {field: 'SourcePath', title: '源路径', minWidth: 200, searchable: true},
   {field: 'TargetPath', title: '目标路径', minWidth: 200, searchable: true},
   {field: 'Remark', title: '备注', minWidth: 120, searchable: true},
-  {field: 'Sort', title: '排序', width: 80, sortable: true},
   {field: 'LinkStatus', title: '状态', width: 100},
   {field: 'Status', title: '启用', width: 80, type: 'switch'},
 ]
