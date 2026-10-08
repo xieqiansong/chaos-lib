@@ -110,22 +110,23 @@ func Run(webFS fs.FS) error {
 // runHTTP3 在启用 HTTP/3 时同时拉起 HTTPS(TCP) 与 HTTP/3(UDP/QUIC) 两个服务，
 // 复用同一个 handler；并通过 Alt-Svc 响应头告知浏览器可升级到 h3（前端代码无需改动）。
 func runHTTP3(handler http.Handler, srv *config.ServerConfig) error {
-	http3Srv := &http3.Server{
-		Addr: srv.GetHTTP3Address(),
-		Port: srv.GetHTTP3Port(),
-		Handler: handler,
-	}
-
 	base, err := loadTLSConfig(srv)
 	if err != nil {
 		return fmt.Errorf("加载 TLS 配置失败: %w", err)
 	}
+
+	http3Srv := &http3.Server{
+		Addr:      srv.GetHTTP3Address(),
+		Port:      srv.GetHTTP3Port(),
+		Handler:   handler,
+		TLSConfig: http3.ConfigureTLSConfig(base.Clone()),
+	}
+
 	// TCP 侧优先协商 HTTP/2，UDP(QUIC) 侧由 ConfigureTLSConfig 设为 h3。
 	tlsTCP := base.Clone()
 	tlsTCP.NextProtos = []string{"h2", "http/1.1"}
-	http3Srv.TLSConfig = http3.ConfigureTLSConfig(base.Clone())
 
-	// Alt-Svc：在 TCP(HTTPS) 响应里告知浏览器本服务支持 HTTP/3，浏览器自动协商升级（前端无感）。
+	// Alt-Svc：在 HTTPS 响应里告知浏览器本服务支持 HTTP/3，浏览器自动协商升级（前端无感）。
 	withAltSvc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_ = http3Srv.SetQUICHeaders(w.Header())
 		handler.ServeHTTP(w, req)
