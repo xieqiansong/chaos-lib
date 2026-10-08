@@ -26,6 +26,12 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+
+	"crypto/tls"
+	"fmt"
+
+	"github.com/quic-go/quic-go/http3"
+	security "chaos-go/internal/framework/security"
 )
 
 // Run 装配并启动 chaos-go 应用，阻塞至 HTTP Server 退出。
@@ -93,7 +99,82 @@ func Run(webFS fs.FS) error {
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	r := router.SetupRouter(webFS)
+
+	if cfg.Server.EnableHTTP3 {
+		return runHTTP3(r, &cfg.Server)
+	}
 	return r.Run(cfg.Server.GetAddress())
+}
+
+// runHTTP3 在启用 HTTP/3 时同时拉起 HTTPS(TCP) 与 HTTP/3(UDP/QUIC) 两个服务，
+// 复用同一个 handler；并通过 Alt-Svc 响应头告知浏览器可升级到 h3（前端代码无需改动）。
+func runHTTP3(handler http.Handler, srv *config.ServerConfig) error {
+	http3Srv := &http3.Server{
+		Addr: srv.GetHTTP3Address(),
+		Port: srv.GetHTTP3Port(),
+		Handler: handler,
+	}
+
+	base, err := loadTLSConfig(srv)
+	if err != nil {
+		return fmt.Errorf("加载 TLS 配置失败: %w", err)
+	}
+	// TCP 侧优先协商 HTTP/2，UDP(QUIC) 侧由 ConfigureTLSConfig 设为 h3。
+	tlsTCP := base.Clone()
+	tlsTCP.NextProtos = []string{"h2", "http/1.1"}
+	http3Srv.TLSConfig = http3.ConfigureTLSConfig(base.Clone())
+
+	// Alt-Svc：在 TCP(HTTPS) 响应里告知浏览器本服务支持 HTTP/3，浏览器自动协商升级（前端无感）。
+	withAltSvc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		_ = http3Srv.SetQUICHeaders(w.Header())
+		handler.ServeHTTP(w, req)
+	})
+	tcpSrv := &http.Server{
+		Addr:      srv.GetAddress(),
+		Handler:   withAltSvc,
+		TLSConfig: tlsTCP,
+	}
+
+	errCh := make(chan error, 2)
+	go func() {
+		slog.Info("HTTP/3(QUIC/UDP) 服务启动", "addr", srv.GetHTTP3Address())
+		errCh <- http3Srv.ListenAndServe()
+	}()
+	go func() {
+		ln, lerr := tls.Listen("tcp", srv.GetAddress(), tlsTCP)
+		if lerr != nil {
+			errCh <- lerr
+			return
+		}
+		slog.Info("HTTPS(TCP) 服务启动", "addr", srv.GetAddress())
+		errCh <- tcpSrv.Serve(ln)
+	}()
+
+	slog.Warn("已启用 HTTPS + HTTP/3（自签名证书），浏览器会提示不安全，需手动信任；生产环境请改用受信任证书")
+	return <-errCh
+}
+
+// loadTLSConfig 加载 TLS 配置：配置了证书文件则直接加载，否则生成自签名证书并落盘（方案 A）。
+func loadTLSConfig(srv *config.ServerConfig) (*tls.Config, error) {
+	if srv.TLSCertFile != "" && srv.TLSKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(srv.TLSCertFile, srv.TLSKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
+	}
+
+	self, err := security.GenerateSelfSigned()
+	if err != nil {
+		return nil, err
+	}
+	certPath, keyPath, err := self.Save("certs")
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("已生成自签名证书，请将 certs/chaos.crt 导入系统/浏览器信任",
+		"cert", certPath, "key", keyPath)
+	return &tls.Config{Certificates: []tls.Certificate{self.Certificate}}, nil
 }
 
 func setupPprof(cfg *config.PprofConfig) {

@@ -5,6 +5,7 @@ services:
       dockerfile: deployments/Dockerfile
     ports:
       - "30030:30030"
+      - "30030:30030/udp"
     environment:
       - CHAOS_UI_DIR=/app/ui
     restart: unless-stopped

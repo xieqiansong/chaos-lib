@@ -28,3 +28,6 @@ mailmap.txt
 .scratch/
 
 .idea
+
+# 证书目录
+chaos-go/certs/

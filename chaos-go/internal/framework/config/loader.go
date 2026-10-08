@@ -30,8 +30,12 @@ type AppConfig struct {
 }
 
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	EnableHTTP3 bool   `yaml:"enable_http3"` // 同时启用 HTTPS(TCP) + HTTP/3(UDP/QUIC)，强制 TLS
+	HTTP3Port   int    `yaml:"http3_port"`   // HTTP/3 的 UDP 端口，0 表示与 Port 相同
+	TLSCertFile string `yaml:"tls_cert_file"` // 受信任证书路径（可选），留空则自动生成自签名证书
+	TLSKeyFile  string `yaml:"tls_key_file"`  // 私钥路径（可选）
 }
 
 type DatabaseConfig struct {
@@ -305,6 +309,19 @@ func (c *DatabaseConfig) GetDSN() string {
 
 func (c *ServerConfig) GetAddress() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
+}
+
+// GetHTTP3Port 返回 HTTP/3 的 UDP 监听端口；为 0 时与 Port 一致。
+func (c *ServerConfig) GetHTTP3Port() int {
+	if c.HTTP3Port > 0 {
+		return c.HTTP3Port
+	}
+	return c.Port
+}
+
+// GetHTTP3Address 返回 HTTP/3(UDP/QUIC) 监听地址。
+func (c *ServerConfig) GetHTTP3Address() string {
+	return fmt.Sprintf("%s:%d", c.Host, c.GetHTTP3Port())
 }
 
 func (c *PprofConfig) GetAddress() string {

@@ -7,6 +7,14 @@
 server:
   host: "0.0.0.0"
   port: 8080
+  # HTTP/3（基于 QUIC/UDP，强制 HTTPS）开关：开启后同时提供 HTTPS(TCP) 与 HTTP/3(UDP)。
+  # 设为 true 且未配置 tls_cert_file/tls_key_file 时，自动生成自签名证书（输出到 certs/ 目录）。
+  enable_http3: false
+  # HTTP/3 的 UDP 端口，0 表示与 port 相同。
+  http3_port: 0
+  # 受信任证书路径（可选）；留空则使用自签名证书。
+  tls_cert_file: ""
+  tls_key_file: ""
 
 # 数据库：type 切换 postgres / sqlite（改 type 即可）
 db:
