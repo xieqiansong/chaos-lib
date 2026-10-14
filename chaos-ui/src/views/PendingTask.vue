@@ -144,7 +144,7 @@ const columns: DataTableColumn[] = [
   {field: 'ContentSize', title: '字数', width: 80},
   {field: 'FsrsReps', title: '复习次数', width: 90},
   {field: 'Status', title: '状态', width: 90},
-  {field: 'StartedAt', title: '开始时间', width: 120, sortable: true},
+  {field: 'StartedAt', title: '开始时间', width: 140, sortable: true},
   {field: '__actions', title: '操作', width: 240, type: 'actions', fixed: 'right'},
 ]
 
@@ -161,7 +161,7 @@ function openPreview(task: PendingTask) {
 function formatTime(timeStr: string | null) {
   if (!timeStr) return ''
   try {
-    return formatDate(new Date(timeStr), 'MM-dd HH:mm')
+    return formatDate(new Date(timeStr), 'yyyy-MM-dd HH:mm')
   } catch {
     return ''
   }

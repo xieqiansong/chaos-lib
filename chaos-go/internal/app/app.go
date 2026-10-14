@@ -4,25 +4,25 @@
 package app
 
 import (
-	"chaos-go/internal/framework/apilog"
-	"chaos-go/internal/framework/config"
 	"chaos-go/internal/domain/cronjob"
-	"chaos-go/internal/framework/datacache"
-	_ "chaos-go/internal/framework/dbmonitor"
 	"chaos-go/internal/domain/envvar"
 	"chaos-go/internal/domain/filelink"
-	"chaos-go/internal/platform/mqttsync"
 	"chaos-go/internal/domain/note"
 	"chaos-go/internal/domain/portfwd"
 	"chaos-go/internal/domain/project"
 	"chaos-go/internal/domain/proxy"
 	"chaos-go/internal/domain/quickedit"
-	"chaos-go/internal/framework/router"
-	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/domain/sdk"
 	"chaos-go/internal/domain/standarddata"
 	_ "chaos-go/internal/domain/systemjob"
 	"chaos-go/internal/domain/taskplan"
+	"chaos-go/internal/framework/apilog"
+	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/datacache"
+	_ "chaos-go/internal/framework/dbmonitor"
+	"chaos-go/internal/framework/router"
+	"chaos-go/internal/framework/scheduler"
+	"chaos-go/internal/platform/mqttsync"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -31,8 +31,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/quic-go/quic-go/http3"
 	security "chaos-go/internal/framework/security"
+
+	"github.com/quic-go/quic-go/http3"
 )
 
 // Run 装配并启动 chaos-go 应用，阻塞至 HTTP Server 退出。
@@ -81,13 +82,16 @@ func Run(webFS fs.FS) error {
 
 	// 接口访问日志：启动异步批量落库消费者（此前由包 init 起 goroutine，现改为显式启动）
 	apilog.Start()
+	slog.Info("接口访问日志记录器启动完成")
 
 	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
-	mqttsync.Start()
+	// mqttsync.Start()
+	slog.Info("多节点 MQTT 同步启动完成")
 
 	// 进程重启后内存中没有任何隧道：按库里"期望运行"（status=true）的规则重建转发，
 	// 实现断线/重启自动重连，而非旧逻辑那样把所有状态清零。
 	portfwd.RecoverForwardsOnBoot()
+	slog.Info("隧道状态恢复完成")
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
