@@ -7,15 +7,9 @@ import (
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的 v1 路由挂载函数登记到 routehub（与存量 /api 并存，双轨迁移）。
-func init() {
-	routehub.RegisterV1("task-plans", RegisterV1)
-}
 
 // metaToQuery 把信封 meta 桥接为查询参数，使既有的 query 解析逻辑（分页 / 过滤 / 排序）在 v1 下复用。
 // 实现已上收到 framework/envelope.MetaToQuery，本处仅为路由注册处的可读性保留薄封装。

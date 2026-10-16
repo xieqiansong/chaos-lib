@@ -4,6 +4,7 @@ import (
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/middleware"
+	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/routehub"
 	"chaos-go/internal/framework/web"
 	"io"
@@ -34,6 +35,8 @@ func SetupRouter(webFS fs.FS) http.Handler {
 	if mounted := routehub.MountAllV1(v1); len(mounted) > 0 {
 		slog.Info("v1 路由模块挂载完成", "modules", strings.Join(mounted, ", "))
 	}
+	// 插件声明的路由（已登记为插件的模块）：直接挂载到 /api/v1，与 routehub 模块共存。
+	plugin.MountAll(v1)
 
 	// 根路径 "/" 由下方 NoRoute 的 "/{path...}" 兜底（同样返回 index.html），
 	// 这里不再单独注册 GET /，否则会与通配模式在 Go ServeMux 中判定为冲突。

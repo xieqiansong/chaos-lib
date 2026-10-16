@@ -15,11 +15,12 @@ import (
 	"chaos-go/internal/domain/sdk"
 	"chaos-go/internal/domain/standarddata"
 	_ "chaos-go/internal/domain/systemjob"
-	"chaos-go/internal/domain/taskplan"
+	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
 	"chaos-go/internal/framework/datacache"
 	_ "chaos-go/internal/framework/dbmonitor"
+	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/platform/mqttsync"
@@ -47,10 +48,19 @@ func Run(webFS fs.FS) error {
 
 	// 数据库连接 & 自动迁移
 	db := config.GetDB()
+
+	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
+	// 本轮仅 taskplan 登记为插件；其余模块仍走下方显式迁移，后续迁移时逐步把
+	// 模型与 Start 下沉到各自插件，并从这里删除对应显式项。
+	regs, err := plugin.Build()
+	if err != nil {
+		slog.Error("插件依赖校验失败", "err", err)
+		return err
+	}
+
 	slog.Info("数据库连接成功，执行自动迁移")
-	if err := config.AutoMigrate(db,
-		&taskplan.TaskPlan{},
-		&taskplan.Task{},
+	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（taskplan 等）
+	migrateModels = append(migrateModels,
 		&project.ProjectGroup{},
 		&project.Project{},
 		&proxy.BrowserHistory{},
@@ -73,7 +83,8 @@ func Run(webFS fs.FS) error {
 		&note.NoteTagRel{},
 		&note.NoteLink{},
 		&apilog.ApiLog{},
-	); err != nil {
+	)
+	if err := config.AutoMigrate(db, migrateModels...); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
 	}
 
@@ -101,6 +112,13 @@ func Run(webFS fs.FS) error {
 	slog.Info("后台任务启动完成")
 
 	cronjob.Start()
+
+	// 插件生命周期启动（按依赖拓扑序）。本轮仅 taskplan 登记为插件且无 Start，
+	// 故当前为空操作；后续 cronjob / systemjob 等迁移为插件后在此统一编排。
+	if err := plugin.StartAll(regs); err != nil {
+		slog.Error("插件启动失败", "err", err)
+		return err
+	}
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	r := router.SetupRouter(webFS)

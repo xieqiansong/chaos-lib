@@ -1,4 +1,6 @@
 import {createRouter, createWebHistory, type RouteRecordRaw} from 'vue-router'
+import '@/plugins' // 触发所有插件登记（必须在 collectRoutes 之前求值）
+import {collectRoutes} from '@/plugins/registry'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -35,24 +37,6 @@ export const appRoutes: RouteRecordRaw[] = [
     name: 'dashboard',
     component: () => import('@/views/Dashboard.vue'),
     meta: {title: '看板', icon: 'Odometer'},
-  },
-  {
-    path: '/taskPlan',
-    name: 'taskPlan',
-    component: () => import('@/views/TaskPlan.vue'),
-    meta: {title: '任务计划', icon: 'Tickets'},
-  },
-  {
-    path: '/pendingTask',
-    name: 'pendingTask',
-    component: () => import('@/views/PendingTask.vue'),
-    meta: {title: '待办任务', icon: 'Clock'},
-  },
-  {
-    // 兼容旧地址：原「任务管理」页已拆为任务计划 / 待办任务
-    path: '/task',
-    redirect: '/taskPlan',
-    meta: {hidden: true},
   },
   {
     path: '/projectManage',
@@ -160,8 +144,11 @@ export const appRoutes: RouteRecordRaw[] = [
   },
 ]
 
+// 聚合「插件路由 + 存量路由」；后续存量路由逐个迁入各自插件后，appRoutes 最终清空。
+const allAppRoutes: RouteRecordRaw[] = [...collectRoutes(), ...appRoutes]
+
 const routes: RouteRecordRaw[] = [
-  ...appRoutes,
+  ...allAppRoutes,
   {path: '/:pathMatch(.*)*', redirect: '/'},
 ]
 
@@ -184,7 +171,7 @@ function resolvePath(base: string, path: string) {
  * - 无 meta.title 的容器路由不显示自身，直接摊平其子项
  * - 子路由自动拼接父级 path
  */
-export function buildMenu(routes: readonly RouteRecordRaw[] = appRoutes, base = ''): MenuNode[] {
+export function buildMenu(routes: readonly RouteRecordRaw[] = allAppRoutes, base = ''): MenuNode[] {
   const nodes: MenuNode[] = []
   for (const route of routes) {
     const path = resolvePath(base, route.path)

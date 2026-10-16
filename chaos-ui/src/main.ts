@@ -10,7 +10,6 @@ import App from './App.vue';
 import router from './router';
 import {
     AlarmClock,
-    Clock,
     Coin,
     Collection,
     Connection,
@@ -30,9 +29,10 @@ import {
     Setting,
     Sort,
     Star,
-    Sunny,
-    Tickets
+    Sunny
 } from '@element-plus/icons-vue';
+import * as ElementPlusIcons from '@element-plus/icons-vue';
+import {collectIcons, installPlugins} from '@/plugins/registry';
 import {initTheme} from './theme';
 import {getHostname} from './utils/api';
 import {Buffer} from 'buffer';
@@ -47,7 +47,6 @@ const app = createApp(App);
 // 全局注册用到的 Element Plus 图标（白名单），供路由 meta.icon 按名称动态渲染
 const usedIcons = {
     AlarmClock,
-    Clock,
     Coin,
     Collection,
     Connection,
@@ -66,13 +65,24 @@ const usedIcons = {
     Sort,
     Star,
     Sunny,
-    Tickets,
     Grid,
     Key
 }
 for (const [key, component] of Object.entries(usedIcons)) {
     app.component(key, component);
 }
+
+// 插件声明的图标自动注册：新增插件只要在路由 meta.icon 写 Element Plus 图标名，
+// 即自动可用，无需再维护上方白名单（后续存量路由迁入插件后，上方白名单可逐步清空）。
+for (const name of collectIcons()) {
+    const comp = (ElementPlusIcons as Record<string, unknown>)[name]
+    if (comp && !app.component(name)) {
+        app.component(name, comp as any)
+    }
+}
+
+// 触发各插件的 install 钩子（如 echarts 按需注册组件），须在挂载前完成。
+installPlugins(app);
 
 app.use(router);
 app.mount('#app');
