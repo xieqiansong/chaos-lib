@@ -4,16 +4,16 @@
 package app
 
 import (
-	"chaos-go/internal/domain/cronjob"
+	_ "chaos-go/internal/domain/cronjob"
 	"chaos-go/internal/domain/envvar"
-	"chaos-go/internal/domain/filelink"
+	_ "chaos-go/internal/domain/filelink"
 	_ "chaos-go/internal/domain/note"
 	_ "chaos-go/internal/domain/portfwd"
 	_ "chaos-go/internal/domain/project"
-	"chaos-go/internal/domain/proxy"
+	_ "chaos-go/internal/domain/proxy"
 	"chaos-go/internal/domain/quickedit"
-	"chaos-go/internal/domain/sdk"
-	"chaos-go/internal/domain/standarddata"
+	_ "chaos-go/internal/domain/sdk"
+	_ "chaos-go/internal/domain/standarddata"
 	_ "chaos-go/internal/domain/systemjob"
 	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
 	"chaos-go/internal/framework/apilog"
@@ -23,7 +23,7 @@ import (
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
-	"chaos-go/internal/platform/mqttsync"
+	_ "chaos-go/internal/platform/mqttsync"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -50,8 +50,9 @@ func Run(webFS fs.FS) error {
 	db := config.GetDB()
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
-	// 已登记为插件的模块：taskplan / project / note / portfwd（模型与 Start 在各自插件内声明）；
-	// 其余模块仍走下方显式迁移，后续迁移时逐步把模型与 Start 下沉到各自插件，并从这里删除对应显式项。
+	// 已登记为插件的模块：proxy / taskplan / project / note / portfwd / envvar / filelink / sdk /
+	// standarddata / quickedit / systemjob / cronjob / mqttsync（模型与 Start 在各自插件内声明）；
+	// 其余存量项逐步下沉。
 	regs, err := plugin.Build()
 	if err != nil {
 		slog.Error("插件依赖校验失败", "err", err)
@@ -59,20 +60,8 @@ func Run(webFS fs.FS) error {
 	}
 
 	slog.Info("数据库连接成功，执行自动迁移")
-	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（taskplan 等）
+	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（proxy / taskplan / project / note / portfwd / envvar / filelink / sdk / standarddata / quickedit / systemjob / cronjob / mqttsync）
 	migrateModels = append(migrateModels,
-		&proxy.BrowserHistory{},
-		&proxy.BrowserHistoryVisit{},
-		&proxy.Bookmark{},
-		&filelink.FileLink{},
-		&quickedit.QuickEditFile{},
-		&quickedit.QuickEditSnapshot{},
-		&sdk.SdkSource{},
-		&mqttsync.MqttSyncMessage{},
-		&mqttsync.MqttSyncNode{},
-		&cronjob.CronJob{},
-		&cronjob.CronJobRun{},
-		&standarddata.StandardData{},
 		&datacache.DataCache{},
 		&apilog.ApiLog{},
 	)
@@ -98,10 +87,9 @@ func Run(webFS fs.FS) error {
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
 
-	cronjob.Start()
-
-	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / note 无 Start；
-	// portfwd 的 Start 在此触发隧道恢复；后续 cronjob / systemjob 等迁移为插件后继续收敛到此。
+	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / note / filelink / sdk /
+	// standarddata / envvar / quickedit / mqttsync / systemjob 无 Start；
+	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发 cron 调度运行时。
 	if err := plugin.StartAll(regs); err != nil {
 		slog.Error("插件启动失败", "err", err)
 		return err

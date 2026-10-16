@@ -16,8 +16,8 @@ export interface PluginMeta {
 // 一个功能模块的前端插件：拥有自己的路由（视图懒加载）、菜单 meta，并可注册全局能力。
 export interface Plugin {
   meta: PluginMeta
-  /** 本插件贡献的路由，由注册表汇总后交给 vue-router */
-  routes: RouteRecordRaw[]
+  /** 本插件贡献的路由，由注册表汇总后交给 vue-router。能力型插件（如 echarts）无路由可省略 */
+  routes?: RouteRecordRaw[]
   /** 可选：安装全局能力（如按需注册组件、指令、ECharts 模块等） */
   install?: (app: App) => void
 }

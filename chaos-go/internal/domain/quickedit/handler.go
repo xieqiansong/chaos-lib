@@ -8,17 +8,9 @@ import (
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
-func init() {
-	routehub.RegisterV1("quick-edits", RegisterV1)
-}
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：list / create / delete / getContent / updateContent / listSnapshots / getSnapshot / restore；

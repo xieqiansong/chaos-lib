@@ -67,8 +67,10 @@ export function buildPlugins(): Plugin[] {
 }
 
 // collectRoutes 汇总所有插件路由（catch-all 由 router 末尾追加）。
+// 能力型插件（如 echarts）无 routes，用空数组兜底，避免产生 undefined 路由项导致
+// vue-router 在创建时抛出 "Cannot read properties of undefined (reading 'path')"。
 export function collectRoutes(): RouteRecordRaw[] {
-  return buildPlugins().flatMap((p) => p.routes)
+  return buildPlugins().flatMap((p) => p.routes ?? [])
 }
 
 // collectIcons 收集所有被插件路由 meta.icon 引用的图标名，供 main.ts 自动注册。
@@ -76,7 +78,7 @@ export function collectRoutes(): RouteRecordRaw[] {
 export function collectIcons(): string[] {
   const icons = new Set<string>()
   for (const p of buildPlugins()) {
-    for (const r of p.routes) {
+    for (const r of p.routes ?? []) {
       const icon = (r.meta as Record<string, unknown> | undefined)?.icon
       if (typeof icon === 'string') icons.add(icon)
     }

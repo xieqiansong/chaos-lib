@@ -8,17 +8,9 @@ import (
 
 	"chaos-go/internal/framework/envelope"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由已废弃（前端统一走 /api/v1 动作路由），此处仅保留 RegisterV1。
-func init() {
-	routehub.RegisterV1("env-variables", RegisterV1)
-}
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 // 动作：get / patch / put / sync / getSnapshot；补丁与快照 id 取自信封 data。

@@ -5,9 +5,8 @@ import (
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"sort"
-
 	"chaos-go/internal/framework/web"
+
 	"gorm.io/gorm/clause"
 )
 
@@ -37,13 +36,13 @@ type FrequentBookmark struct {
 // BookmarkNode 是书签树的嵌套节点，用于前端展示。
 // 结构与 Chrome extensions.bookmarks.getTree() 对齐，便于前端复用现有逻辑。
 type BookmarkNode struct {
-	ID        string          `json:"id"`
-	ParentID  string          `json:"parentId,omitempty"`
-	Title     string          `json:"title"`
-	URL       string          `json:"url,omitempty"`
-	IsFolder  bool            `json:"isFolder"`
-	SortIndex int             `json:"sortIndex"`
-	DateAdded int64           `json:"dateAdded"`
+	ID        string         `json:"id"`
+	ParentID  string         `json:"parentId,omitempty"`
+	Title     string         `json:"title"`
+	URL       string         `json:"url,omitempty"`
+	IsFolder  bool           `json:"isFolder"`
+	SortIndex int            `json:"sortIndex"`
+	DateAdded int64          `json:"dateAdded"`
 	Children  []*BookmarkNode `json:"children,omitempty"`
 }
 
@@ -62,7 +61,7 @@ func SaveBookmarks(c *web.Context) {
 	}
 	res := config.GetDB().Clauses(clause.OnConflict{UpdateAll: true}).Create(&items)
 	if err := res.Error; err != nil {
-		renv.Error(c, 500, "数据库写入失败: "+err.Error())
+		renv.Error(c, 500, "数据库写入失败: " + err.Error())
 		return
 	}
 	renv.Success(c, nil)
@@ -92,7 +91,7 @@ func GetFrequentBookmarks(c *web.Context) {
 	var items []FrequentBookmark
 	total, err := pagination.Paginate(base, &items, q)
 	if err != nil {
-		renv.Error(c, 500, "查询失败: "+err.Error())
+		renv.Error(c, 500, "查询失败: " + err.Error())
 		return
 	}
 	// 响应统一为 { items, total, page, size }
@@ -103,7 +102,7 @@ func GetFrequentBookmarks(c *web.Context) {
 // 顶层节点的 parent_id 为空串或不在表中时视为根。
 func GetBookmarkTree(c *web.Context) {
 	var flat []Bookmark
-	if err := config.GetDB().Find(&flat).Error; err != nil {
+	if err := config.GetDB().Order("sort_index ASC").Find(&flat).Error; err != nil {
 		renv.Error(c, 500, "查询书签失败: "+err.Error())
 		return
 	}
@@ -133,19 +132,5 @@ func GetBookmarkTree(c *web.Context) {
 			roots = append(roots, node)
 		}
 	}
-
-	// ---- 排序 ----
-	bySort := func(s []*BookmarkNode) {
-		sort.SliceStable(s, func(i, j int) bool {
-			return s[i].SortIndex < s[j].SortIndex
-		})
-	}
-	bySort(roots)
-	for _, node := range nodeMap {
-		if len(node.Children) > 1 {
-			bySort(node.Children)
-		}
-	}
-
 	renv.Success(c, roots)
 }

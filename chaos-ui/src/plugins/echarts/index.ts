@@ -15,6 +15,8 @@ export const echartsPlugin: Plugin = {
     version: '1.0.0',
     dependencies: [],
   },
+  // 能力型插件（无路由），仅通过 install 注册全局 ECharts 模块。
+  routes: [],
   install() {
     use([
       CanvasRenderer,

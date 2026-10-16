@@ -71,9 +71,11 @@ func redirectPolicy(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-// GetFavicon GET /api/favicon/:host —— 返回图片二进制流与识别出的 Content-Type。
-func GetFavicon(c *web.Context) {
-	host := normalizeHost(c.Param("host"))
+// GetFavicon 返回图片二进制流与识别出的 Content-Type。
+// host 由调用方显式传入：GET 路由取自路径参数 {host}，v1 动作路由（faviconV1）取自信封 data。
+// 自研 web 层无 gin 的 c.Params 注入机制，故改为显式参数（web.Context.Param 仅用于 GET 路由取值）。
+func GetFavicon(c *web.Context, host string) {
+	host = normalizeHost(host)
 	if host == "" {
 		c.Status(http.StatusBadRequest)
 		return

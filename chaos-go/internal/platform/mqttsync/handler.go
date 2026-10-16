@@ -7,17 +7,9 @@ import (
 	"chaos-go/internal/framework/crud"
 	envelopepkg "chaos-go/internal/framework/envelope"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
-func init() {
-	routehub.RegisterV1("mqtt-syncs", RegisterV1)
-}
 
 // mqttSyncOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。
 var mqttSyncOpts = crud.Opts[MqttSyncMessage]{

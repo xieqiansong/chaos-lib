@@ -33,12 +33,6 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '看板', icon: 'Odometer'},
   },
   {
-    path: '/sdk',
-    name: 'sdk',
-    component: () => import('@/views/Sdk.vue'),
-    meta: {title: 'SDK版本', icon: 'Collection'},
-  },
-  {
     path: '/fileLink',
     name: 'fileLink',
     component: () => import('@/views/FileLink.vue'),
@@ -51,22 +45,10 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: 'SSH连接', icon: 'Key'},
   },
   {
-    path: '/quickEdit',
-    name: 'quickEdit',
-    component: () => import('@/views/QuickEdit.vue'),
-    meta: {title: '快速编辑', icon: 'EditPen'},
-  },
-  {
     path: '/environment',
     name: 'environment',
     component: () => import('@/views/Environment.vue'),
     meta: {title: '环境变量', icon: 'Setting'},
-  },
-  {
-    path: '/browserHistory',
-    name: 'browserHistory',
-    component: () => import('@/views/BrowserHistory.vue'),
-    meta: {title: '历史记录', icon: 'Clock', hidden: true},
   },
   {
     path: '/example',
@@ -80,12 +62,7 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/MobileBoard.vue'),
     meta: {title: '全屏看板', icon: 'Monitor', hidden: true, fullscreen: true},
   },
-  {
-    path: '/mqttSync',
-    name: 'mqttSync',
-    component: () => import('@/views/MqttSync.vue'),
-    meta: {title: 'MQTT同步', icon: 'Connection'},
-  },
+
   {
     path: '/polyform',
     name: 'polyform',
@@ -97,25 +74,6 @@ export const appRoutes: RouteRecordRaw[] = [
     name: 'databaseMonitor',
     component: () => import('@/views/DatabaseMonitor.vue'),
     meta: {title: '数据监控', icon: 'Coin'},
-  },
-  {
-    path: '/bookmarks',
-    name: 'bookmarks',
-    component: () => import('@/views/Bookmarks.vue'),
-    meta: {title: '书签管理', icon: 'Star'},
-  },
-  {
-    path: '/cronJob',
-    name: 'cronJob',
-    component: () => import('@/views/CronJob.vue'),
-    meta: {title: '定时任务', icon: 'AlarmClock'},
-  },
-  {
-    // 标准参考表：配置驱动表格 + 一键 CRUD 的基准界面（前端 src/api/standardData.ts）
-    path: '/standardData',
-    name: 'standardData',
-    component: () => import('@/views/StandardData.vue'),
-    meta: {title: '标准数据', icon: 'Grid'},
   },
   {
     // 数据缓存：配置驱动表格 + 一键 CRUD（前端 src/api/dataCache.ts）
