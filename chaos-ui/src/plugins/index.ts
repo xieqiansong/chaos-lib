@@ -3,7 +3,10 @@
 // router/index.ts 会在使用 collectRoutes 之前导入本文件，确保登记先于路由汇总完成。
 import './taskplan'
 import './echarts'
+import './project'
+import './note'
+import './portfwd'
 
 // 后续插件在此追加副作用导入，例如：
-// import './project'
-// import './portForward'
+// import './sdk'
+// import './fileLink'

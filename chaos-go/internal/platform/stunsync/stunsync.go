@@ -55,7 +55,7 @@ func splitHostPort(addr string) (string, string) {
 // 未启用（需 MQTT 已启用且配置 LUCKY_OPEN_TOKEN）时直接跳过。
 func RunSync() {
 	if !enabled() {
-		slog.Info("stun 规则同步跳过", "reason", "未启用（需 MQTT 已启用且配置 LUCKY_OPEN_TOKEN）")
+		slog.Debug("stun 规则同步跳过", "reason", "未启用（需 MQTT 已启用且配置 LUCKY_OPEN_TOKEN）")
 		return
 	}
 	run()

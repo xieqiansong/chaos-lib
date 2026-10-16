@@ -27,22 +27,10 @@ export const appRoutes: RouteRecordRaw[] = [
     meta: {title: '首页', icon: 'HomeFilled'},
   },
   {
-    path: '/notes',
-    name: 'notes',
-    component: () => import('@/views/Notes.vue'),
-    meta: {title: '笔记', icon: 'Notebook'},
-  },
-  {
     path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/Dashboard.vue'),
     meta: {title: '看板', icon: 'Odometer'},
-  },
-  {
-    path: '/projectManage',
-    name: 'projectManage',
-    component: () => import('@/views/ProjectManage.vue'),
-    meta: {title: '项目管理', icon: 'Folder'},
   },
   {
     path: '/sdk',
@@ -61,12 +49,6 @@ export const appRoutes: RouteRecordRaw[] = [
     name: 'sshConn',
     component: () => import('@/views/SshConn.vue'),
     meta: {title: 'SSH连接', icon: 'Key'},
-  },
-  {
-    path: '/portForward',
-    name: 'portForward',
-    component: () => import('@/views/PortForward.vue'),
-    meta: {title: '端口转发', icon: 'Connection'},
   },
   {
     path: '/quickEdit',

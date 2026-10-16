@@ -9,7 +9,6 @@ import (
 	"chaos-go/internal/framework/httpx"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
@@ -24,10 +23,6 @@ var errRules = []httpx.ErrRule{
 	{Err: ErrConflict, Status: 409, Msg: "文件已被外部修改，请重新加载或选择覆盖"},
 	{Err: ErrAlreadyExists, Status: 409, Msg: "目标位置已存在同名文件"},
 	{Err: ErrContentTooLarge, Status: 413, Msg: "文件过大，暂不支持在线编辑"},
-}
-
-func init() {
-	routehub.RegisterV1("notes", RegisterV1)
 }
 
 // noteOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。

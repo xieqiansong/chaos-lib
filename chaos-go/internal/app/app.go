@@ -7,9 +7,9 @@ import (
 	"chaos-go/internal/domain/cronjob"
 	"chaos-go/internal/domain/envvar"
 	"chaos-go/internal/domain/filelink"
-	"chaos-go/internal/domain/note"
-	"chaos-go/internal/domain/portfwd"
-	"chaos-go/internal/domain/project"
+	_ "chaos-go/internal/domain/note"
+	_ "chaos-go/internal/domain/portfwd"
+	_ "chaos-go/internal/domain/project"
 	"chaos-go/internal/domain/proxy"
 	"chaos-go/internal/domain/quickedit"
 	"chaos-go/internal/domain/sdk"
@@ -50,8 +50,8 @@ func Run(webFS fs.FS) error {
 	db := config.GetDB()
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
-	// 本轮仅 taskplan 登记为插件；其余模块仍走下方显式迁移，后续迁移时逐步把
-	// 模型与 Start 下沉到各自插件，并从这里删除对应显式项。
+	// 已登记为插件的模块：taskplan / project / note / portfwd（模型与 Start 在各自插件内声明）；
+	// 其余模块仍走下方显式迁移，后续迁移时逐步把模型与 Start 下沉到各自插件，并从这里删除对应显式项。
 	regs, err := plugin.Build()
 	if err != nil {
 		slog.Error("插件依赖校验失败", "err", err)
@@ -61,13 +61,9 @@ func Run(webFS fs.FS) error {
 	slog.Info("数据库连接成功，执行自动迁移")
 	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（taskplan 等）
 	migrateModels = append(migrateModels,
-		&project.ProjectGroup{},
-		&project.Project{},
 		&proxy.BrowserHistory{},
 		&proxy.BrowserHistoryVisit{},
 		&proxy.Bookmark{},
-		&portfwd.PortForwarding{},
-		&portfwd.SshConnection{},
 		&filelink.FileLink{},
 		&quickedit.QuickEditFile{},
 		&quickedit.QuickEditSnapshot{},
@@ -78,10 +74,6 @@ func Run(webFS fs.FS) error {
 		&cronjob.CronJobRun{},
 		&standarddata.StandardData{},
 		&datacache.DataCache{},
-		&note.Note{},
-		&note.NoteTag{},
-		&note.NoteTagRel{},
-		&note.NoteLink{},
 		&apilog.ApiLog{},
 	)
 	if err := config.AutoMigrate(db, migrateModels...); err != nil {
@@ -99,11 +91,6 @@ func Run(webFS fs.FS) error {
 	// mqttsync.Start()
 	slog.Info("多节点 MQTT 同步启动完成")
 
-	// 进程重启后内存中没有任何隧道：按库里"期望运行"（status=true）的规则重建转发，
-	// 实现断线/重启自动重连，而非旧逻辑那样把所有状态清零。
-	portfwd.RecoverForwardsOnBoot()
-	slog.Info("隧道状态恢复完成")
-
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
@@ -113,8 +100,8 @@ func Run(webFS fs.FS) error {
 
 	cronjob.Start()
 
-	// 插件生命周期启动（按依赖拓扑序）。本轮仅 taskplan 登记为插件且无 Start，
-	// 故当前为空操作；后续 cronjob / systemjob 等迁移为插件后在此统一编排。
+	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / note 无 Start；
+	// portfwd 的 Start 在此触发隧道恢复；后续 cronjob / systemjob 等迁移为插件后继续收敛到此。
 	if err := plugin.StartAll(regs); err != nil {
 		slog.Error("插件启动失败", "err", err)
 		return err

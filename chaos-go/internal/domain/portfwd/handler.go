@@ -7,17 +7,9 @@ import (
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/httpx"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
-func init() {
-	routehub.RegisterV1("portFwd", RegisterV1)
-}
 
 // ruleErrRules 转发启停的领域错误 → HTTP 状态码映射表（未命中回落 500）。
 var ruleErrRules = []httpx.ErrRule{

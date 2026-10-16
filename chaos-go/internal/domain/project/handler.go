@@ -9,17 +9,9 @@ import (
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
 
 	"chaos-go/internal/framework/web"
 )
-
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
-func init() {
-	routehub.RegisterV1("project", RegisterV1)
-}
 
 // projectGroupOpts / projectOpts 两套资源的 CRUD 选项，存量 /api 与 v1 动作路由共用。
 var projectGroupOpts = crud.Opts[ProjectGroup]{
