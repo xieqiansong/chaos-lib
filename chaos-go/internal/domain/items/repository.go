@@ -10,13 +10,13 @@ import (
 
 // 领域错误
 var (
-	ErrItemNotFound      = errors.New("items: 物品不存在")
-	ErrCategoryNotFound  = errors.New("items: 分类不存在")
-	ErrLocationNotFound  = errors.New("items: 位置不存在")
-	ErrAssemblyNotFound  = errors.New("items: 装配关系不存在")
-	ErrSelfAssembly      = errors.New("items: 配件不能与主机相同")
-	ErrInsufficient      = errors.New("items: 库存不足")
-	ErrDBUnavailable     = errors.New("items: 数据库不可用")
+	ErrItemNotFound     = errors.New("items: 物品不存在")
+	ErrCategoryNotFound = errors.New("items: 分类不存在")
+	ErrLocationNotFound = errors.New("items: 位置不存在")
+	ErrAssemblyNotFound = errors.New("items: 装配关系不存在")
+	ErrSelfAssembly     = errors.New("items: 配件不能与主机相同")
+	ErrInsufficient     = errors.New("items: 库存不足")
+	ErrDBUnavailable    = errors.New("items: 数据库不可用")
 )
 
 func db() *gorm.DB { return config.GetDB() }
@@ -43,23 +43,12 @@ func GetItem(tx *gorm.DB, id int) (*Item, error) {
 	return &it, nil
 }
 
-func GetLocation(tx *gorm.DB, id int) (*Location, error) {
-	var l Location
-	if err := tx.First(&l, "id = ?", id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrLocationNotFound
-		}
-		return nil, err
-	}
-	return &l, nil
-}
-
 func UpdateItemFields(tx *gorm.DB, id int, fields map[string]any) error {
 	return tx.Model(&Item{}).Where("id = ?", id).Updates(fields).Error
 }
 
-func CreateItem(tx *gorm.DB, it *Item) error    { return tx.Create(it).Error }
-func CreateRecord(tx *gorm.DB, r *ItemRecord) error  { return tx.Create(r).Error }
+func CreateItem(tx *gorm.DB, it *Item) error            { return tx.Create(it).Error }
+func CreateRecord(tx *gorm.DB, r *ItemRecord) error     { return tx.Create(r).Error }
 func CreateAssembly(tx *gorm.DB, a *ItemAssembly) error { return tx.Create(a).Error }
 
 // CurrentAssembly 取配件当前在位的装配关系（removed_at 为 NULL）。
@@ -163,10 +152,10 @@ func CategoryStats() ([]CategoryStat, error) {
 	}
 	var rows []CategoryStat
 	if err := d.Model(&Item{}).
-		Select("i.category_id, c.name AS category_name, COUNT(*) AS count, COALESCE(SUM(i.purchase_price * i.quantity), 0) AS total_value").
-		Joins("LEFT JOIN item_category c ON c.id = i.category_id").
+		Select("i.category_id, d.label AS category_name, COUNT(*) AS count, COALESCE(SUM(i.purchase_price * i.quantity), 0) AS total_value").
+		Joins("LEFT JOIN dict_data d ON d.id = i.category_id AND d.type_code = ? AND d.is_deleted = 0", "item_category").
 		Where("i.is_deleted = 0 AND i.status <> ?", StatusDisposed).
-		Group("i.category_id, c.name").
+		Group("i.category_id, d.label").
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -205,12 +194,12 @@ func WarrantySoon(days int) ([]Item, error) {
 
 // ReplenishCycle 消耗品补货周期预测。
 type ReplenishCycle struct {
-	ItemID           int
-	ItemName         string
-	Cycles           int
-	AvgCycleDays     float64
-	LastBuy          time.Time
-	NextBuyEstimate  *time.Time
+	ItemID          int
+	ItemName        string
+	Cycles          int
+	AvgCycleDays    float64
+	LastBuy         time.Time
+	NextBuyEstimate *time.Time
 }
 
 // ReplenishForecast 基于 replenish 流水预测下次补货时间（窗口函数改为 Go 计算，方言无关）。
@@ -253,9 +242,9 @@ func ReplenishForecast() ([]ReplenishCycle, error) {
 		next := last.AddDate(0, 0, int(avg))
 		out = append(out, ReplenishCycle{
 			ItemID:          id,
-			Cycles:         n,
-			AvgCycleDays:   avg,
-			LastBuy:        last,
+			Cycles:          n,
+			AvgCycleDays:    avg,
+			LastBuy:         last,
 			NextBuyEstimate: &next,
 		})
 	}

@@ -4,27 +4,6 @@ import {useRestApi, toSnake} from '@/composables/useRestApi'
 import type {DataTableApiParams} from '@/components/dataTable/types'
 
 // ── 类型 ────────────────────────────────────────────────
-export interface Category {
-    ID: number
-    ParentID: number
-    Name: string
-    Icon: string | null
-    SortOrder: number
-    CreatedAt: string
-    UpdatedAt: string
-    IsDeleted: boolean
-}
-
-export interface Location {
-    ID: number
-    ParentID: number
-    Name: string
-    SortOrder: number
-    CreatedAt: string
-    UpdatedAt: string
-    IsDeleted: boolean
-}
-
 export interface Item {
     ID: number
     Name: string
@@ -118,9 +97,8 @@ export interface ReplenishCycle {
     NextBuyEstimate: string | null
 }
 
-// ── 通用 CRUD（分类 / 位置 / 物品 / 流水 / 装配）────────────
-export const categoriesApi = useRestApi<Category>('categories')
-export const locationsApi = useRestApi<Location>('locations')
+// ── 通用 CRUD（物品 / 流水 / 装配）────────────
+// 注：物品分类 / 存放位置 / 购入来源已统一收敛到数据字典，相关读写请走 @/api/dataDict。
 export const itemsApi = useRestApi<Item>('items')
 export const itemRecordsApi = useRestApi<ItemRecord>('item-records')
 export const itemAssembliesApi = useRestApi<ItemAssembly>('item-assemblies')
@@ -189,11 +167,3 @@ export const RECORD_TYPE_LABEL: Record<string, string> = {
 export const STATUS_LABEL: Record<string, string> = {
     in_use: '在用', idle: '闲置', lent: '借出', repairing: '维修', broken: '损坏', disposed: '已处置',
 }
-export const SOURCE_OPTIONS = [
-    {label: '淘宝', value: '淘宝'},
-    {label: '京东', value: '京东'},
-    {label: '闲鱼', value: '闲鱼'},
-    {label: '拼多多', value: '拼多多'},
-    {label: '线下', value: '线下'},
-    {label: '其他', value: '其他'},
-]

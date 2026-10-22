@@ -15,6 +15,7 @@
 - **📦 SDK 版本切换**：管理 JDK / Maven / Python / Llama 多版本来源，通过符号链接一键切换
 - **🔌 SSH 端口转发**：SSH 连接管理（凭据仅后端使用、响应脱敏）+ local(`ssh -L`) / remote(`ssh -R`) 转发规则，Web 界面启停
 - **🗄️ 数据监控**：只读自省当前库内表名、行数、表/索引/合计大小、索引数，以及 PostgreSQL 下的扫描与维护统计（兼容 SQLite / PostgreSQL 双后端）
+- **🗂️ 数据字典**：企业级枚举中心，统一管理「存放位置 / 物品分类 / 购入来源」等字典类型与数据项（支持父子级），其他模块按「类型编码 + 值」引用，便于把零散字典收敛到一处
 - **🔖 书签管理**：通过浏览器扩展直连本机浏览器，读取并管理书签树（新建 / 修改 / 删除 / 拖拽排序），支持按标题与 URL 即时筛选（需填写扩展直连 ID）
 - **🔄 格式转换**：JSON / YAML / CSV / XML / INI / CBOR（HEX）/ Java Class / Go Struct 等格式互转，支持自动转换、格式化、格式交换、文件上传与结果复制 / 下载
 - **📡 MQTT 多节点同步**：基于 MQTT Broker 的指令 / 消息广播通道（paho.mqtt.golang），支持连接状态监控、AES 加密（`MQTT_ENCRYPT_KEY`）、发送 / 接收与按 topic 软删除，用于多节点协同
@@ -196,6 +197,7 @@ chaos-lib/
 | `/quickEdit` | 快速编辑 | 文件编辑与快照回滚 |
 | `/environment` | 环境变量 | 系统 / 用户环境变量管理 |
 | `/databaseMonitor` | 数据监控 | 表清单 / 大小 / 行数 / 索引与列详情（只读） |
+| `/dataDict` | 数据字典 | 字典类型与数据项管理（枚举中心，支持父子级） |
 | `/bookmarks` | 书签管理 | 浏览器书签树：新建 / 修改 / 删除 / 拖拽排序（需扩展直连 ID） |
 | `/polyform` | 格式转换 | JSON / YAML / CSV / XML / INI / CBOR / Java / Go 互转（polyform-tools） |
 | `/mqttSync` | MQTT同步 | 多节点消息广播：状态 / 发送 / 接收 / 按 topic 删除 |

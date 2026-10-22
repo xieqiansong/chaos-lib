@@ -9,11 +9,12 @@ import {action} from '@/utils/request'
 import {prompt, showError, showSuccess} from '@/utils/message'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {
-    itemsApi, categoriesApi, locationsApi, itemActions, itemQueries,
-    ITEM_TYPE_OPTIONS, STATUS_OPTIONS, STATUS_LABEL, RECORD_TYPE_LABEL, SOURCE_OPTIONS,
-    type Item, type Category, type Location,
+    itemsApi, itemActions, itemQueries,
+    ITEM_TYPE_OPTIONS, STATUS_OPTIONS, STATUS_LABEL, RECORD_TYPE_LABEL,
+    type Item,
     type ItemRecord, type ComponentView, type AssemblyHistory, type CategoryStat, type ReplenishCycle,
 } from '@/api/items'
+import {listDictOptions} from '@/api/dataDict'
 
 const tableRef = ref<any>(null)
 const {run} = useCrudAction()
@@ -68,17 +69,20 @@ function submitEdit() {
     })
 }
 
-// 分类 / 位置下拉选项（从字典接口加载）
+// 分类 / 位置 / 来源下拉选项（统一从数据字典加载）
 const categoryOptions = ref<{label: string; value: number}[]>([])
 const locationOptions = ref<{label: string; value: number}[]>([])
+const sourceOptions = ref<{label: string; value: string}[]>([])
 onMounted(async () => {
     try {
-        const [cats, locs] = await Promise.all([
-            categoriesApi.fetch({page: 1, pageSize: 500}),
-            locationsApi.fetch({page: 1, pageSize: 500}),
+        const [cats, locs, srcs] = await Promise.all([
+            listDictOptions('item_category'),
+            listDictOptions('item_location'),
+            listDictOptions('purchase_source'),
         ])
-        categoryOptions.value = (cats.rows as Category[]).map(c => ({label: c.Name, value: c.ID}))
-        locationOptions.value = (locs.rows as Location[]).map(l => ({label: l.Name, value: l.ID}))
+        categoryOptions.value = cats.map(c => ({label: c.Label, value: c.ID}))
+        locationOptions.value = locs.map(l => ({label: l.Label, value: l.ID}))
+        sourceOptions.value = srcs.map(s => ({label: s.Label, value: s.Value}))
         await loadItemOptions()
     } catch {
         // 字典加载失败不阻塞页面，仅退化为无选项下拉
@@ -99,7 +103,7 @@ const fields = computed(() => [
     {field: 'MinQuantity', title: '低库存阈值', type: 'number', span: 12, min: 0, defaultValue: null},
     {field: 'Status', title: '状态', type: 'select', span: 12, options: STATUS_OPTIONS},
     {field: 'SerialNo', title: '序列号', type: 'text', span: 12},
-    {field: 'PurchaseChannel', title: '购入来源', type: 'select', span: 12, options: SOURCE_OPTIONS, clearable: true, allowCreate: true},
+    {field: 'PurchaseChannel', title: '购入来源', type: 'select', span: 12, options: sourceOptions.value, clearable: true, allowCreate: true},
     {field: 'PurchasePrice', title: '购买价', type: 'number', span: 12, min: 0, precision: 2, step: 0.01, defaultValue: null},
     {field: 'PurchaseDate', title: '购买日期', type: 'datetime', span: 12},
     {field: 'WarrantyEnd', title: '保修到期', type: 'datetime', span: 12},
@@ -353,7 +357,7 @@ async function openQuery(tab: string) {
                     <el-col :span="12"><el-form-item label="序列号"><el-input v-model="purchaseForm.SerialNo"/></el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="购入来源">
                         <el-select v-model="purchaseForm.PurchaseChannel" clearable filterable allow-create default-first-option placeholder="可空/自定义">
-                            <el-option v-for="o in SOURCE_OPTIONS" :key="o.value" :label="o.label" :value="o.value"/>
+                            <el-option v-for="o in sourceOptions" :key="o.value" :label="o.label" :value="o.value"/>
                         </el-select>
                     </el-form-item></el-col>
                     <el-col :span="12"><el-form-item label="单位"><el-input v-model="purchaseForm.Unit"/></el-form-item></el-col>

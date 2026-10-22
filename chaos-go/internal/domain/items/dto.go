@@ -4,7 +4,7 @@ import "time"
 
 // PurchaseRequest 购入一件物品（耐用品 / 消耗品），并记一笔 purchase 流水。
 type PurchaseRequest struct {
-	Item       Item     `json:"item"`
+	Item       Item      `json:"item"`
 	RecordDate time.Time `json:"recordDate"`
 	Note       *string   `json:"note"`
 }

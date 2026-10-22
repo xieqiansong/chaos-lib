@@ -72,6 +72,49 @@ CREATE TABLE IF NOT EXISTS public.note_tag_rels (
     PRIMARY KEY (note_id, tag_id)
 );
 
+-- 2026-10-22 新增数据字典模块（internal/domain/dict）：企业级枚举中心。
+-- 设计：dict_type 定义一组枚举的容器（如 存放位置 / 物品分类 / 购入来源），
+--       dict_data 为具体可选项，支持父子级（ParentID），其他业务模块按 TypeCode + Value 引用。
+-- 软删除统一走 soft_delete flag 模式（is_deleted smallint，由 GORM 插件自动维护）。
+CREATE TABLE IF NOT EXISTS public.dict_type (
+    id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    created_at timestamptz,
+    updated_at timestamptz,
+    is_deleted smallint NOT NULL DEFAULT 0,          -- soft_delete flag 模式
+    name       varchar(50)  NOT NULL,
+    code       varchar(64)  NOT NULL,
+    status     boolean NOT NULL DEFAULT true,
+    sort       integer NOT NULL DEFAULT 0,
+    remark     varchar(255) DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_dict_type_code ON public.dict_type (code);
+CREATE INDEX IF NOT EXISTS idx_dict_type_deleted ON public.dict_type (is_deleted);
+
+CREATE TABLE IF NOT EXISTS public.dict_data (
+    id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    created_at timestamptz,
+    updated_at timestamptz,
+    is_deleted smallint NOT NULL DEFAULT 0,          -- soft_delete flag 模式
+    type_code  varchar(64)  NOT NULL,
+    label      varchar(100) NOT NULL,
+    value      varchar(100) NOT NULL,
+    parent_id  integer NOT NULL DEFAULT 0,
+    sort       integer NOT NULL DEFAULT 0,
+    status     boolean NOT NULL DEFAULT true,
+    remark     varchar(255) DEFAULT '',
+    ext        text DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_dict_data_type ON public.dict_data (type_code);
+CREATE INDEX IF NOT EXISTS idx_dict_data_parent ON public.dict_data (parent_id);
+CREATE INDEX IF NOT EXISTS idx_dict_data_deleted ON public.dict_data (is_deleted);
+
+-- 2026-10-22 个人物品「物品分类 / 存放位置」已收敛到数据字典（dict_data）。
+-- 下列两张遗留表在迁移后已无人引用（数据已拷入 dict_data 并重映射 Item 引用）。
+-- ⚠️ 仅可在「应用已至少启动一次以完成迁移」后执行，否则会丢失未迁移的分类/位置数据。
+--    SQLite 等价语句：DROP TABLE IF EXISTS item_category; DROP TABLE IF EXISTS item_location;
+DROP TABLE IF EXISTS public.item_category;
+DROP TABLE IF EXISTS public.item_location;
+
 CREATE TABLE IF NOT EXISTS public.note_links (
     id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     source_id  integer NOT NULL,

@@ -22,16 +22,9 @@ var errRules = []httpx.ErrRule{
 }
 
 // RegisterV1 挂载个人物品模块到 /api/v1（POST + Action 风格）。
-// 字典表 / 流水 / 装配表走通用 CRUD；物品主表的"业务动作"单独挂载在 items 组下。
+// 物品分类 / 存放位置 / 购入来源已收敛到数据字典（dict），由 dict 模块统一提供 CRUD；
+// 此处仅保留物品主表、流水与装配表的通用 CRUD，以及物品主表的"业务动作"。
 func RegisterV1(rg *web.RouterGroup) {
-	crud.RegisterActions[Category](rg, "categories", crud.Opts[Category]{
-		Searchable: []string{"name"},
-		Sortable:   []string{"id", "sort_order", "created_at"},
-	}, nil)
-	crud.RegisterActions[Location](rg, "locations", crud.Opts[Location]{
-		Searchable: []string{"name"},
-		Sortable:   []string{"id", "sort_order", "created_at"},
-	}, nil)
 	crud.RegisterActions[ItemRecord](rg, "item-records", crud.Opts[ItemRecord]{
 		Searchable: []string{"note"},
 		Sortable:   []string{"id", "record_date", "created_at"},

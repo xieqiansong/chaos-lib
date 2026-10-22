@@ -14,12 +14,12 @@ const (
 
 // 物品状态
 const (
-	StatusInUse     = "in_use"     // 在用
-	StatusIdle      = "idle"       // 闲置
-	StatusLent      = "lent"       // 借出
-	StatusRepairing = "repairing"  // 维修
-	StatusBroken    = "broken"     // 损坏
-	StatusDisposed  = "disposed"   // 已处置
+	StatusInUse     = "in_use"    // 在用
+	StatusIdle      = "idle"      // 闲置
+	StatusLent      = "lent"      // 借出
+	StatusRepairing = "repairing" // 维修
+	StatusBroken    = "broken"    // 损坏
+	StatusDisposed  = "disposed"  // 已处置
 )
 
 // 流水类型
@@ -104,14 +104,14 @@ func (ItemRecord) TableName() string { return "item_record" }
 // ItemAssembly 装配关系：配件作为独立 item 装入主机。
 type ItemAssembly struct {
 	crud.BaseModel
-	HostID      int       `json:"HostID"`
-	ComponentID int       `json:"ComponentID"`
-	Slot        *string   `json:"Slot"`
-	Quantity    float64   `json:"Quantity" gorm:"default:1"`
-	InstalledAt time.Time `json:"InstalledAt"`
+	HostID      int        `json:"HostID"`
+	ComponentID int        `json:"ComponentID"`
+	Slot        *string    `json:"Slot"`
+	Quantity    float64    `json:"Quantity" gorm:"default:1"`
+	InstalledAt time.Time  `json:"InstalledAt"`
 	RemovedAt   *time.Time `json:"RemovedAt"`
-	InstallNote *string   `json:"InstallNote"`
-	RemoveNote  *string   `json:"RemoveNote"`
+	InstallNote *string    `json:"InstallNote"`
+	RemoveNote  *string    `json:"RemoveNote"`
 }
 
 func (ItemAssembly) TableName() string { return "item_assembly" }

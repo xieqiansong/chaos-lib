@@ -5,21 +5,22 @@ package app
 
 import (
 	_ "chaos-go/internal/domain/cronjob"
+	_ "chaos-go/internal/domain/dashboard"
+	_ "chaos-go/internal/domain/dict"
 	"chaos-go/internal/domain/envvar"
 	_ "chaos-go/internal/domain/filelink"
 	itemsdomain "chaos-go/internal/domain/items"
 	_ "chaos-go/internal/domain/note"
+	_ "chaos-go/internal/domain/polyform"
 	_ "chaos-go/internal/domain/portfwd"
 	_ "chaos-go/internal/domain/project"
 	_ "chaos-go/internal/domain/proxy"
 	"chaos-go/internal/domain/quickedit"
 	_ "chaos-go/internal/domain/sdk"
+	_ "chaos-go/internal/domain/sshconn"
 	_ "chaos-go/internal/domain/standarddata"
 	_ "chaos-go/internal/domain/systemjob"
 	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
-	_ "chaos-go/internal/domain/dashboard"
-	_ "chaos-go/internal/domain/sshconn"
-	_ "chaos-go/internal/domain/polyform"
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
 	_ "chaos-go/internal/framework/datacache"
@@ -55,7 +56,7 @@ func Run(webFS fs.FS) error {
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
 	// 已登记为插件的模块：proxy / taskplan / project / note / portfwd / envvar / filelink / sdk /
-	// standarddata / quickedit / systemjob / cronjob / mqttsync / dbmonitor / datacache /
+	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync / dbmonitor / datacache /
 	// dashboard / sshconn / polyform（模型与 Start 在各自插件内声明）；
 	// 其余存量项逐步下沉。
 	regs, err := plugin.Build()
