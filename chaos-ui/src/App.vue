@@ -87,29 +87,33 @@ onUnmounted(() => {
               unique-opened
           >
             <template v-for="item in menuItems" :key="item.path">
-              <el-sub-menu v-if="item.children.length" :index="item.path" :title="item.title">
+              <el-sub-menu v-if="item.children.length" :index="item.path">
                 <template #title>
-                  <el-icon v-if="item.icon">
-                    <component :is="item.icon"/>
-                  </el-icon>
+                  <el-tooltip :content="item.title" placement="right" :show-after="0" :hide-after="0">
+                    <el-icon v-if="item.icon" class="sidebar-menu-icon">
+                      <component :is="item.icon"/>
+                    </el-icon>
+                  </el-tooltip>
                 </template>
                 <el-menu-item
                     v-for="child in item.children"
                     :key="child.path"
                     :index="child.path"
-                    :title="child.title"
                 >
-                  <el-icon v-if="child.icon">
-                    <component :is="child.icon"/>
-                  </el-icon>
-                  <span>{{ child.title }}</span>
+                  <el-tooltip :content="child.title" placement="right" :show-after="0" :hide-after="0">
+                    <el-icon v-if="child.icon" class="sidebar-menu-icon">
+                      <component :is="child.icon"/>
+                    </el-icon>
+                  </el-tooltip>
                 </el-menu-item>
               </el-sub-menu>
-              <el-menu-item v-else :index="item.path" :title="item.title">
-                <el-icon v-if="item.icon">
-                  <component :is="item.icon"/>
-                </el-icon>
-              </el-menu-item>
+              <el-tooltip v-else :content="item.title" placement="right" :show-after="0" :hide-after="0">
+                <el-menu-item :index="item.path">
+                  <el-icon v-if="item.icon" class="sidebar-menu-icon">
+                    <component :is="item.icon"/>
+                  </el-icon>
+                </el-menu-item>
+              </el-tooltip>
             </template>
           </el-menu>
         </div>
