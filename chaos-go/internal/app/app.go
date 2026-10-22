@@ -7,6 +7,7 @@ import (
 	_ "chaos-go/internal/domain/cronjob"
 	"chaos-go/internal/domain/envvar"
 	_ "chaos-go/internal/domain/filelink"
+	itemsdomain "chaos-go/internal/domain/items"
 	_ "chaos-go/internal/domain/note"
 	_ "chaos-go/internal/domain/portfwd"
 	_ "chaos-go/internal/domain/project"
@@ -70,6 +71,11 @@ func Run(webFS fs.FS) error {
 	)
 	if err := config.AutoMigrate(db, migrateModels...); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
+	}
+
+	// 个人物品模块：初始化默认分类 / 位置字典（幂等）
+	if err := itemsdomain.Seed(); err != nil {
+		slog.Error("个人物品字典初始化失败", "err", err)
 	}
 
 	setupPprof(&cfg.Pprof)

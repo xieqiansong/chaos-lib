@@ -92,6 +92,10 @@ function downloadBinary(f: FormField) {
                 v-else-if="f.type === 'select'"
                 v-model="form[f.field]"
                 :disabled="readonly"
+                :clearable="f.clearable ?? true"
+                :filterable="f.filterable ?? !!f.allowCreate"
+                :allow-create="f.allowCreate"
+                :default-first-option="f.allowCreate"
                 :placeholder="f.placeholder ?? '请选择'"
                 style="width: 100%"
             >
