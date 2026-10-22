@@ -7,15 +7,24 @@ import (
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
 	renv "chaos-go/internal/framework/resp"
-	"chaos-go/internal/framework/routehub"
+	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/web"
 )
 
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
+// init 把本模块登记为插件：路由改由插件框架统一挂载（plugin.MountAll 内部调用 RegisterV1），
+// 不再经 routehub 二次登记，避免重复挂载。
 func init() {
-	routehub.RegisterV1("db-monitors", RegisterV1)
+	plugin.Register(plugin.Registration{
+		Meta: plugin.Meta{
+			ID:           "dbmonitor",
+			Name:         "数据监控",
+			Version:      "1.0.0",
+			Dependencies: nil,
+		},
+		RegisterRoutes: func(rg *web.RouterGroup) {
+			RegisterV1(rg)
+		},
+	})
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。

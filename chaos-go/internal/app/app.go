@@ -16,9 +16,12 @@ import (
 	_ "chaos-go/internal/domain/standarddata"
 	_ "chaos-go/internal/domain/systemjob"
 	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
+	_ "chaos-go/internal/domain/dashboard"
+	_ "chaos-go/internal/domain/sshconn"
+	_ "chaos-go/internal/domain/polyform"
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
-	"chaos-go/internal/framework/datacache"
+	_ "chaos-go/internal/framework/datacache"
 	_ "chaos-go/internal/framework/dbmonitor"
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
@@ -51,7 +54,8 @@ func Run(webFS fs.FS) error {
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
 	// 已登记为插件的模块：proxy / taskplan / project / note / portfwd / envvar / filelink / sdk /
-	// standarddata / quickedit / systemjob / cronjob / mqttsync（模型与 Start 在各自插件内声明）；
+	// standarddata / quickedit / systemjob / cronjob / mqttsync / dbmonitor / datacache /
+	// dashboard / sshconn / polyform（模型与 Start 在各自插件内声明）；
 	// 其余存量项逐步下沉。
 	regs, err := plugin.Build()
 	if err != nil {
@@ -60,9 +64,8 @@ func Run(webFS fs.FS) error {
 	}
 
 	slog.Info("数据库连接成功，执行自动迁移")
-	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（proxy / taskplan / project / note / portfwd / envvar / filelink / sdk / standarddata / quickedit / systemjob / cronjob / mqttsync）
+	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（含 dbmonitor 无模型、datacache 的 DataCache 等）
 	migrateModels = append(migrateModels,
-		&datacache.DataCache{},
 		&apilog.ApiLog{},
 	)
 	if err := config.AutoMigrate(db, migrateModels...); err != nil {
@@ -88,7 +91,8 @@ func Run(webFS fs.FS) error {
 	slog.Info("后台任务启动完成")
 
 	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / note / filelink / sdk /
-	// standarddata / envvar / quickedit / mqttsync / systemjob 无 Start；
+	// standarddata / envvar / quickedit / mqttsync / systemjob / dbmonitor / datacache /
+	// dashboard / sshconn / polyform 无 Start；
 	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发 cron 调度运行时。
 	if err := plugin.StartAll(regs); err != nil {
 		slog.Error("插件启动失败", "err", err)

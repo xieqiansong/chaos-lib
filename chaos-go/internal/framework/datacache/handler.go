@@ -2,15 +2,25 @@ package datacache
 
 import (
 	"chaos-go/internal/framework/crud"
-	"chaos-go/internal/framework/routehub"
+	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/web"
 )
 
-// init 把本模块的路由挂载函数登记到 routehub，
-// 使其随 internal/app 导入该包而自动生效，无需 router.go 逐条编排。
-// 存量 /api 路由与新的 /api/v1 动作路由并存（双轨迁移）。
+// init 把本模块登记为插件：模型与路由挂载交由插件框架编排（plugin.ModelsOf / plugin.MountAll），
+// 不再经 routehub 二次登记，避免重复挂载；DataCache 模型也在此声明，统一由装配层迁移。
 func init() {
-	routehub.RegisterV1("data-caches", RegisterV1)
+	plugin.Register(plugin.Registration{
+		Meta: plugin.Meta{
+			ID:           "datacache",
+			Name:         "数据缓存",
+			Version:      "1.0.0",
+			Dependencies: nil,
+		},
+		Models: []any{&DataCache{}},
+		RegisterRoutes: func(rg *web.RouterGroup) {
+			RegisterV1(rg)
+		},
+	})
 }
 
 // dataCacheOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。

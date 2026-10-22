@@ -19,36 +19,14 @@ declare module 'vue-router' {
  * 业务路由表：meta.title / meta.icon 是侧边菜单与面包屑的唯一数据来源，
  * 新增页面只需在此追加一条路由，菜单自动出现。
  */
+// 应用级路由（非业务插件）：落地页、隐藏的测试页与全屏页。
+// 业务功能路由已全部迁入各自前端插件（见 src/plugins/*），由 collectRoutes 汇总。
 export const appRoutes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'home',
     component: () => import('@/views/Home.vue'),
     meta: {title: '首页', icon: 'HomeFilled'},
-  },
-  {
-    path: '/dashboard',
-    name: 'dashboard',
-    component: () => import('@/views/Dashboard.vue'),
-    meta: {title: '看板', icon: 'Odometer'},
-  },
-  {
-    path: '/fileLink',
-    name: 'fileLink',
-    component: () => import('@/views/FileLink.vue'),
-    meta: {title: '文件链接', icon: 'Link'},
-  },
-  {
-    path: '/sshConn',
-    name: 'sshConn',
-    component: () => import('@/views/SshConn.vue'),
-    meta: {title: 'SSH连接', icon: 'Key'},
-  },
-  {
-    path: '/environment',
-    name: 'environment',
-    component: () => import('@/views/Environment.vue'),
-    meta: {title: '环境变量', icon: 'Setting'},
   },
   {
     path: '/example',
@@ -62,30 +40,10 @@ export const appRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/MobileBoard.vue'),
     meta: {title: '全屏看板', icon: 'Monitor', hidden: true, fullscreen: true},
   },
-
-  {
-    path: '/polyform',
-    name: 'polyform',
-    component: () => import('@/views/Polyform.vue'),
-    meta: {title: '格式转换', icon: 'Sort'},
-  },
-  {
-    path: '/databaseMonitor',
-    name: 'databaseMonitor',
-    component: () => import('@/views/DatabaseMonitor.vue'),
-    meta: {title: '数据监控', icon: 'Coin'},
-  },
-  {
-    // 数据缓存：配置驱动表格 + 一键 CRUD（前端 src/api/dataCache.ts）
-    path: '/dataCache',
-    name: 'dataCache',
-    component: () => import('@/views/DataCache.vue'),
-    meta: {title: '数据缓存', icon: 'Collection'},
-  },
 ]
 
-// 聚合「插件路由 + 存量路由」；后续存量路由逐个迁入各自插件后，appRoutes 最终清空。
-const allAppRoutes: RouteRecordRaw[] = [...collectRoutes(), ...appRoutes]
+// 聚合「插件路由 + 应用级路由」；业务路由已全部迁入各自插件，appRoutes 仅剩应用级页面。
+const allAppRoutes: RouteRecordRaw[] = [...appRoutes, ...collectRoutes()]
 
 const routes: RouteRecordRaw[] = [
   ...allAppRoutes,
