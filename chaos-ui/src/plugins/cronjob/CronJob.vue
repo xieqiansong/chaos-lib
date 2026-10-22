@@ -12,7 +12,7 @@ import {showSuccess, showError, showWarning} from '@/utils/message'
 import {format as formatDate, parseISO} from 'date-fns'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {cronJobApi, type CronJob, type CronJobRun} from '@/api/cronJob'
+import {cronJobApi, type CronJob, type CronJobRun} from './api'
 
 // 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）
 defineProps<{ searchText?: string }>()

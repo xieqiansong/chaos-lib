@@ -8,7 +8,7 @@ export const filelinkPlugin: Plugin = {
     {
       path: '/fileLink',
       name: 'fileLink',
-      component: () => import('@/views/FileLink.vue'),
+      component: () => import('./FileLink.vue'),
       meta: { title: '文件链接', icon: 'Link' },
     },
   ],

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed, defineAsyncComponent, onMounted, ref, watch} from 'vue'
 import {action} from '@/utils/request'
-const MonacoDiffEditor = defineAsyncComponent(() => import('../components/MonacoDiffEditor.vue'))
+const MonacoDiffEditor = defineAsyncComponent(() => import('@/components/MonacoDiffEditor.vue'))
 
 const props = defineProps<{
   searchText: string

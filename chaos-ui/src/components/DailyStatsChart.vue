@@ -12,7 +12,7 @@ import {
   themeColors,
   type CappedItem,
 } from './chartHelpers'
-import {getDailyStats} from '@/api/dashboard'
+import {getDailyStats} from '@/plugins/dashboard/api'
 
 // 近一年每日完成任务数的折线图（带面积渐变）
 const chartOption = ref({})

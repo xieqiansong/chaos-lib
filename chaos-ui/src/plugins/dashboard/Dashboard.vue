@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {computed, onMounted, ref} from 'vue'
 import {useRouter} from 'vue-router'
-import ContributionPanel from '../components/ContributionPanel.vue'
-import DailyStatsChart from '../components/DailyStatsChart.vue'
-import ActiveStatsChart from '../components/ActiveStatsChart.vue'
-import {getDeepSeekBalance, getContributionStats} from '@/api/dashboard'
+import ContributionPanel from '@/components/ContributionPanel.vue'
+import DailyStatsChart from '@/components/DailyStatsChart.vue'
+import ActiveStatsChart from '@/components/ActiveStatsChart.vue'
+import {getDeepSeekBalance, getContributionStats} from './api'
 
 const router = useRouter()
 

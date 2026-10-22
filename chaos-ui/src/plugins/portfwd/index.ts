@@ -14,7 +14,7 @@ export const portfwdPlugin: Plugin = {
     {
       path: '/portForward',
       name: 'portForward',
-      component: () => import('@/views/PortForward.vue'),
+      component: () => import('./PortForward.vue'),
       meta: { title: '端口转发', icon: 'Connection' },
     },
   ],

@@ -14,13 +14,13 @@ export const proxyPlugin: Plugin = {
     {
       path: '/browserHistory',
       name: 'browserHistory',
-      component: () => import('@/views/BrowserHistory.vue'),
+      component: () => import('./BrowserHistory.vue'),
       meta: { title: '历史记录', icon: 'Clock', hidden: true },
     },
     {
       path: '/bookmarks',
       name: 'bookmarks',
-      component: () => import('@/views/Bookmarks.vue'),
+      component: () => import('./Bookmarks.vue'),
       meta: { title: '书签管理', icon: 'Star' },
     },
   ],

@@ -3,7 +3,7 @@
 // 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {dataCacheApi, COMPRESSION_OPTIONS, DATATYPE_OPTIONS} from '@/api/dataCache'
+import {dataCacheApi, COMPRESSION_OPTIONS, DATATYPE_OPTIONS} from './api'
 import {binarySummary} from '@/utils/binary'
 
 function truncate(s: string, n: number): string {

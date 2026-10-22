@@ -8,7 +8,7 @@ export const itemsPlugin: Plugin = {
         {
             path: '/items',
             name: 'items',
-            component: () => import('@/views/Items.vue'),
+            component: () => import('./Items.vue'),
             meta: {title: '个人物品', icon: 'Box'},
         },
 

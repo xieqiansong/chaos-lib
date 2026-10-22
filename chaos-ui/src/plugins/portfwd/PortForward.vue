@@ -5,8 +5,8 @@
 import {computed, onMounted, ref} from 'vue'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {portForwardApi, type PortForward, type PortForwardDirection} from '@/api/portForward'
-import {sshConnApi, type SshConnection} from '@/api/sshConn'
+import {portForwardApi, type PortForward, type PortForwardDirection} from './api'
+import {sshConnApi, type SshConnection} from '@/plugins/sshconn/api'
 
 // 关联 SSH 连接列表：用于表单下拉与列表展示
 const sshConns = ref<SshConnection[]>([])

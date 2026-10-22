@@ -12,8 +12,8 @@ import {useCrudAction} from '@/composables/useCrudAction'
 import {defaultForm} from '@/composables/useFormDefaults'
 import {toSnake} from '@/composables/useRestApi'
 import {showError, showSuccess, showWarning} from '@/utils/message'
-import {type ProjectGroup, projectGroupApi} from '@/api/projectGroup'
-import {type Project, projectApi} from '@/api/project'
+import {type ProjectGroup, projectGroupApi} from './projectGroup'
+import {type Project, projectApi} from './api'
 import {action} from '@/utils/request'
 
 const selectedGroupId = ref<number | null>(null)

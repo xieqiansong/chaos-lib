@@ -9,7 +9,7 @@ export const cronjobPlugin: Plugin = {
     {
       path: '/cronJob',
       name: 'cronJob',
-      component: () => import('@/views/CronJob.vue'),
+      component: () => import('./CronJob.vue'),
       meta: { title: '定时任务', icon: 'AlarmClock' },
     },
   ],

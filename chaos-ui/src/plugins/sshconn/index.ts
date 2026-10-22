@@ -9,7 +9,7 @@ export const sshconnPlugin: Plugin = {
     {
       path: '/sshConn',
       name: 'sshConn',
-      component: () => import('@/views/SshConn.vue'),
+      component: () => import('./SshConn.vue'),
       meta: { title: 'SSH连接', icon: 'Key' },
     },
   ],

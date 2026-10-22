@@ -14,7 +14,7 @@ export const projectPlugin: Plugin = {
     {
       path: '/projectManage',
       name: 'projectManage',
-      component: () => import('@/views/ProjectManage.vue'),
+      component: () => import('./ProjectManage.vue'),
       meta: { title: '项目管理', icon: 'Folder' },
     },
   ],

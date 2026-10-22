@@ -13,8 +13,8 @@ import {
     ITEM_TYPE_OPTIONS, STATUS_OPTIONS, STATUS_LABEL, RECORD_TYPE_LABEL,
     type Item,
     type ItemRecord, type ComponentView, type AssemblyHistory, type CategoryStat, type ReplenishCycle,
-} from '@/api/items'
-import {listDictOptions} from '@/api/dataDict'
+} from './api'
+import {listDictOptions} from '@/plugins/datadict/api'
 
 const tableRef = ref<any>(null)
 const {run} = useCrudAction()

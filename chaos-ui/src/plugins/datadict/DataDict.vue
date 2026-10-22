@@ -11,7 +11,7 @@ import {
     listDictDataAll,
     type DictType,
     type DictData,
-} from '@/api/dataDict'
+} from './api'
 
 // ── 字典类型 ────────────────────────────────────────────
 const typeColumns: DataTableColumn[] = [

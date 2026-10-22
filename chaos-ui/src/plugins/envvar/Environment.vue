@@ -3,7 +3,7 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {showSuccess, showError, showWarning} from '@/utils/message'
 import {Rank, Close} from '@element-plus/icons-vue'
-import {getEnvVariables, syncEnvVariables, patchEnvVariables, buildPatch, type EnvResponse} from '@/api/environment'
+import {getEnvVariables, syncEnvVariables, patchEnvVariables, buildPatch, type EnvResponse} from './api'
 
 const props = defineProps<{
   searchText: string

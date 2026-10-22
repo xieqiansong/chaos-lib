@@ -8,7 +8,7 @@ export const datadictPlugin: Plugin = {
         {
             path: '/dataDict',
             name: 'dataDict',
-            component: () => import('@/views/DataDict.vue'),
+            component: () => import('./DataDict.vue'),
             meta: { title: '数据字典', icon: 'Collection' },
         },
     ],

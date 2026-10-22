@@ -9,7 +9,7 @@ export const dashboardPlugin: Plugin = {
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: () => import('@/views/Dashboard.vue'),
+      component: () => import('./Dashboard.vue'),
       meta: { title: '看板', icon: 'Odometer' },
     },
   ],

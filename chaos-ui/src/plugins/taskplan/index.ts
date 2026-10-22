@@ -15,13 +15,13 @@ export const taskplanPlugin: Plugin = {
     {
       path: '/taskPlan',
       name: 'taskPlan',
-      component: () => import('@/views/TaskPlan.vue'),
+      component: () => import('./TaskPlan.vue'),
       meta: { title: '任务计划', icon: 'Tickets' },
     },
     {
       path: '/pendingTask',
       name: 'pendingTask',
-      component: () => import('@/views/PendingTask.vue'),
+      component: () => import('./PendingTask.vue'),
       meta: { title: '待办任务', icon: 'Clock' },
     },
     {

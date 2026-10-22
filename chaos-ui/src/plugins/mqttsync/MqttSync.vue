@@ -7,7 +7,7 @@ import {useCrudAction} from '@/composables/useCrudAction'
 import {showWarning} from '@/utils/message'
 import DataTable from '@/components/DataTable.vue'
 import {CRUD_ACTION, type DataTableColumn, type FormField} from '@/components/dataTable/types'
-import {mqttSyncApi, type MqttStatus} from '@/api/mqttSync'
+import {mqttSyncApi, type MqttStatus} from './api'
 
 const status = ref<MqttStatus | null>(null)
 // 平铺广播表单：主题同时作为「广播」与「删除该主题消息」的目标

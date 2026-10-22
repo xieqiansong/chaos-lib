@@ -5,7 +5,7 @@ import VChart from 'vue-echarts'
 import '../plugins/echarts'
 import {theme} from '@/theme'
 import {type CappedItem, capTooltip, capValues, capYAxis, MAX_VISUAL, themeColors,} from './chartHelpers'
-import {getActiveStats} from '@/api/dashboard'
+import {getActiveStats} from '@/plugins/dashboard/api'
 
 // 每日待办任务数的直方图：过期（早于今天）标红，未过期标琥珀
 const chartOption = ref({})

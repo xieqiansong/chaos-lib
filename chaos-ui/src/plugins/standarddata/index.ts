@@ -8,7 +8,7 @@ export const standarddataPlugin: Plugin = {
     {
       path: '/standardData',
       name: 'standardData',
-      component: () => import('@/views/StandardData.vue'),
+      component: () => import('./StandardData.vue'),
       meta: { title: '标准数据', icon: 'Grid' },
     },
   ],

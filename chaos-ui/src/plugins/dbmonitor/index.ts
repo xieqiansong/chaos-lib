@@ -8,7 +8,7 @@ export const dbmonitorPlugin: Plugin = {
     {
       path: '/databaseMonitor',
       name: 'databaseMonitor',
-      component: () => import('@/views/DatabaseMonitor.vue'),
+      component: () => import('./DatabaseMonitor.vue'),
       meta: { title: '数据监控', icon: 'Coin' },
     },
   ],

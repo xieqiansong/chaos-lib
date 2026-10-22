@@ -110,7 +110,7 @@ import {
   type TableDetail,
   type ColumnInfo,
   type IndexInfo,
-} from '@/api/dbMonitor'
+} from './api'
 
 // ── 概览指标条（页面级，独立于分页列表）──
 const overview = ref<DbOverview>({ dbType: '', version: '', totalBytes: 0, tableCount: 0, totalRows: 0, sizeSupported: false })

@@ -3,7 +3,7 @@
 // 仅声明 columns 与 fields 两份配置即可，无需任何增删改查样板。
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {standardDataApi, type StandardData} from '@/api/standardData'
+import {standardDataApi, type StandardData} from './api'
 
 const columns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 160, searchable: true},

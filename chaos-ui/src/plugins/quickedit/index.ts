@@ -9,7 +9,7 @@ export const quickeditPlugin: Plugin = {
     {
       path: '/quickEdit',
       name: 'quickEdit',
-      component: () => import('@/views/QuickEdit.vue'),
+      component: () => import('./QuickEdit.vue'),
       meta: { title: '快速编辑', icon: 'EditPen' },
     },
   ],

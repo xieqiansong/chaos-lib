@@ -8,7 +8,7 @@ export const mqttsyncPlugin: Plugin = {
     {
       path: '/mqttSync',
       name: 'mqttSync',
-      component: () => import('@/views/MqttSync.vue'),
+      component: () => import('./MqttSync.vue'),
       meta: { title: 'MQTT同步', icon: 'Connection' },
     },
   ],

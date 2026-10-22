@@ -4,7 +4,7 @@
 import {showSuccess, showError} from '@/utils/message'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {sshConnApi, type SshConnection} from '@/api/sshConn'
+import {sshConnApi, type SshConnection} from './api'
 
 const columns: DataTableColumn[] = [
   {field: 'Name', title: '名称', minWidth: 140, searchable: true},

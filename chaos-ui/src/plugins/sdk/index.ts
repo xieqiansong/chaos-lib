@@ -8,7 +8,7 @@ export const sdkPlugin: Plugin = {
     {
       path: '/sdk',
       name: 'sdk',
-      component: () => import('@/views/Sdk.vue'),
+      component: () => import('./Sdk.vue'),
       meta: { title: 'SDK版本', icon: 'Collection' },
     },
   ],

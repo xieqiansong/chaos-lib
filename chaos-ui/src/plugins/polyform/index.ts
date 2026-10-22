@@ -8,7 +8,7 @@ export const polyformPlugin: Plugin = {
     {
       path: '/polyform',
       name: 'polyform',
-      component: () => import('@/views/Polyform.vue'),
+      component: () => import('./Polyform.vue'),
       meta: { title: '格式转换', icon: 'Sort' },
     },
   ],

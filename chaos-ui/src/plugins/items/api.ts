@@ -98,7 +98,7 @@ export interface ReplenishCycle {
 }
 
 // ── 通用 CRUD（物品 / 流水 / 装配）────────────
-// 注：物品分类 / 存放位置 / 购入来源已统一收敛到数据字典，相关读写请走 @/api/dataDict。
+// 注：物品分类 / 存放位置 / 购入来源已统一收敛到数据字典，相关读写请走 @/plugins/datadict/api。
 export const itemsApi = useRestApi<Item>('items')
 export const itemRecordsApi = useRestApi<ItemRecord>('item-records')
 export const itemAssembliesApi = useRestApi<ItemAssembly>('item-assemblies')

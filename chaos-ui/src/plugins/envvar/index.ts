@@ -9,7 +9,7 @@ export const envvarPlugin: Plugin = {
     {
       path: '/environment',
       name: 'environment',
-      component: () => import('@/views/Environment.vue'),
+      component: () => import('./Environment.vue'),
       meta: { title: '环境变量', icon: 'Setting' },
     },
   ],

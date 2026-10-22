@@ -8,7 +8,7 @@ export const datacachePlugin: Plugin = {
     {
       path: '/dataCache',
       name: 'dataCache',
-      component: () => import('@/views/DataCache.vue'),
+      component: () => import('./DataCache.vue'),
       meta: { title: '数据缓存', icon: 'Collection' },
     },
   ],
