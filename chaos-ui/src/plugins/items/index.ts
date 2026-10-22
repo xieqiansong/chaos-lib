@@ -11,18 +11,7 @@ export const itemsPlugin: Plugin = {
             component: () => import('@/views/Items.vue'),
             meta: {title: '个人物品', icon: 'Box'},
         },
-        {
-            path: '/itemCategories',
-            name: 'itemCategories',
-            component: () => import('@/views/ItemCategories.vue'),
-            meta: {title: '物品分类', icon: 'Collection'},
-        },
-        {
-            path: '/itemLocations',
-            name: 'itemLocations',
-            component: () => import('@/views/ItemLocations.vue'),
-            meta: {title: '存放位置', icon: 'Location'},
-        },
+
     ],
 }
 
