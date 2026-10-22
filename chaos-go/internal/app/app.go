@@ -9,8 +9,6 @@ import (
 	_ "chaos-go/internal/domain/dict"
 	"chaos-go/internal/domain/envvar"
 	_ "chaos-go/internal/domain/filelink"
-	itemsdomain "chaos-go/internal/domain/items"
-	_ "chaos-go/internal/domain/note"
 	_ "chaos-go/internal/domain/polyform"
 	_ "chaos-go/internal/domain/portfwd"
 	_ "chaos-go/internal/domain/project"
@@ -55,7 +53,7 @@ func Run(webFS fs.FS) error {
 	db := config.GetDB()
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
-	// 已登记为插件的模块：proxy / taskplan / project / note / portfwd / envvar / filelink / sdk /
+	// 已登记为插件的模块：proxy / taskplan / project / portfwd / envvar / filelink / sdk /
 	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync / dbmonitor / datacache /
 	// dashboard / sshconn / polyform（模型与 Start 在各自插件内声明）；
 	// 其余存量项逐步下沉。
@@ -72,11 +70,6 @@ func Run(webFS fs.FS) error {
 	)
 	if err := config.AutoMigrate(db, migrateModels...); err != nil {
 		slog.Error("数据库迁移失败", "err", err)
-	}
-
-	// 个人物品模块：初始化默认分类 / 位置字典（幂等）
-	if err := itemsdomain.Seed(); err != nil {
-		slog.Error("个人物品字典初始化失败", "err", err)
 	}
 
 	setupPprof(&cfg.Pprof)
@@ -97,7 +90,7 @@ func Run(webFS fs.FS) error {
 	scheduler.Start()
 	slog.Info("后台任务启动完成")
 
-	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / note / filelink / sdk /
+	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / filelink / sdk /
 	// standarddata / envvar / quickedit / mqttsync / systemjob / dbmonitor / datacache /
 	// dashboard / sshconn / polyform 无 Start；
 	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发 cron 调度运行时。

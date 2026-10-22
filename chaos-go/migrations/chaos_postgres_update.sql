@@ -33,45 +33,6 @@ ALTER TABLE public.sdk_sources              ALTER COLUMN is_deleted DROP DEFAULT
 CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_abs_path ON public.projects USING btree (absolute_path) WHERE (is_deleted = 0);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sdk_sources_name ON public.sdk_sources USING btree (name) WHERE (is_deleted = 0);
 
--- 2026-10-04 新增笔记模块（internal/note）：磁盘 Vault 派生索引。
--- 设计：磁盘 md 是唯一真相，本组表仅存索引，可随时从文件全量重建。
-CREATE TABLE IF NOT EXISTS public.notes (
-    id           integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    created_at   timestamptz,
-    updated_at   timestamptz,
-    is_deleted   smallint NOT NULL DEFAULT 0,          -- soft_delete flag 模式
-    vault_id     integer NOT NULL DEFAULT 1,
-    rel_path     text NOT NULL,
-    parent_rel   text NOT NULL DEFAULT '',
-    name         text NOT NULL,
-    title        text NOT NULL DEFAULT '',
-    summary      text NOT NULL DEFAULT '',
-    search_text  text NOT NULL DEFAULT '',
-    format       text NOT NULL DEFAULT '',
-    size_bytes   integer NOT NULL DEFAULT 0,
-    content_hash text NOT NULL DEFAULT '',
-    disk_mtime   timestamptz,
-    disk_missing boolean NOT NULL DEFAULT false,
-    starred      boolean NOT NULL DEFAULT false,
-    word_count   integer NOT NULL DEFAULT 0,
-    tag_names    text NOT NULL DEFAULT '',
-    indexed_at   timestamptz,
-    UNIQUE (vault_id, rel_path)
-);
-CREATE INDEX IF NOT EXISTS idx_note_parent ON public.notes (parent_rel);
-CREATE INDEX IF NOT EXISTS idx_note_title ON public.notes (title);
-
-CREATE TABLE IF NOT EXISTS public.note_tags (
-    id   integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    name text NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS public.note_tag_rels (
-    note_id integer NOT NULL,
-    tag_id  integer NOT NULL,
-    PRIMARY KEY (note_id, tag_id)
-);
-
 -- 2026-10-22 新增数据字典模块（internal/domain/dict）：企业级枚举中心。
 -- 设计：dict_type 定义一组枚举的容器（如 存放位置 / 物品分类 / 购入来源），
 --       dict_data 为具体可选项，支持父子级（ParentID），其他业务模块按 TypeCode + Value 引用。
@@ -114,12 +75,5 @@ CREATE INDEX IF NOT EXISTS idx_dict_data_deleted ON public.dict_data (is_deleted
 --    SQLite 等价语句：DROP TABLE IF EXISTS item_category; DROP TABLE IF EXISTS item_location;
 DROP TABLE IF EXISTS public.item_category;
 DROP TABLE IF EXISTS public.item_location;
-
-CREATE TABLE IF NOT EXISTS public.note_links (
-    id         integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    source_id  integer NOT NULL,
-    target_ref text NOT NULL DEFAULT '',
-    resolved   boolean NOT NULL DEFAULT false
-);
 
 

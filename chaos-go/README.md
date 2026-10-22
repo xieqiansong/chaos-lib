@@ -47,7 +47,6 @@ chaos-go/
 │   │   ├── portfwd/          # SSH 端口转发
 │   │   ├── filelink/         # 文件连接
 │   │   ├── quickedit/        # 快速编辑
-│   │   ├── note/             # 笔记
 │   │   ├── proxy/            # 代理
 │   │   ├── cronjob/          # 定时任务
 │   │   ├── envvar/           # 环境变量管理

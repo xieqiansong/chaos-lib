@@ -4,7 +4,6 @@
 import './taskplan'
 import './echarts'
 import './project'
-import './note'
 import './portfwd'
 import './envvar'
 import './filelink'

@@ -19,7 +19,6 @@ import (
 
 	"chaos-go/internal/domain/cronjob"
 	"chaos-go/internal/domain/filelink"
-	"chaos-go/internal/domain/note"
 	"chaos-go/internal/domain/portfwd"
 	"chaos-go/internal/domain/project"
 	"chaos-go/internal/domain/proxy"
@@ -55,10 +54,6 @@ var models = []interface{}{
 	&cronjob.CronJobRun{},
 	&standarddata.StandardData{},
 	&datacache.DataCache{},
-	&note.Note{},
-	&note.NoteTag{},
-	&note.NoteTagRel{},
-	&note.NoteLink{},
 	&apilog.ApiLog{},
 }
 
