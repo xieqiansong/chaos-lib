@@ -6,6 +6,7 @@ import type {
   DataTableApiResult,
   DataTableColumn,
 } from '@/components/dataTable/types'
+import {getPageSize, setPageSize} from '@/utils/pageSizeStorage'
 
 interface UseDataTableProps {
   columns: DataTableColumn[]
@@ -17,11 +18,20 @@ interface UseDataTableProps {
   defaultSort?: { field: string; order: 'ascending' | 'descending' }
   /** 取数完成回调（每次 getData / 翻页 / 搜索 / 排序 / 刷新后均触发），参数为当前页行 */
   onLoaded?: (rows: any[]) => void
+  /**
+   * 每页条数持久化 key：传入后，初始 pageSize 从浏览器读取、用户改每页数量时写回。
+   * 由调用方决定 key（如路由路径 = 每页各自记忆），不传则不持久化。
+   */
+  pageSizeStorageKey?: string
 }
 
 export function useDataTable(props: UseDataTableProps) {
   const page = ref(1)
-  const pageSize = ref(props.pageSize ?? 20)
+  const pageSize = ref(
+    props.pageSizeStorageKey
+      ? getPageSize(props.pageSizeStorageKey, props.pageSize ?? 10)
+      : props.pageSize ?? 10,
+  )
   const total = ref(0)
   const rows = ref<any[]>([])
   const loading = ref(false)
@@ -107,6 +117,7 @@ export function useDataTable(props: UseDataTableProps) {
 
   function handleSizeChange(s: number) {
     pageSize.value = s
+    if (props.pageSizeStorageKey) setPageSize(props.pageSizeStorageKey, s)
     page.value = 1
     getData()
   }

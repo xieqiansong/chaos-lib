@@ -6,6 +6,7 @@
 //         业务扩展动作经 #actions 插槽追加在同格（如定时任务的「运行 / 历史」），
 //         非 CRUD 场景可仅用 { type: 'actions' } + #actions 插槽自行定义全部按钮。
 import {computed, onMounted, reactive, ref} from 'vue'
+import {useRoute} from 'vue-router'
 import {useCrudAction} from '@/composables/useCrudAction'
 import {showError} from '@/utils/message'
 
@@ -67,13 +68,19 @@ const props = withDefaults(
       /** 是否启用自动取数：默认 true。为 false 时跳过挂载时的初始请求，
        *  适用于「依赖外部条件（如先选中左侧项目组）才取数」的场景，避免无意义的初始空请求。 */
       enabled?: boolean
+      /**
+       * 每页条数持久化：默认 true，按当前路由路径记住用户选择（各页面各自独立）。
+       * - false：不持久化（保持原每次进入默认 10）；
+       * - string：以该字符串为 key（如共享同组件多入口、动态路由忽略参数、同页多表格区分）。
+       */
+      persistPageSize: { type: [Boolean, String], default: true },
     }>(),
     {
       data: undefined,
       api: undefined,
       rowKey: 'ID',
       pageSize: 10,
-      pageSizeOptions: () => [10, 20, 50, 100],
+      pageSizeOptions: () => [10, 15, 20, 100, 1000],
       selection: false,
       stripe: true,
       border: true,
@@ -92,6 +99,14 @@ const fetchFn = computed(() =>
     typeof props.api === 'function' ? props.api : props.api ? props.api.fetch : undefined,
 )
 const crudMode = computed(() => isCrud.value && !!props.fields)
+
+// 每页条数持久化 key：默认按路由路径（各页面独立），可显式覆盖或关闭
+const route = useRoute()
+const pageSizeKey = computed<string | undefined>(() => {
+  if (props.persistPageSize === false) return undefined
+  if (typeof props.persistPageSize === 'string') return props.persistPageSize
+  return route.path
+})
 
 // 内置 CRUD 动作是否启用（被 template 逐项显隐使用），取值见 CRUD_ACTION 枚举
 function hasAction(action: CrudAction): boolean {
@@ -122,6 +137,7 @@ const {
     : undefined,
   pageSize: props.pageSize,
   pageSizeOptions: props.pageSizeOptions,
+  pageSizeStorageKey: pageSizeKey.value,
   defaultSort: props.defaultSort,
   onLoaded: (rows) => emit('loaded', rows),
 })
