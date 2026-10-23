@@ -27,6 +27,7 @@ import (
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
+	"chaos-go/internal/platform/mqttsync"
 	_ "chaos-go/internal/platform/mqttsync"
 	"io/fs"
 	"log/slog"
@@ -81,7 +82,7 @@ func Run(webFS fs.FS) error {
 	slog.Info("接口访问日志记录器启动完成")
 
 	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
-	// mqttsync.Start()
+	mqttsync.Start()
 	slog.Info("多节点 MQTT 同步启动完成")
 
 	// 注入 quickedit env 回调（避免循环依赖）
