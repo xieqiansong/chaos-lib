@@ -1,6 +1,6 @@
 # chaos-lib
 
-自托管的个人工具箱：Go 后端（Gin + GORM）+ Vue 3 前端，覆盖任务与间隔复习、项目管理、环境变量、文件连接、快捷编辑、SDK 版本切换、SSH 端口转发等日常开发场景。前端构建产物外置为 exe 同目录的 `ui/`，后端启动时从 `CHAOS_UI_DIR` 或 `./ui` 读取，默认使用 PostgreSQL（也可切 SQLite）。
+自托管的个人工具箱：Go 后端（自研 Web 框架 + GORM）+ Vue 3 前端，覆盖任务与间隔复习、项目管理、环境变量、文件连接、快捷编辑、SDK 版本切换、SSH 端口转发等日常开发场景。前端构建产物外置为 exe 同目录的 `ui/`，后端启动时从 `CHAOS_UI_DIR` 或 `./ui` 读取，默认使用 PostgreSQL（也可切 SQLite）。
 
 ## 功能一览
 
@@ -66,7 +66,7 @@
 
 | 层 | 技术 |
 |---|------|
-| 后端 | Go 1.26 + Gin 1.12 + GORM 1.31（gzip 压缩、内置 pprof） |
+| 后端 | Go 1.27 + 自研 Web 框架（`net/http` 封装，替代 Gin）+ GORM 1.31（gzip 压缩、内置 pprof） |
 | 前端 | Vue 3 + TypeScript + Vite 5 + Element Plus + ECharts 6 + Monaco Editor |
 | 数据库 | PostgreSQL（`gorm.io/driver/postgres`，默认）/ SQLite3（`glebarez/sqlite`） |
 | 任务调度 | robfig/cron v3 + 内置 `scheduler` 周期调度器 |
@@ -82,7 +82,7 @@
 cd chaos-go
 
 # 复制配置模板
-cp .env.example .env
+cp configs/config.example.yaml configs/config.yaml
 
 # 运行（自动建表）
 go run cmd/server/main.go
@@ -108,75 +108,90 @@ pnpm build      # 构建到 dist/
 
 ## 配置
 
-| 环境变量 | 说明 | 默认值 |
-|----------|------|--------|
-| `SERVER_PORT` | HTTP 服务端口 | `8080` |
-| `SERVER_HOST` | HTTP 监听地址 | `0.0.0.0` |
-| `DB_TYPE` | 数据库类型：`postgres` / `sqlite` | `postgres` |
-| `DB_PATH` | SQLite 文件路径（`DB_TYPE=sqlite` 时生效） | `chaos.db` |
-| `DB_HOST` | PostgreSQL 主机 | `localhost` |
-| `DB_PORT` | PostgreSQL 端口 | `5432` |
-| `DB_USER` | PostgreSQL 用户 | `postgres` |
-| `DB_PASSWORD` | PostgreSQL 密码 | - |
-| `DB_NAME` | PostgreSQL 库名 | `chaos` |
-| `DB_SSLMODE` | PostgreSQL SSL 模式 | `disable` |
-| `PPROF_ENABLED` | 是否启用 pprof | `false` |
-| `PPROF_PORT` | pprof 端口 | `6060` |
-| `PPROF_HOST` | pprof 地址 | `localhost` |
-| `FEATURE_FILE_LINK` | 文件连接功能开关 | `true` |
-| `FEATURE_CRON_SHELL` | 定时任务「执行命令/脚本」动作总开关（危险能力，默认关闭） | `false` |
-| `LOG_LEVEL` | 日志级别 | `info` |
-| `DEEPSEEK_API_KEY` | DeepSeek 密钥（余额查询 / AI 评分，可选） | - |
-| `BAIDU_AK` | 百度地图 AK（手机看板天气，可选） | - |
-| `SUPABASE_URL` | Supabase 项目地址 | - |
-| `SUPABASE_SECRET_KEY` | 后端专用 key（绕过 RLS，禁止提交） | - |
-| `SUPABASE_PUBLISHABLE_KEY` | 前端只读预留 key（后端不使用） | - |
-| `SUPABASE_SCHEMA` | 目标 schema | `public` |
-| `SUPABASE_TIMEOUT_SEC` | 单次请求超时（秒） | `15` |
-| `SUPABASE_TABLES` | 允许访问的表名清单（逗号分隔，留空则该通道不可用） | - |
-| `MQTT_ENABLED` | MQTT 多节点同步总开关 | `false` |
-| `MQTT_BROKER` | MQTT broker 地址 | `tcp://broker.emqx.io:1883` |
-| `MQTT_PREFIX` | 集群公共主题前缀 | `test/` |
-| `MQTT_ENCRYPT` | 是否启用 AES-256-GCM 载荷加密 | `false` |
-| `MQTT_ENCRYPT_KEY` | 32 字节共享密钥（仅进 `.env`，禁止提交） | - |
-| `CHAOS_UI_DIR` | 前端静态资源目录覆盖（缺省读 exe 同目录 `ui/`） | - |
+| 配置项（YAML 路径） | 说明 | 默认值 |
+|--------------------|------|--------|
+| `server.host` | HTTP 监听地址 | `0.0.0.0` |
+| `server.port` | HTTP 服务端口 | `8080` |
+| `server.enable_http3` | 是否启用 HTTP/3（QUIC，强制 HTTPS，自动生成自签名证书） | `false` |
+| `db.type` | 数据库类型：`postgres` / `sqlite` | `postgres` |
+| `db.host` / `db.port` / `db.user` / `db.password` / `db.name` / `db.sslmode` | PostgreSQL 连接（type=postgres 时生效） | `localhost` / `5432` / `postgres` / - / `chaos` / `disable` |
+| `db.path` | SQLite 文件路径（type=sqlite 时生效） | `data/chaos.db` |
+| `pprof.enabled` / `pprof.host` / `pprof.port` | 性能分析开关与地址 | `false` / `localhost` / `6060` |
+| `log.level` | 日志级别 | `info` |
+| `feature.file_link` | 文件连接功能开关 | `true` |
+| `feature.cron_shell` | 定时任务「执行命令/脚本」动作总开关（危险能力，默认关闭） | `false` |
+| `deepseek.api_key` | DeepSeek 密钥（余额查询 / AI 评分，可选） | - |
+| `baidu.ak` | 百度地图 AK（手机看板天气，可选） | - |
+| `lucky.open_token` | Lucky STUN 规则同步令牌（mqtt 启用时生效） | - |
+| `stun.port_forward_sync_interval_sec` | STUN → 端口转发同步间隔（秒） | `30` |
+| `mqtt.enabled` | MQTT 多节点同步总开关 | `false` |
+| `mqtt.broker` | MQTT broker 地址 | `tcp://broker.emqx.io:1883` |
+| `mqtt.prefix` | 集群公共主题前缀 | `test/` |
+| `mqtt.encrypt` | 是否启用 AES-256-GCM 载荷加密 | `false` |
+| `mqtt.encrypt_key` | 32 字节共享密钥（仅进 `configs/config.yaml`，禁止提交） | - |
+| `supabase.url` | Supabase 项目地址 | - |
+| `supabase.secret_key` | 后端专用 key（绕过 RLS，仅放 `configs/config.yaml`，禁止提交） | - |
+| `supabase.publishable_key` | 前端只读预留 key（后端不使用） | - |
+| `supabase.schema` | 目标 schema | `public` |
+| `supabase.timeout_sec` | 单次请求超时（秒） | `15` |
+| `supabase.tables` | 允许访问的表名清单（留空则该通道不可用） | - |
+| `CONFIG_FILE`（环境变量） | 覆盖配置文件路径（缺省 `configs/config.yaml`） | - |
+| `CHAOS_UI_DIR`（环境变量） | 前端静态资源目录覆盖（缺省读 exe 同目录 `ui/`） | - |
 
-启动时从当前工作目录加载 `.env`（缺失则全部使用内置默认值）；更多配置项见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md)。
+启动时从运行目录加载 `configs/config.yaml`（`CONFIG_FILE` 可覆盖路径；缺失或解析失败回退内置默认值）；更多配置项见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md) 与 `chaos-go/configs/config.example.yaml`。
 
 ## 项目结构
 
 ```
 chaos-lib/
 ├── chaos-go/                    # Go 后端（module chaos-go）
-│   ├── cmd/server/              # HTTP 服务入口，启动时读外部 UI 目录（CHAOS_UI_DIR 或 exe 同目录 ui/）
-│   ├── cmd/tcp_over_websockets/ # TCP over WebSocket 隧道（独立服务）
-│   ├── cmd/test/                # 一次性脚本：批量导入任务计划 / 连通性探针
-│   ├── internal/                # 业务逻辑，按功能分包（模型 + handler 同包）
-│   │   ├── taskplan/            # 任务计划 + 任务 + FSRS
-│   │   ├── project/             # 项目管理 + 回收站
-│   │   ├── envvar/              # 环境变量 + TOML 快照
-│   │   ├── filelink/            # Windows Junction
-│   │   ├── quickedit/           # 文件快照 / 回滚
-│   │   ├── proxy/               # SDK 切换 / 浏览器历史 / 天气 / 余额
-│   │   ├── portfwd/             # SSH 连接 + 端口转发
-│   │   ├── cronjob/             # 定时任务（robfig/cron）
-│   │   ├── mqttsync/            # MQTT 多节点消息广播 + AES 加密
-│   │   ├── stunpf/ stunsync/    # STUN 公网地址同步
-│   │   ├── datacache/           # 数据缓存
-│   │   ├── apilog/              # 接口访问日志
-│   │   ├── dbmonitor/           # 数据库只读自省
-│   │   ├── notify/              # Windows 通知 / WxPusher
-│   │   ├── deepseek/            # DeepSeek Chat API 客户端
-│   │   ├── supabase/            # Supabase PostgREST 客户端
-│   │   ├── crud/                # 通用 CRUD 基线
-│   │   └── pagination/          # 统一分页
-│   ├── config/                  # 配置加载 / DB 单例 / 日志
-│   ├── routes/                  # 路由注册 + SPA 回退
-│   ├── scheduler/               # 内置周期任务调度器
-│   ├── sql/                     # PostgreSQL 基准快照 + 增量变更日志
-│   └── tools/                   # 通用工具函数（Windows API / HTTP / 通知等）
-├── chaos-ui/                    # Vue 3 + TypeScript 前端
-│   └── src/                     # views / components / router / utils
+│   ├── cmd/server/              # HTTP 服务入口：解析 webFS（CHAOS_UI_DIR 或 exe 同目录 ui/），调 app.Run
+│   ├── internal/
+│   │   ├── app/                 # 组合根：编排启动（config → DB → 插件 Build → 迁移 → 启动钩子 → 路由）
+│   │   ├── domain/              # 业务模块（共 16 个，均为插件：handler/service/repository/model/plugin）
+│   │   │   ├── taskplan/        # 任务计划 + 任务 + FSRS
+│   │   │   ├── project/         # 项目管理 + 回收站
+│   │   │   ├── envvar/          # 环境变量 + TOML 快照
+│   │   │   ├── filelink/        # Windows Junction
+│   │   │   ├── quickedit/       # 文件快照 / 回滚
+│   │   │   ├── proxy/           # SDK 切换 / 浏览器历史 / 天气 / 余额
+│   │   │   ├── portfwd/         # SSH 连接 + 端口转发
+│   │   │   ├── cronjob/         # 定时任务（robfig/cron）
+│   │   │   ├── items/           # 个人物品（购入 / 补货 / 消耗 / 装配 / 借还 / 维修 / 盘点）
+│   │   │   ├── dict/            # 数据字典（枚举中心）
+│   │   │   ├── sdk/             # SDK 版本切换
+│   │   │   ├── polyform/        # 格式转换
+│   │   │   ├── standarddata/    # 标准数据
+│   │   │   ├── systemjob/       # 系统周期任务
+│   │   │   ├── dashboard/       # 看板统计
+│   │   │   └── sshconn/         # SSH 连接
+│   │   ├── framework/           # 自研 web 框架 + 跨切面基础设施
+│   │   │   ├── web/             # gin 兼容薄封装（替代 gin）
+│   │   │   ├── router/          # SetupRouter 装配（/api/v1）
+│   │   │   ├── routehub/        # 存量 v1 路由登记中心
+│   │   │   ├── plugin/          # 插件注册与依赖编排
+│   │   │   ├── config/          # 配置加载 / DB 单例 / 日志
+│   │   │   ├── crud/            # 通用 CRUD 基线（POST + Action）
+│   │   │   ├── envelope/ resp/ httpx/ middleware/ pagination/  # 信封 / 响应 / 错误映射 / 鉴权 / 分页
+│   │   │   └── scheduler/ apilog/ security/ dbmonitor/ datacache/ memcache/
+│   │   ├── platform/           # 外部集成适配器：deepseek / stunpf / stunsync / mqttsync / supabase
+│   │   └── pkg/tools/           # 跨平台宿主交互工具（非业务）
+│   ├── web/                     # 前端构建产物放置目录（运行期解析为 webFS）
+│   ├── configs/                 # config.yaml（运行时，勿提交）+ config.example.yaml（模板）
+│   ├── migrations/              # PostgreSQL 基准快照 / 种子 / 增量变更 / supabase 建表
+│   ├── deployments/             # Dockerfile + docker-compose.yml
+│   ├── api/                     # openapi 规范占位
+│   ├── scripts/ test/           # 占位
+├── chaos-ui/                    # Vue 3 + TypeScript 前端（pnpm workspace）
+│   └── src/
+│       ├── plugins/             # 业务插件（与后端插件一一对应）：api.ts + .vue + 插件登记
+│       ├── views/               # 应用级页面（首页 / 测试例子 / 全屏看板）
+│       ├── components/          # DataTable 等通用组件
+│       ├── composables/        # useRestApi / useCrudAction
+│       ├── utils/               # request / message
+│       ├── router/              # appRoutes + collectRoutes 汇总插件路由
+│       └── theme.ts             # 主题（dark / paper）
+├── chaos-browser-extension/     # 浏览器扩展（书签 / 历史直连本机）
 ├── scripts/chaos.deploy.ps1     # 一键构建 + 部署
 └── docs/screenshots/            # 界面截图
 ```

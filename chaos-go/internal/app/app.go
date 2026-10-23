@@ -9,6 +9,7 @@ import (
 	_ "chaos-go/internal/domain/dict"
 	"chaos-go/internal/domain/envvar"
 	_ "chaos-go/internal/domain/filelink"
+	_ "chaos-go/internal/domain/items" // 副作用导入：触发其 init() 登记 items 插件（含 items/item-records/item-assemblies 路由）
 	_ "chaos-go/internal/domain/polyform"
 	_ "chaos-go/internal/domain/portfwd"
 	_ "chaos-go/internal/domain/project"
