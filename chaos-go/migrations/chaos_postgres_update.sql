@@ -69,11 +69,4 @@ CREATE INDEX IF NOT EXISTS idx_dict_data_type ON public.dict_data (type_code);
 CREATE INDEX IF NOT EXISTS idx_dict_data_parent ON public.dict_data (parent_id);
 CREATE INDEX IF NOT EXISTS idx_dict_data_deleted ON public.dict_data (is_deleted);
 
--- 2026-10-22 个人物品「物品分类 / 存放位置」已收敛到数据字典（dict_data）。
--- 下列两张遗留表在迁移后已无人引用（数据已拷入 dict_data 并重映射 Item 引用）。
--- ⚠️ 仅可在「应用已至少启动一次以完成迁移」后执行，否则会丢失未迁移的分类/位置数据。
---    SQLite 等价语句：DROP TABLE IF EXISTS item_category; DROP TABLE IF EXISTS item_location;
-DROP TABLE IF EXISTS public.item_category;
-DROP TABLE IF EXISTS public.item_location;
-
 

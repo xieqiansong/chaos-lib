@@ -86,7 +86,7 @@ type Item struct {
 	Remark            *string    `json:"Remark"`
 }
 
-func (Item) TableName() string { return "item" }
+func (Item) TableName() string { return "items" }
 
 // ItemRecord 变动流水：所有"发生过的事"都记这里，是库存真相。
 type ItemRecord struct {
@@ -99,7 +99,7 @@ type ItemRecord struct {
 	Note       *string   `json:"Note"`
 }
 
-func (ItemRecord) TableName() string { return "item_record" }
+func (ItemRecord) TableName() string { return "item_records" }
 
 // ItemAssembly 装配关系：配件作为独立 item 装入主机。
 type ItemAssembly struct {
@@ -114,7 +114,7 @@ type ItemAssembly struct {
 	RemoveNote  *string    `json:"RemoveNote"`
 }
 
-func (ItemAssembly) TableName() string { return "item_assembly" }
+func (ItemAssembly) TableName() string { return "item_assemblies" }
 
 // strPtr 便捷构造 *string。
 func strPtr(s string) *string { return &s }
