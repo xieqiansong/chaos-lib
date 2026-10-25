@@ -28,11 +28,7 @@ func jsonUnmarshal(s string, v interface{}) error {
 }
 
 func selfBaseURL() string {
-	if config.GetConfig().Server.EnableHTTP3 {
-		return fmt.Sprintf("https://localhost:%d", config.GetConfig().Server.Port)
-	} else {
-		return fmt.Sprintf("http://localhost:%d", config.GetConfig().Server.Port)
-	}
+	return fmt.Sprintf("http://localhost:%d", config.GetConfig().Server.Port)
 }
 
 // timeoutOf 兜底超时：未配置（0）或非法值时按 30 秒计，避免 http.Client 零超时等于不超时。

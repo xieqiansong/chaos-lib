@@ -112,7 +112,6 @@ pnpm build      # 构建到 dist/
 |--------------------|------|--------|
 | `server.host` | HTTP 监听地址 | `0.0.0.0` |
 | `server.port` | HTTP 服务端口 | `8080` |
-| `server.enable_http3` | 是否启用 HTTP/3（QUIC，强制 HTTPS，自动生成自签名证书） | `false` |
 | `db.type` | 数据库类型：`postgres` / `sqlite` | `postgres` |
 | `db.host` / `db.port` / `db.user` / `db.password` / `db.name` / `db.sslmode` | PostgreSQL 连接（type=postgres 时生效） | `localhost` / `5432` / `postgres` / - / `chaos` / `disable` |
 | `db.path` | SQLite 文件路径（type=sqlite 时生效） | `data/chaos.db` |
