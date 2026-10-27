@@ -14,12 +14,10 @@ import (
 	"time"
 )
 
-// version 表示三段式版本号，用于外部工具的最低版本检查。
 type version [3]int
 
 func (v version) String() string { return fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2]) }
 
-// atLeast 判断当前版本不低于 o。
 func (v version) atLeast(o version) bool {
 	for i := range v {
 		if v[i] != o[i] {
@@ -29,7 +27,6 @@ func (v version) atLeast(o version) bool {
 	return true
 }
 
-// 各外部工具的版本匹配与最低版本要求。
 var (
 	iptablesVerRe = regexp.MustCompile(`iptables v([0-9]+)\.([0-9]+)\.([0-9]+)`)
 	nftVerRe      = regexp.MustCompile(`nftables v([0-9]+)\.([0-9]+)\.([0-9]+)`)
@@ -37,13 +34,12 @@ var (
 	socatVerRe    = regexp.MustCompile(`socat version ([0-9]+)\.([0-9]+)\.([0-9]+)`)
 
 	iptablesMinVer  = version{1, 4, 1}
-	iptablesWaitVer = version{1, 4, 20} // 自 1.4.20 起支持 -w 等待锁
+	iptablesWaitVer = version{1, 4, 20}
 	nftMinVer       = version{0, 9, 6}
 	gostMinVer      = version{2, 3, 0}
 	socatMinVer     = version{1, 7, 2}
 )
 
-// parseVersion 从命令输出里提取版本号。
 func parseVersion(out string, re *regexp.Regexp) (version, bool) {
 	m := re.FindStringSubmatch(out)
 	if m == nil {
@@ -60,7 +56,6 @@ func parseVersion(out string, re *regexp.Regexp) (version, bool) {
 	return v, true
 }
 
-// concat 拼接命令行，始终返回新切片，避免污染基础命令。
 func concat(base, extra []string) []string {
 	out := make([]string, 0, len(base)+len(extra))
 	out = append(out, base...)
@@ -68,7 +63,6 @@ func concat(base, extra []string) []string {
 	return out
 }
 
-// runCmd 执行外部命令并返回 stdout；stderr 直接透传给终端。
 func runCmd(cmd []string) (string, error) {
 	if len(cmd) == 0 {
 		return "", errors.New("empty command")
@@ -81,7 +75,6 @@ func runCmd(cmd []string) (string, error) {
 	return buf.String(), err
 }
 
-// checkSysForwardConfig 检查系统是否允许 IP 转发。
 func checkSysForwardConfig(tag string) error {
 	const fpath = "/proc/sys/net/ipv4/ip_forward"
 	b, err := os.ReadFile(fpath)
@@ -95,18 +88,15 @@ func checkSysForwardConfig(tag string) error {
 	return nil
 }
 
-// isRoot 判断当前是否具备 root 权限（非 Unix 恒为 false）。
 func isRoot() bool {
 	return runtime.GOOS != "windows" && os.Getuid() == 0
 }
 
-// extProc 管理转发用的外部子进程。
 type extProc struct {
 	cmd  *exec.Cmd
 	done chan struct{}
 }
 
-// startExtProc 启动子进程并等待 1 秒确认它没有立刻退出。
 func startExtProc(name string, args ...string) (*extProc, error) {
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stderr
@@ -127,7 +117,6 @@ func startExtProc(name string, args ...string) (*extProc, error) {
 	return p, nil
 }
 
-// stop 终止子进程；已退出则直接返回。
 func (p *extProc) stop() {
 	if p == nil || p.cmd == nil || p.cmd.Process == nil {
 		return
@@ -141,7 +130,6 @@ func (p *extProc) stop() {
 	<-p.done
 }
 
-// toolAvailable 检查外部工具是否存在且版本达标。
 func toolAvailable(name string, verArgs []string, re *regexp.Regexp, min version) bool {
 	out, err := runCmd(append([]string{name}, verArgs...))
 	if err != nil {
@@ -155,7 +143,6 @@ func toolAvailable(name string, verArgs []string, re *regexp.Regexp, min version
 	return v.atLeast(min)
 }
 
-// ForwardIptables 通过 iptables 的 DNAT（可选 SNAT）实现转发。
 type ForwardIptables struct {
 	snat    bool
 	sudo    bool
@@ -164,7 +151,6 @@ type ForwardIptables struct {
 	currVer version
 }
 
-// NewForwardIptables 校验 iptables 可用性并初始化 Natter 链。
 func NewForwardIptables(snat, sudo bool) (*ForwardIptables, error) {
 	f := &ForwardIptables{snat: snat, sudo: sudo}
 	if !f.check() {
@@ -231,7 +217,6 @@ func (f *ForwardIptables) initChain() error {
 	return nil
 }
 
-// StartForward 添加 DNAT（及可选 SNAT）规则。
 func (f *ForwardIptables) StartForward(ip string, port int, toIP string, toPort int, udp bool) error {
 	if ip != toIP {
 		if err := checkSysForwardConfig("fwd-iptables"); err != nil {
@@ -271,7 +256,6 @@ func (f *ForwardIptables) StartForward(ip string, port int, toIP string, toPort 
 	return nil
 }
 
-// cleanRules 逆序删除已添加的规则。
 func (f *ForwardIptables) cleanRules() {
 	for len(f.rules) > 0 {
 		last := len(f.rules) - 1
@@ -291,13 +275,11 @@ func (f *ForwardIptables) cleanRules() {
 	}
 }
 
-// StopForward 清理所有 Natter 规则。
 func (f *ForwardIptables) StopForward() {
 	slog.Debug("fwd-iptables: Cleaning up Natter rules")
 	f.cleanRules()
 }
 
-// ForwardNftables 通过 nftables 的 dnat（可选 snat）实现转发。
 type ForwardNftables struct {
 	snat       bool
 	sudo       bool
@@ -306,7 +288,6 @@ type ForwardNftables struct {
 	handleSNAT int
 }
 
-// NewForwardNftables 校验 nftables 可用性并初始化 Natter 表。
 func NewForwardNftables(snat, sudo bool) (*ForwardNftables, error) {
 	f := &ForwardNftables{snat: snat, sudo: sudo, handle: -1, handleSNAT: -1}
 	if !f.check() {
@@ -342,7 +323,6 @@ func (f *ForwardNftables) check() bool {
 	return v.atLeast(nftMinVer)
 }
 
-// initialRules Natter 表与链的初始规则集。
 const initialRules = `
 table ip natter {
     chain natter_dnat { }
@@ -375,7 +355,6 @@ func (f *ForwardNftables) initTable() error {
 	return err
 }
 
-// StartForward 插入 dnat（及可选 snat）规则并记住 handle。
 func (f *ForwardNftables) StartForward(ip string, port int, toIP string, toPort int, udp bool) error {
 	if ip != toIP {
 		if err := checkSysForwardConfig("fwd-nftables"); err != nil {
@@ -425,7 +404,6 @@ func (f *ForwardNftables) StartForward(ip string, port int, toIP string, toPort 
 	return nil
 }
 
-// handleRe 从 `nft --echo --handle` 的输出里提取规则 handle。
 var handleRe = regexp.MustCompile(`# handle ([0-9]+)`)
 
 func parseHandle(out string) (int, error) {
@@ -450,15 +428,12 @@ func (f *ForwardNftables) clean() {
 	}
 }
 
-// StopForward 删除已插入的规则。
 func (f *ForwardNftables) StopForward() { f.clean() }
 
-// ForwardGost 通过外部 gost 进程转发。
 type ForwardGost struct {
 	proc *extProc
 }
 
-// NewForwardGost 校验 gost 版本。
 func NewForwardGost() (*ForwardGost, error) {
 	if !toolAvailable("gost", []string{"-V"}, gostVerRe, gostMinVer) {
 		return nil, fmt.Errorf("gost >= %d.%d not available", gostMinVer[0], gostMinVer[1])
@@ -466,7 +441,6 @@ func NewForwardGost() (*ForwardGost, error) {
 	return &ForwardGost{}, nil
 }
 
-// StartForward 启动 gost 进程。
 func (f *ForwardGost) StartForward(ip string, port int, toIP string, toPort int, udp bool) error {
 	if err := checkForwardTarget(ip, port, toIP, toPort); err != nil {
 		return err
@@ -485,19 +459,16 @@ func (f *ForwardGost) StartForward(ip string, port int, toIP string, toPort int,
 	return nil
 }
 
-// StopForward 停止 gost 进程。
 func (f *ForwardGost) StopForward() {
 	slog.Debug("fwd-gost: Stopping gost")
 	f.proc.stop()
 	f.proc = nil
 }
 
-// ForwardSocat 通过外部 socat 进程转发。
 type ForwardSocat struct {
 	proc *extProc
 }
 
-// NewForwardSocat 校验 socat 版本。
 func NewForwardSocat() (*ForwardSocat, error) {
 	if !toolAvailable("socat", []string{"-V"}, socatVerRe, socatMinVer) {
 		return nil, fmt.Errorf("socat >= %s not available", socatMinVer)
@@ -505,7 +476,6 @@ func NewForwardSocat() (*ForwardSocat, error) {
 	return &ForwardSocat{}, nil
 }
 
-// StartForward 启动 socat 进程。
 func (f *ForwardSocat) StartForward(ip string, port int, toIP string, toPort int, udp bool) error {
 	if err := checkForwardTarget(ip, port, toIP, toPort); err != nil {
 		return err
@@ -529,14 +499,12 @@ func (f *ForwardSocat) StartForward(ip string, port int, toIP string, toPort int
 	return nil
 }
 
-// StopForward 停止 socat 进程。
 func (f *ForwardSocat) StopForward() {
 	slog.Debug("fwd-socat: Stopping socat")
 	f.proc.stop()
 	f.proc = nil
 }
 
-// protoName 返回协议名（小写，用于 iptables / nftables / gost）。
 func protoName(udp bool) string {
 	if udp {
 		return "udp"
@@ -544,7 +512,6 @@ func protoName(udp bool) string {
 	return "tcp"
 }
 
-// newForwarder 按方法名创建转发实现。
 func newForwarder(method string) (Forwarder, error) {
 	switch method {
 	case "none":

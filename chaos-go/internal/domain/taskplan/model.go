@@ -7,26 +7,20 @@ import (
 	"gorm.io/plugin/soft_delete"
 )
 
-// 领域错误哨兵：repository 与 service 据此表达「不存在」或「前置条件不满足」。
 var (
 	ErrPlanNotFound = errors.New("taskplan: 任务计划不存在")
 	ErrTaskNotFound = errors.New("taskplan: 任务不存在")
 	ErrNoRawLink    = errors.New("taskplan: 该计划没有 raw_link，无法获取原文")
-	// ErrInvalidState 业务前置条件不满足（状态不对、缺少必填等），调用方映射 400。
+
 	ErrInvalidState = errors.New("taskplan: 业务前置条件不满足")
 )
 
-// InvalidStateError 前置条件不满足：Msg 面向用户可直接呈现，
-// 同时 errors.Is(err, ErrInvalidState) 为 true，便于调用方统一映射 400。
 type InvalidStateError struct{ Msg string }
 
 func (e *InvalidStateError) Error() string { return e.Msg }
 
 func (e *InvalidStateError) Is(target error) bool { return target == ErrInvalidState }
 
-// ── 任务（Task）─────────────────────────────────────────────────
-
-// TaskStatus 任务执行状态
 type TaskStatus string
 
 const (
@@ -36,7 +30,6 @@ const (
 	TaskStatusCancelled TaskStatus = "cancelled"
 )
 
-// Task 单条任务记录。
 type Task struct {
 	ID            int                   `gorm:"primaryKey"`
 	PlanID        int                   ``
@@ -52,7 +45,6 @@ type Task struct {
 	UpdatedAt     time.Time             `gorm:"default:CURRENT_TIMESTAMP"`
 }
 
-// PendingTask 待办任务视图（联表查询）。
 type PendingTask struct {
 	Task
 	PlanName    string         ``
@@ -64,8 +56,6 @@ type PendingTask struct {
 	FsrsReps    int            ``
 	IsOverdue   bool           ``
 }
-
-// ── 任务计划（TaskPlan）─────────────────────────────────────────
 
 type TaskPlanStatus string
 
@@ -85,7 +75,6 @@ const (
 	TaskPlanTypeInterval TaskPlanType = "interval"
 )
 
-// TaskPlan 任务计划（可形成树，含 FSRS 记忆参数）。
 type TaskPlan struct {
 	ID                int                   `gorm:"primaryKey"`
 	ParentID          *int                  ``
@@ -120,7 +109,6 @@ type TaskPlan struct {
 	UpdatedAt         time.Time             `gorm:"default:CURRENT_TIMESTAMP"`
 }
 
-// TaskPlanTree 任务计划树节点。
 type TaskPlanTree struct {
 	TaskPlan
 	Children []TaskPlanTree ``

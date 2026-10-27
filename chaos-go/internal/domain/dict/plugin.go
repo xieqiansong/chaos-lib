@@ -5,7 +5,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// init 把数据字典模块登记为插件：声明两张表模型并挂载路由。
 func init() {
 	plugin.Register(plugin.Registration{
 		Meta: plugin.Meta{

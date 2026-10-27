@@ -106,7 +106,6 @@ func tableDetailPostgres(name string) (*TableDetail, error) {
 	detail.Name = name
 	detail.SizeSupported = true
 
-	// 列
 	type colRow struct {
 		Name     string  `gorm:"column:column_name"`
 		Type     string  `gorm:"column:data_type"`
@@ -133,7 +132,6 @@ func tableDetailPostgres(name string) (*TableDetail, error) {
 		})
 	}
 
-	// 索引
 	type idxRow struct {
 		IndexName string `gorm:"column:index_name"`
 		Unique    bool   `gorm:"column:indisunique"`
@@ -154,7 +152,6 @@ func tableDetailPostgres(name string) (*TableDetail, error) {
 	}
 	detail.IndexCount = len(detail.Indexes)
 
-	// 统计
 	var row pgListRow
 	if err := db.Raw(`SELECT c.relname AS name,
 		pg_table_size(c.oid) AS table_bytes,

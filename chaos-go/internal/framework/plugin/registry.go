@@ -8,10 +8,8 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// regs 保存全部已登记的插件（按登记顺序）。
 var regs []Registration
 
-// Register 登记一个插件。重复 ID 直接 panic（尽早暴露配置错误）。
 func Register(r Registration) {
 	if r.Meta.ID == "" {
 		panic("plugin: 空 ID 的插件登记")
@@ -24,18 +22,14 @@ func Register(r Registration) {
 	regs = append(regs, r)
 }
 
-// All 返回当前已登记的全部插件（未做校验/排序）。
 func All() []Registration { return regs }
 
-// Build 做依赖校验与拓扑排序，返回依赖有序的「启用」插件列表。
-// 缺失依赖或硬循环依赖会返回 error（装配层据此 fail-fast）。
 func Build() ([]Registration, error) {
 	byID := make(map[string]Registration, len(regs))
 	for _, r := range regs {
 		byID[r.Meta.ID] = r
 	}
 
-	// 缺失依赖检测（SoftDeps 不计入硬依赖）
 	for _, r := range regs {
 		if !r.Meta.IsEnabled() {
 			continue
@@ -47,7 +41,6 @@ func Build() ([]Registration, error) {
 		}
 	}
 
-	// Kahn 拓扑排序（仅启用插件参与；边为硬依赖）
 	indeg := make(map[string]int)
 	adj := make(map[string][]string)
 	for _, r := range regs {
@@ -98,7 +91,6 @@ func Build() ([]Registration, error) {
 	return out, nil
 }
 
-// ModelsOf 汇总所有插件的 GORM 模型，供装配层统一 AutoMigrate。
 func ModelsOf(rs []Registration) []any {
 	var models []any
 	for _, r := range rs {
@@ -107,7 +99,6 @@ func ModelsOf(rs []Registration) []any {
 	return models
 }
 
-// TasksOf 汇总所有插件的内置任务声明，供装配层交给 scheduler 统一运行。
 func TasksOf(rs []Registration) []scheduler.TaskSpec {
 	var tasks []scheduler.TaskSpec
 	for _, r := range rs {
@@ -116,7 +107,6 @@ func TasksOf(rs []Registration) []scheduler.TaskSpec {
 	return tasks
 }
 
-// StartAll 按依赖拓扑序启动插件（调用非 nil 的 Start）。
 func StartAll(rs []Registration) error {
 	for _, r := range rs {
 		if r.Start == nil {
@@ -130,7 +120,6 @@ func StartAll(rs []Registration) error {
 	return nil
 }
 
-// StopAll 逆序停止插件（调用非 nil 的 Stop），用于优雅退出。
 func StopAll(rs []Registration) error {
 	for i := len(rs) - 1; i >= 0; i-- {
 		r := rs[i]
@@ -144,10 +133,6 @@ func StopAll(rs []Registration) error {
 	return nil
 }
 
-// MountAll 把已登记插件的路由直接挂载到传入的分组（通常是 /api/v1）。
-// 各插件 RegisterRoutes 内部直接在该分组上建子路由（如 RegisterV1(rg)），
-// 不再经 routehub 二次登记，避免「遍历 modulesV1 时追加元素导致漏挂」的问题。
-// 路由按前缀隔离，插件间挂载顺序无关紧要。
 func MountAll(rg *web.RouterGroup) {
 	for _, r := range regs {
 		if !r.Meta.IsEnabled() {

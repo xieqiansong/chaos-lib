@@ -8,14 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// 领域哨兵错误（供 service / handler 映射为 HTTP 状态码）。
 var (
 	ErrDBUnavailable    = errors.New("dict: database unavailable")
 	ErrDictTypeNotFound = errors.New("dict: 字典类型不存在")
 	ErrDictDataNotFound = errors.New("dict: 字典数据不存在")
 )
 
-// FindActiveDictTypeByID 按 ID 加载未删除的字典类型；不存在返回 ErrDictTypeNotFound。
 func FindActiveDictTypeByID(id string) (*DictType, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -31,7 +29,6 @@ func FindActiveDictTypeByID(id string) (*DictType, error) {
 	return &row, nil
 }
 
-// SetDictTypeStatusDB 切换字典类型的启用状态，返回更新后的完整行。
 func SetDictTypeStatusDB(id string, status bool) (*DictType, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -47,7 +44,6 @@ func SetDictTypeStatusDB(id string, status bool) (*DictType, error) {
 	return &row, nil
 }
 
-// FindActiveDictDataByID 按 ID 加载未删除的字典数据项；不存在返回 ErrDictDataNotFound。
 func FindActiveDictDataByID(id string) (*DictData, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -63,7 +59,6 @@ func FindActiveDictDataByID(id string) (*DictData, error) {
 	return &row, nil
 }
 
-// SetDictDataStatusDB 切换字典数据项的启用状态，返回更新后的完整行。
 func SetDictDataStatusDB(id string, status bool) (*DictData, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -79,7 +74,6 @@ func SetDictDataStatusDB(id string, status bool) (*DictData, error) {
 	return &row, nil
 }
 
-// ListByTypeCode 返回某类型下全部未删除的数据项（树/管理用），按排序与 ID 升序。
 func ListByTypeCode(code string) ([]DictData, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -92,7 +86,6 @@ func ListByTypeCode(code string) ([]DictData, error) {
 	return rows, nil
 }
 
-// ListEnabledByTypeCode 返回某类型下启用状态的数据项（下拉用），按排序与 ID 升序。
 func ListEnabledByTypeCode(code string) ([]DictData, error) {
 	db := config.GetDB()
 	if db == nil {

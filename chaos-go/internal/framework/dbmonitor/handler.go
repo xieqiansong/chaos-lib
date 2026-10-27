@@ -6,13 +6,11 @@ import (
 
 	"chaos-go/internal/framework/envelope"
 	"chaos-go/internal/framework/pagination"
-	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/plugin"
+	renv "chaos-go/internal/framework/resp"
 	"chaos-go/internal/framework/web"
 )
 
-// init 把本模块登记为插件：路由改由插件框架统一挂载（plugin.MountAll 内部调用 RegisterV1），
-// 不再经 routehub 二次登记，避免重复挂载。
 func init() {
 	plugin.Register(plugin.Registration{
 		Meta: plugin.Meta{
@@ -27,8 +25,6 @@ func init() {
 	})
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 动作：overview（库级总览）、listTables（表分页，参数来自信封 meta）、getTable（单表详情，表名来自 data.name）。
 func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/db-monitors")
 	g.POST("/overview", GetOverview)
@@ -36,7 +32,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	g.POST("/getTable", getTableV1)
 }
 
-// listTablesV1 是 ListTables 的「POST + Action」版：分页与过滤取自信封 meta。
 func listTablesV1(c *web.Context) {
 	var m struct {
 		Name     string `json:"name"`
@@ -61,7 +56,6 @@ func listTablesV1(c *web.Context) {
 	renv.Success(c, pagination.New(items, total, q))
 }
 
-// getTableV1 是 GetTableDetail 的「POST + Action」版：表名取自信封 data.name。
 func getTableV1(c *web.Context) {
 	var req struct {
 		Name string `json:"name"`
@@ -85,7 +79,6 @@ func getTableV1(c *web.Context) {
 	renv.Success(c, detail)
 }
 
-// GetOverview 返回库级总览（类型 / 版本 / 总大小 / 表数 / 总行数）。
 func GetOverview(c *web.Context) {
 	ov, err := Overview()
 	if err != nil {
@@ -95,8 +88,6 @@ func GetOverview(c *web.Context) {
 	renv.Success(c, ov)
 }
 
-// ListTables 返回用户表统计的分页列表（?page / ?page_size / ?sort / ?order / ?name）。
-// 分页与排序约定与标准 CRUD 基线（pagination 包）一致：排序键为 snake_case。
 func ListTables(c *web.Context) {
 	q := pagination.Parse(c)
 	items, total, err := ListTableStats(c.Query("name"), c.Query("sort"), c.Query("order"), q)
@@ -107,7 +98,6 @@ func ListTables(c *web.Context) {
 	renv.Success(c, pagination.New(items, total, q))
 }
 
-// GetTableDetail 返回单表详情（统计 + 列 + 索引）。
 func GetTableDetail(c *web.Context) {
 	detail, err := TableDetailOf(c.Param("name"))
 	if err != nil {

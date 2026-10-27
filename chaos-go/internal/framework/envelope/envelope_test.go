@@ -13,10 +13,8 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// setup 构造一个仅用于验证信封行为的测试路由：挂载 envelope.Middleware，
-// handler 从信封取 data/meta/action 并原样回显。
 func setup() *web.Router {
-	
+
 	r := web.NewRouter()
 	g := r.Group("/api/v1/echo")
 	g.Use(renv.Middleware())
@@ -89,8 +87,6 @@ func TestEnvelopeBind(t *testing.T) {
 	}
 }
 
-// TestEnvelopeLegacyFallback 验证无信封的存量请求：Bind 直接绑定整个 body，
-// 响应由框架生成服务端 requestId，从而双轨兼容。
 func TestEnvelopeLegacyFallback(t *testing.T) {
 	r := setup()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/echo/bind", bytes.NewReader([]byte(`{"name":"张三"}`)))

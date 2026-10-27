@@ -21,7 +21,7 @@ func privateConnectDB() (*gorm.DB, error) {
 	var dialector gorm.Dialector
 	switch cfg.Database.Type {
 	case "sqlite":
-		// 确保数据库文件所在目录存在
+
 		if dir := filepath.Dir(dsn); dir != "" && dir != "." {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return nil, fmt.Errorf("failed to create sqlite dir: %v", err)
@@ -43,7 +43,7 @@ func privateConnectDB() (*gorm.DB, error) {
 	}
 
 	if cfg.Database.Type == "sqlite" {
-		// SQLite 写并发低：单写连接 + WAL，避免 database is locked
+
 		sqlDB.SetMaxOpenConns(1)
 		sqlDB.SetMaxIdleConns(1)
 		if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
@@ -61,8 +61,6 @@ func privateConnectDB() (*gorm.DB, error) {
 	return db, nil
 }
 
-// AutoMigrate 通用数据库迁移。由 cmd/server/main.go 在启动时调用，
-// 传入所有需要建表的模型实例。
 func AutoMigrate(db *gorm.DB, dst ...interface{}) error {
 	return db.AutoMigrate(dst...)
 }

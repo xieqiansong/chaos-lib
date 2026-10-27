@@ -20,25 +20,17 @@ import (
 	"golang.org/x/net/html"
 )
 
-// 站点 favicon 代理：前端不再直连第三方图标服务，统一经本接口
-// 1) 先查 datacache（缓存优先）→ 2) 未命中/过期则按序回源（DDG→Google→目标站）
-// → 3) 成功即以二进制写回并写入缓存。全部失败返回 404（前端 <img @error> 自动隐藏）。
-
 const (
 	faviconCategory = "favicon"
-	faviconTTL      = 7 * 24 * time.Hour // 持久缓存 7 天
-	faviconMemTTL   = 5 * time.Minute    // 内存缓存 5 分钟（短期兜底，缓解回源失败）
-	maxFaviconSize  = 1 << 20            // 单图标上限 1 MiB
-	faviconTimeout  = 5 * time.Second    // 单次抓取超时
-	faviconBudget   = 15 * time.Second   // 单次 favicon 请求总预算（代理+直连双跑的最坏界）
+	faviconTTL      = 7 * 24 * time.Hour
+	faviconMemTTL   = 5 * time.Minute
+	maxFaviconSize  = 1 << 20
+	faviconTimeout  = 5 * time.Second
+	faviconBudget   = 15 * time.Second
 
-	// browserUA 模拟主流浏览器 UA 与 Accept，避免站点/WAF 以「无 UA / 爬虫」为由返回 403 或 HTML 错误页
-	// （这正是很多站点浏览器能显示、本接口却抓不到的主因）。
 	browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
-// 双路径客户端：faviconProxyClient 走代理，faviconDirectClient 强制直连。
-// 共用 redirectPolicy：跟随后每跳重定向都要再过一遍 safeHost，防跳转子网/本机绕过校验。
 var (
 	faviconProxyClient = &http.Client{Timeout: faviconTimeout, CheckRedirect: redirectPolicy}
 
@@ -50,16 +42,10 @@ var (
 	faviconDirectClient = &http.Client{Timeout: faviconTimeout, Transport: faviconDirectTransport, CheckRedirect: redirectPolicy}
 )
 
-// faviconMemCache 内存级短期缓存：进程内、重启即失，TTL 5 分钟。
-// 用于 datacache 缺失/过期或回源失败时的兜底，缓解溯源等高频重试场景下的回源失败。
 var faviconMemCache = memcache.New(1024, faviconMemTTL)
 
-// safeHostCache 缓存 safeHost 的可达性校验结果（含否定结果），避免重定向逐跳与回源路径重复做 DNS 查询。
-// 进程内、带 TTL；仅做结果复用，不改变校验语义。
 var safeHostCache = memcache.New(1024, 5*time.Minute)
 
-// redirectPolicy 限跳 5 次，并确保每个重定向目标都通过 SSRF 校验。
-// 校验失败返回 error——http.Client 连同原始响应一并返回，fetchBytes 命中 err 即该路失败。
 func redirectPolicy(req *http.Request, via []*http.Request) error {
 	const maxRedirects = 5
 	if len(via) >= maxRedirects {
@@ -71,9 +57,6 @@ func redirectPolicy(req *http.Request, via []*http.Request) error {
 	return nil
 }
 
-// GetFavicon 返回图片二进制流与识别出的 Content-Type。
-// host 由调用方显式传入：GET 路由取自路径参数 {host}，v1 动作路由（faviconV1）取自信封 data。
-// 自研 web 层无 gin 的 c.Params 注入机制，故改为显式参数（web.Context.Param 仅用于 GET 路由取值）。
 func GetFavicon(c *web.Context, host string) {
 	host = normalizeHost(host)
 	if host == "" {
@@ -81,9 +64,6 @@ func GetFavicon(c *web.Context, host string) {
 		return
 	}
 
-	// 1) 内存级短期缓存（memcache，TTL 5 分钟）第一道关卡：命中即返回，跳过后续校验与回源
-	//    - 命中且非空 → 直接返回（含近期成功回源结果，省去回源/查库）
-	//    - 命中但为空对象（负缓存，已知回源失败）→ 直接 404，不再回源/查库
 	if body, ok := faviconMemCache.Get(faviconCategory, host); ok {
 		if len(body) == 0 {
 			c.Status(http.StatusNotFound)
@@ -93,7 +73,6 @@ func GetFavicon(c *web.Context, host string) {
 		return
 	}
 
-	// 2) 持久缓存（datacache，TTL 7 天）：命中且未过期则直接返回
 	if row, err := datacache.Get(faviconCategory, host); err == nil && len(row.Value) > 0 {
 		if row.ExpireAt == nil || row.ExpireAt.After(time.Now()) {
 			c.Data(http.StatusOK, detectType(row.Value), row.Value)
@@ -102,7 +81,6 @@ func GetFavicon(c *web.Context, host string) {
 		}
 	}
 
-	// 3) 缓存未命中：做可达性校验，再按序回源（代理 / 直连双跑，并行竞争）
 	if !safeHost(host) {
 		c.Status(http.StatusBadRequest)
 		return
@@ -111,28 +89,22 @@ func GetFavicon(c *web.Context, host string) {
 	defer cancel()
 	body, ct, err := fetchFavicon(ctx, host)
 	if err != nil || len(body) == 0 {
-		// 溯源失败（含回源报错或返回空内容）：把空对象写入内存（负缓存 5 分钟），
-		// 避免溯源等高频重试短时间反复回源
+
 		faviconMemCache.Set(faviconCategory, host, nil)
 		c.Status(http.StatusNotFound)
 		return
 	}
 
-	// 4) 溯源成功：同时写入持久缓存（TTL 7 天）与内存短期缓存（TTL 5 分钟）并返回
 	exp := time.Now().Add(faviconTTL)
 	_ = datacache.Set(faviconCategory, host, body, ct, "none", &exp)
 	faviconMemCache.Set(faviconCategory, host, body)
 	c.Data(http.StatusOK, ct, body)
 }
 
-// looksLikeImage 用文件头 magic bytes 判断字节是否像图标图片（不依赖 Content-Type 字符串），
-// 规避服务端回错误页却标成 image/*、或把 SVG 标成 text/plain 导致的误判/漏判。
 func looksLikeImage(b []byte) bool {
 	return sniffImageType(b) != ""
 }
 
-// sniffImageType 返回能识别出的图片类型（空串表示不像图片）。覆盖站点常见 favicon 格式：
-// PNG / GIF / JPEG / WebP / ICO / BMP / SVG。
 func sniffImageType(b []byte) string {
 	if len(b) < 4 {
 		return ""
@@ -147,7 +119,7 @@ func sniffImageType(b []byte) string {
 	case bytes.HasPrefix(b, []byte("RIFF")) && len(b) >= 12 && bytes.Equal(b[8:12], []byte("WEBP")):
 		return "image/webp"
 	case b[0] == 0x00 && b[1] == 0x00 && b[2] == 0x01 && b[3] == 0x00:
-		return "image/x-icon" // ICO
+		return "image/x-icon"
 	case b[0] == 0x42 && b[1] == 0x4D:
 		return "image/bmp"
 	case isSVG(b):
@@ -156,7 +128,6 @@ func sniffImageType(b []byte) string {
 	return ""
 }
 
-// isSVG 判断字节是否为 SVG（允许前置空白与 XML 声明）。
 func isSVG(b []byte) bool {
 	s := bytes.TrimSpace(b)
 	if len(s) == 0 {
@@ -168,10 +139,6 @@ func isSVG(b []byte) bool {
 	return bytes.HasPrefix(bytes.ToLower(s), []byte("<svg"))
 }
 
-// fetchFavicon 两阶段溯源：
-// 阶段一（廉价）：第三方图标服务 + 站点常见固定路径，直连/代理双跑并发竞争，首个图标即返回；
-// 阶段二（回退）：解析站点首页 HTML 的 <link rel=icon>/<link rel=manifest>，按发现的真实
-// 图标地址再试——这正是浏览器定位 favicon 的方式，可覆盖「无固定 /favicon.ico」的现代站点。
 func fetchFavicon(ctx context.Context, hostPort string) ([]byte, string, error) {
 	host := hostnameOnly(hostPort)
 
@@ -187,7 +154,6 @@ func fetchFavicon(ctx context.Context, hostPort string) ([]byte, string, error) 
 	return nil, "", fmt.Errorf("favicon: 所有回源均失败 host=%s", hostPort)
 }
 
-// raceFetch 并发抓取候选 URL，首个「看起来是图标」的成功结果即返回；其余任务被取消。
 func raceFetch(ctx context.Context, tasks []fetchTask) ([]byte, string, error) {
 	if len(tasks) == 0 {
 		return nil, "", fmt.Errorf("favicon: 无候选源")
@@ -198,7 +164,7 @@ func raceFetch(ctx context.Context, tasks []fetchTask) ([]byte, string, error) {
 		body []byte
 		ct   string
 	}
-	ch := make(chan hit, 1) // 缓冲 1：首个成功写入，后续自动丢弃
+	ch := make(chan hit, 1)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var lastErr error
@@ -216,11 +182,10 @@ func raceFetch(ctx context.Context, tasks []fetchTask) ([]byte, string, error) {
 				return
 			}
 			if len(b) == 0 || !looksLikeImage(b) {
-				// 空响应或非图片（如源站回退的 HTML 错误页 / 纯文本）：不夺标，
-				// 不取消其余任务，交由其它源/路径继续尝试。
+
 				return
 			}
-			cancel() // 首个成功夺标，作废其余任务
+			cancel()
 			select {
 			case ch <- hit{b, detectType(b)}:
 			default:
@@ -239,8 +204,6 @@ func raceFetch(ctx context.Context, tasks []fetchTask) ([]byte, string, error) {
 	}
 }
 
-// buildStaticTasks 组装「廉价源」任务：第三方图标服务 + 站点常见固定路径（含 .ico/.png/.svg）。
-// 每源至少一条直连任务；该源在环境中走代理时，再追加一条代理任务。
 func buildStaticTasks(host, hostPort string) []fetchTask {
 	urls := []string{
 		"https://icons.duckduckgo.com/ip3/" + host + ".ico",
@@ -264,9 +227,6 @@ func buildStaticTasks(host, hostPort string) []fetchTask {
 	return tasks
 }
 
-// discoverFaviconTasks 回退方案：抓取站点首页 HTML，提取 <link rel="icon"> / apple-touch-icon
-// 与 <link rel="manifest">（再解析 manifest 的 icons 数组）中的真实图标地址。
-// 仅当地址通过 safeHost 校验才入候选；上限 12 避免无界膨胀。
 func discoverFaviconTasks(ctx context.Context, hostPort string) []fetchTask {
 	page, base := fetchSiteRoot(ctx, hostPort)
 	if page == "" || base == nil {
@@ -304,8 +264,6 @@ func discoverFaviconTasks(ctx context.Context, hostPort string) []fetchTask {
 	return tasks
 }
 
-// fetchSiteRoot 抓取站点首页（先 https 后 http），返回 HTML 文本与页面基准 URL。
-// 仅用于解析 favicon 线索，限制读取体积避免被超大页面拖慢。
 func fetchSiteRoot(ctx context.Context, hostPort string) (string, *url.URL) {
 	var page string
 	for _, scheme := range []string{"https", "http"} {
@@ -337,8 +295,6 @@ func fetchSiteRoot(ctx context.Context, hostPort string) (string, *url.URL) {
 	return "", nil
 }
 
-// parseIconCandidates 单次解析首页 HTML，提取 rel 含 icon 类的 <link> 绝对地址，
-// 以及 <link rel="manifest"> 的 manifest 地址（可能为空）。避免重复遍历 DOM。
 func parseIconCandidates(page string, base *url.URL) (icons []string, manifestURL string) {
 	doc, err := html.Parse(strings.NewReader(page))
 	if err != nil {
@@ -376,7 +332,6 @@ func parseIconCandidates(page string, base *url.URL) (icons []string, manifestUR
 	return icons, manifestURL
 }
 
-// iconRel 判断 link 的 rel 是否为图标类。
 func iconRel(rel string) bool {
 	for _, tok := range strings.Fields(rel) {
 		switch tok {
@@ -387,7 +342,6 @@ func iconRel(rel string) bool {
 	return false
 }
 
-// fetchManifestIcons 抓取 manifest，解析其 icons 数组，返回绝对地址。
 func fetchManifestIcons(ctx context.Context, manifestURL string) []string {
 	cl := faviconDirectClient
 	if usesProxy(manifestURL) {
@@ -431,13 +385,11 @@ func fetchManifestIcons(ctx context.Context, manifestURL string) []string {
 	return out
 }
 
-// fetchTask 描述一次回源尝试：目标 URL 与其使用的客户端（代理或直连）。
 type fetchTask struct {
 	url    string
 	client *http.Client
 }
 
-// usesProxy 判断该 URL 在当前环境（HTTP_PROXY / NO_PROXY 等）下是否走代理。
 func usesProxy(rawURL string) bool {
 	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -447,7 +399,6 @@ func usesProxy(rawURL string) bool {
 	return err == nil && p != nil
 }
 
-// hostnameOnly 去掉端口，返回纯域名（DDG/Google 图标服务不接受端口）。
 func hostnameOnly(hostPort string) string {
 	if h, _, err := net.SplitHostPort(hostPort); err == nil {
 		return h
@@ -455,13 +406,12 @@ func hostnameOnly(hostPort string) string {
 	return hostPort
 }
 
-// fetchBytes 带上下文、状态校验与大小上限地抓取原始字节。
 func fetchBytes(ctx context.Context, cl *http.Client, rawURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	// 模拟浏览器请求头，避免被站点/WAF 以「无 UA / 爬虫」拦截，返回 403 或 HTML 错误页。
+
 	req.Header.Set("User-Agent", browserUA)
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
@@ -484,8 +434,6 @@ func fetchBytes(ctx context.Context, cl *http.Client, rawURL string) ([]byte, er
 	return body, nil
 }
 
-// detectType 识别图片 Content-Type。优先用文件头 magic bytes（涵盖 SVG / WebP 等
-// http.DetectContentType 不识别的格式），兜底再用标准探测；ICO 常被判为 octet-stream，转成 image/x-icon。
 func detectType(body []byte) string {
 	if len(body) == 0 {
 		return ""
@@ -500,7 +448,6 @@ func detectType(body []byte) string {
 	return ct
 }
 
-// normalizeHost 归一化 host[:port]：剥去 scheme/路径，hostname 转小写。解析失败返回空串。
 func normalizeHost(raw string) string {
 	s := strings.TrimSpace(raw)
 	if s == "" {
@@ -520,9 +467,6 @@ func normalizeHost(raw string) string {
 	return host
 }
 
-// safeHost 校验主机可解析（DNS/字面 IP 能解析出地址即可）。
-// 不做内网/公网/本机过滤：个人书签数据由本应用自己维护，需支持内网与本机站点。
-// 结果带 TTL 缓存（见 safeHostCache），避免重定向逐跳与回源路径重复做 DNS 查询。
 func safeHost(host string) bool {
 	h := host
 	if hp, _, err := net.SplitHostPort(host); err == nil {
@@ -532,7 +476,7 @@ func safeHost(host string) bool {
 	if h == "" {
 		return false
 	}
-	// 命中缓存：非空值=历史校验通过，空值=历史校验失败（负缓存），均直接复用
+
 	if v, ok := safeHostCache.Get(faviconCategory, h); ok {
 		return len(v) > 0
 	}
@@ -545,7 +489,6 @@ func safeHost(host string) bool {
 	return ok
 }
 
-// lookupHost 执行实际的 DNS 可达性校验，结果由 safeHost 包裹缓存。
 func lookupHost(h string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

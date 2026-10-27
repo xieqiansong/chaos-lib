@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-// Middleware 记录每个 /api 请求的元数据，投递到异步落库通道（channel 满则丢弃，避免阻塞请求链路）。
-// 非 /api 路径（静态资源、SPA 回退等）直接放行，不记录。
 func Middleware() web.HandlerFunc {
 	return func(c *web.Context) {
 		if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
@@ -33,20 +31,17 @@ func Middleware() web.HandlerFunc {
 		select {
 		case logCh <- rec:
 		default:
-			// 通道满则丢弃，避免阻塞请求链路。
+
 		}
 	}
 }
 
-// logCh 异步落库缓冲通道（采集端 middleware → 持久化端 flushLoop）。
 var logCh = make(chan *ApiLog, 2000)
 
-// Start 启动后台消费者，由启动流程显式调用（不在 init 里起 goroutine）。
 func Start() {
 	go flushLoop()
 }
 
-// flushLoop 后台消费者：累计 100 条或每 2s 批量落库一次。
 func flushLoop() {
 	const batchSize = 100
 	batch := make([]*ApiLog, 0, batchSize)
@@ -56,7 +51,7 @@ func flushLoop() {
 		}
 		db := config.GetDB()
 		if db == nil {
-			// 数据库不可用：丢弃本批日志，避免 nil 解引用导致进程崩溃。
+
 			batch = batch[:0]
 			return
 		}

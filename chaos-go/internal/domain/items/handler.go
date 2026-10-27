@@ -10,7 +10,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// errRules 领域错误 → HTTP 状态码映射。
 var errRules = []httpx.ErrRule{
 	{Err: ErrItemNotFound, Status: http.StatusNotFound, Msg: "物品不存在"},
 	{Err: ErrCategoryNotFound, Status: http.StatusNotFound, Msg: "分类不存在"},
@@ -21,9 +20,6 @@ var errRules = []httpx.ErrRule{
 	{Err: ErrDBUnavailable, Status: http.StatusInternalServerError, Msg: "数据库不可用"},
 }
 
-// RegisterV1 挂载个人物品模块到 /api/v1（POST + Action 风格）。
-// 物品分类 / 存放位置 / 购入来源已收敛到数据字典（dict），由 dict 模块统一提供 CRUD；
-// 此处仅保留物品主表、流水与装配表的通用 CRUD，以及物品主表的"业务动作"。
 func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[ItemRecord](rg, "item-records", crud.Opts[ItemRecord]{
 		Searchable: []string{"note"},
@@ -37,10 +33,9 @@ func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[Item](rg, "items", crud.Opts[Item]{
 		Searchable: []string{"name", "brand", "model", "serial_no", "tags", "remark"},
 		Sortable:   []string{"id", "quantity", "warranty_end", "expire_date", "purchase_date", "created_at"},
-		Protected:  []string{"Quantity"}, // 数量只能由流水动作改动，禁止通用 update 直接改
+		Protected:  []string{"Quantity"},
 	}, nil)
 
-	// 业务动作（事务型，先写流水再更新主表）
 	g.POST("/purchase", purchaseAction)
 	g.POST("/replenish", replenishAction)
 	g.POST("/consume", consumeAction)
@@ -52,7 +47,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	g.POST("/dispose", disposeAction)
 	g.POST("/inventory", inventoryAction)
 
-	// 派生查询（只读）
 	g.POST("/lowStock", lowStockAction)
 	g.POST("/warrantySoon", warrantySoonAction)
 	g.POST("/categoryStats", categoryStatsAction)

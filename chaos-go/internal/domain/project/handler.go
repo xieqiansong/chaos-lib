@@ -13,7 +13,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// projectGroupOpts / projectOpts 两套资源的 CRUD 选项，存量 /api 与 v1 动作路由共用。
 var projectGroupOpts = crud.Opts[ProjectGroup]{
 	Searchable:   []string{"name"},
 	Sortable:     []string{"order_num", "created_at", "id"},
@@ -24,17 +23,14 @@ var projectGroupOpts = crud.Opts[ProjectGroup]{
 var projectOpts = crud.Opts[Project]{
 	Searchable: []string{"name"},
 	Sortable:   []string{"last_accessed_at", "created_at", "id"},
-	// 路径类字段只能经带副作用的专属流程（建项目 / 移动）改写，禁止通用 PATCH 绕过。
+
 	Protected:    []string{"GroupID", "AbsolutePath", "RelativePath", "LastAccessedAt", "CreatedAt"},
 	BeforeCreate: PrepareProjectForCreate,
 	AfterDelete:  RemoveProjectDir,
-	// v1 列表复用同一自定义实现（合并未认领目录）。
+
 	V1ListHandler: listProjects,
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 两套资源的标准 CRUD 由通用 crud 生成；自定义列表（合并未认领目录）经 V1ListHandler 复用；
-// move / access 以动作形式补齐（v1 下已完备，可安全删除存量 /api 路由）。
 func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[ProjectGroup](rg, "project-groups", projectGroupOpts, nil)
 	projects := crud.RegisterActions[Project](rg, "projects", projectOpts, nil)
@@ -42,9 +38,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	projects.POST("/access", projectAccessV1)
 }
 
-// ── 自定义列表 ──────────────────────────────────────────────────
-
-// listProjects 自定义列表：按 groupId 过滤，合并磁盘扫描出的未认领子目录（合并逻辑在 service）。
 func listProjects(c *web.Context) {
 	q := pagination.Parse(c)
 	var groupID *int
@@ -78,9 +71,6 @@ func listProjects(c *web.Context) {
 	renv.Success(c, pagination.New(items[start:end], int64(len(items)), q))
 }
 
-// ── 扩展动作 ────────────────────────────────────────────────────
-
-// moveProject 移动项目文件夹并同步路径字段（PATCH /projects/:id/move）。
 func moveProject(c *web.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -112,7 +102,6 @@ func moveProject(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// accessProject 记录项目访问时间（PATCH /projects/:id/access）。
 func accessProject(c *web.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -130,9 +119,6 @@ func accessProject(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// ── v1 动作（POST + Action）─────────────────────────────────────────
-
-// projectMoveV1 移动项目（POST /api/v1/projects/move）。v1 路径不带 :id，主键取自信封 data.id。
 func projectMoveV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {
@@ -163,7 +149,6 @@ func projectMoveV1(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// projectAccessV1 记录项目访问时间（POST /api/v1/projects/access）。
 func projectAccessV1(c *web.Context) {
 	id, ok := envelope.ID(c)
 	if !ok {

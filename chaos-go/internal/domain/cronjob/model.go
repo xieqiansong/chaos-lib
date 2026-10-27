@@ -1,4 +1,3 @@
-// 本文件只放实体与动作配置结构；响应视图见 dto.go，校验与用例见 service.go。
 package cronjob
 
 import (
@@ -8,24 +7,18 @@ import (
 	"chaos-go/internal/framework/crud"
 )
 
-// ErrJobNotFound 定时任务不存在（或已软删）。
 var ErrJobNotFound = errors.New("cronjob: 定时任务不存在")
 
-// ErrDBUnavailable 表示数据库不可用（启动期调度器加载任务时用于降级）。
 var ErrDBUnavailable = errors.New("cronjob: database unavailable")
 
-// ActionType 是定时任务到点后要执行的动作类型。
 type ActionType string
 
 const (
-	// ActionTypeHTTP 调用 HTTP 接口 / Webhook。
 	ActionTypeHTTP ActionType = "http"
-	// ActionTypeShell 执行命令 / 脚本（受 FEATURE_CRON_SHELL 开关控制，默认关闭）。
+
 	ActionTypeShell ActionType = "shell"
 )
 
-// CronJob 是独立的定时任务（cron job），与任务计划 / 待办任务完全无关。
-// 嵌入 crud.BaseModel 自动获得 ID / CreatedAt / UpdatedAt / IsDeleted。
 type CronJob struct {
 	crud.BaseModel
 	Name         string     `json:"Name"`
@@ -35,16 +28,14 @@ type CronJob struct {
 	Enabled      bool       `json:"Enabled"`
 	TimeoutSec   int        `json:"TimeoutSec"`
 	LastRunAt    *time.Time `json:"LastRunAt"`
-	LastStatus   string     `json:"LastStatus"` // ok / failed / ""
+	LastStatus   string     `json:"LastStatus"`
 }
 
-// TableName 显式指定表名（与前端资源名 cronJob 对应）。
 func (CronJob) TableName() string { return "cron_jobs" }
 
-// CronJobRun 是单次执行的运行日志（只追加、不软删，故不套 CRUD 基字段）。
 type CronJobRun struct {
-	ID         int `gorm:"primaryKey" json:"ID"`
-	JobID      int `json:"JobID"`
+	ID         int        `gorm:"primaryKey" json:"ID"`
+	JobID      int        `json:"JobID"`
 	StartedAt  time.Time  `json:"StartedAt"`
 	FinishedAt *time.Time `json:"FinishedAt"`
 	Success    bool       `json:"Success"`
@@ -53,7 +44,6 @@ type CronJobRun struct {
 	CreatedAt  time.Time  `json:"CreatedAt"`
 }
 
-// HTTPAction 是 http 类型动作的配置（存于 CronJob.ActionConfig 的 JSON）。
 type HTTPAction struct {
 	Method  string            `json:"method"`
 	URL     string            `json:"url"`
@@ -61,7 +51,6 @@ type HTTPAction struct {
 	Body    string            `json:"body,omitempty"`
 }
 
-// ShellAction 是 shell 类型动作的配置（默认禁用，仅 FEATURE_CRON_SHELL=true 时真正执行）。
 type ShellAction struct {
 	Command string   `json:"command"`
 	Args    []string `json:"args,omitempty"`

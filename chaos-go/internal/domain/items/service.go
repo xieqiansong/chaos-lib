@@ -6,7 +6,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// 归一化：缺省记录日期用当前时间。
 func normalizeDate(t *time.Time) {
 	if t == nil {
 		return
@@ -16,7 +15,6 @@ func normalizeDate(t *time.Time) {
 	}
 }
 
-// Purchase 购入物品 + purchase 流水，返回新建的物品。
 func Purchase(req PurchaseRequest) (*Item, error) {
 	it := req.Item
 	it.ID = 0
@@ -42,7 +40,6 @@ func Purchase(req PurchaseRequest) (*Item, error) {
 	return &created, nil
 }
 
-// Replenish 消耗品补货：先清旧库存（可选），再进新货并记 replenish 流水。
 func Replenish(req ReplenishRequest) (*Item, error) {
 	normalizeDate(&req.RecordDate)
 	var updated *Item
@@ -78,7 +75,6 @@ func Replenish(req ReplenishRequest) (*Item, error) {
 	return updated, err
 }
 
-// Consume 消耗指定数量（库存不足报错）。
 func Consume(req ConsumeRequest) (*Item, error) {
 	normalizeDate(&req.RecordDate)
 	var updated *Item
@@ -107,7 +103,6 @@ func Consume(req ConsumeRequest) (*Item, error) {
 	return updated, err
 }
 
-// Install 装配配件到主机：建装配关系 + 配件位置跟随主机 + install 流水。
 func Install(req InstallRequest) error {
 	if req.HostID == req.ComponentID {
 		return ErrSelfAssembly
@@ -135,7 +130,6 @@ func Install(req InstallRequest) error {
 	})
 }
 
-// Remove 拆下配件：置 removed_at + 配件转闲置 + remove 流水。
 func Remove(req RemoveRequest) error {
 	normalizeDate(&req.RemovedAt)
 	return WithinTx(func(tx *gorm.DB) error {
@@ -159,17 +153,14 @@ func Remove(req RemoveRequest) error {
 	})
 }
 
-// Lend 借出：状态转 lent + lend 流水。
 func Lend(req IDRequest) error {
 	return statusWithRecord(req, StatusLent, RecordLend)
 }
 
-// ReturnItem 归还：状态转 in_use + return 流水。
 func ReturnItem(req IDRequest) error {
 	return statusWithRecord(req, StatusInUse, RecordReturn)
 }
 
-// Repair 维修：状态转 repairing + repair 流水（可记费用）。
 func Repair(req RepairRequest) error {
 	normalizeDate(&req.RecordDate)
 	return WithinTx(func(tx *gorm.DB) error {
@@ -186,7 +177,6 @@ func Repair(req RepairRequest) error {
 	})
 }
 
-// Dispose 处置：自动拆下在位配件，主机转 disposed + dispose 流水。
 func Dispose(req IDRequest) error {
 	normalizeDate(&req.RecordDate)
 	return WithinTx(func(tx *gorm.DB) error {
@@ -219,7 +209,6 @@ func Dispose(req IDRequest) error {
 	})
 }
 
-// Inventory 盘点修正：按实际数量调整并记差额（正=账面多）。
 func Inventory(req InventoryRequest) (*Item, error) {
 	normalizeDate(&req.RecordDate)
 	var updated *Item
@@ -245,7 +234,6 @@ func Inventory(req InventoryRequest) (*Item, error) {
 	return updated, err
 }
 
-// statusWithRecord 通用「改状态 + 写流水」事务。
 func statusWithRecord(req IDRequest, status, recType string) error {
 	normalizeDate(&req.RecordDate)
 	return WithinTx(func(tx *gorm.DB) error {

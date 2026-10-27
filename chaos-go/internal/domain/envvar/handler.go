@@ -12,8 +12,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 动作：get / patch / put / sync / getSnapshot；补丁与快照 id 取自信封 data。
 func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/env-variables")
 	g.POST("/get", func(c *web.Context) {
@@ -93,8 +91,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	})
 }
 
-// logWarnings 记录写入 / 快照过程中的非致命告警。
-// 响应体保持既有形状（data 为 null），告警只进日志，避免改动对外契约。
 func logWarnings(scope string, warnings []string) {
 	for _, w := range warnings {
 		slog.Warn("环境变量操作告警", "scope", scope, "warn", w)

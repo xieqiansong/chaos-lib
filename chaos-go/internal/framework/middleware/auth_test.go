@@ -13,9 +13,8 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// newTestRouter 构造只含 v1 + 信封 + 鉴权中间件的测试路由。
 func newTestRouter(t *testing.T, token, deny string) *web.Router {
-	
+
 	if token != "" {
 		t.Setenv("CHAOS_API_TOKEN", token)
 	} else {
@@ -57,7 +56,6 @@ func decodeCode(t *testing.T, w *httptest.ResponseRecorder) int {
 	return out.Code
 }
 
-// 未配置令牌：默认放行，业务码 0。
 func TestAuthDefaultAllow(t *testing.T) {
 	r := newTestRouter(t, "", "")
 	w := doPost(r, "/api/v1/demo/ping", "")
@@ -69,7 +67,6 @@ func TestAuthDefaultAllow(t *testing.T) {
 	}
 }
 
-// 已配置令牌但请求缺 token：40100（未登录）。
 func TestAuthMissingToken(t *testing.T) {
 	r := newTestRouter(t, "secret", "")
 	if code := decodeCode(t, doPost(r, "/api/v1/demo/ping", "")); code != resp.CodeUnauthorized {
@@ -77,7 +74,6 @@ func TestAuthMissingToken(t *testing.T) {
 	}
 }
 
-// 令牌正确：放行，业务码 0。
 func TestAuthValidToken(t *testing.T) {
 	r := newTestRouter(t, "secret", "")
 	if code := decodeCode(t, doPost(r, "/api/v1/demo/ping", "secret")); code != 0 {
@@ -85,7 +81,6 @@ func TestAuthValidToken(t *testing.T) {
 	}
 }
 
-// action 命中拒绝名单：40300（无权限）。
 func TestAuthDenyAction(t *testing.T) {
 	r := newTestRouter(t, "secret", "demo.ping")
 	if code := decodeCode(t, doPost(r, "/api/v1/demo/ping", "secret")); code != resp.CodeForbidden {

@@ -12,9 +12,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 动作：list / create / delete / getContent / updateContent / listSnapshots / getSnapshot / restore；
-// 主键与分页取自信封，复用既有 service 函数。
 func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/quick-edits")
 	g.POST("/list", func(c *web.Context) {
@@ -150,7 +147,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	})
 }
 
-// quickEditErr 把受管控文件相关的领域错误映射为 HTTP 状态码（与存量 CreateQuickEdit 一致）。
 func quickEditErr(c *web.Context, err error) {
 	switch {
 	case errors.Is(err, ErrFileExists), errors.Is(err, ErrPathNotFound),
@@ -161,7 +157,6 @@ func quickEditErr(c *web.Context, err error) {
 	}
 }
 
-// ListQuickEdits 列出受管控文件（含最近一次快照信息）。
 func ListQuickEdits(c *web.Context) {
 	items, err := ListFilesWithSnapshot()
 	if err != nil {
@@ -171,7 +166,6 @@ func ListQuickEdits(c *web.Context) {
 	renv.Success(c, items)
 }
 
-// CreateQuickEdit 登记一个受管控文件并落首条快照。
 func CreateQuickEdit(c *web.Context) {
 	var req struct {
 		Name     string
@@ -201,7 +195,6 @@ func CreateQuickEdit(c *web.Context) {
 	})
 }
 
-// DeleteQuickEdit 删除受管控文件记录（不动磁盘文件）。
 func DeleteQuickEdit(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -218,7 +211,6 @@ func DeleteQuickEdit(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// GetQuickEditContent 读取文件当前内容（虚拟文件走 envvar 回调）。
 func GetQuickEditContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -232,7 +224,6 @@ func GetQuickEditContent(c *web.Context) {
 	renv.Success(c, view)
 }
 
-// UpdateQuickEditContent 保存内容并追加一条快照。
 func UpdateQuickEditContent(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -251,7 +242,6 @@ func UpdateQuickEditContent(c *web.Context) {
 	renv.Success(c, saveResultToMap(res, false))
 }
 
-// ListQuickEditSnapshots 分页列出某文件的历史快照。
 func ListQuickEditSnapshots(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -266,7 +256,6 @@ func ListQuickEditSnapshots(c *web.Context) {
 	renv.Success(c, pagination.New(items, total, q))
 }
 
-// GetQuickEditSnapshot 读取单条快照内容。
 func GetQuickEditSnapshot(c *web.Context) {
 	fileID, ok := httpx.ParseID(c)
 	if !ok {
@@ -290,7 +279,6 @@ func GetQuickEditSnapshot(c *web.Context) {
 	})
 }
 
-// RestoreQuickEdit 回滚到指定快照，并追加一条新快照。
 func RestoreQuickEdit(c *web.Context) {
 	fileID, ok := httpx.ParseID(c)
 	if !ok {
@@ -309,9 +297,6 @@ func RestoreQuickEdit(c *web.Context) {
 	renv.Success(c, saveResultToMap(res, true))
 }
 
-// ── 响应辅助 ────────────────────────────────────────────────────
-
-// errRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeError。
 var errRules = []httpx.ErrRule{
 	{Err: ErrFileNotFound, Status: http.StatusNotFound, Msg: "文件不存在"},
 	{Err: ErrSnapshotNotFound, Status: http.StatusNotFound, Msg: "快照不存在"},
@@ -319,7 +304,6 @@ var errRules = []httpx.ErrRule{
 	{Err: ErrContentTooLarge, Status: http.StatusBadRequest},
 }
 
-// saveResultToMap 把保存 / 回滚结果转为响应体；withFrom 时附带来源快照 id。
 func saveResultToMap(res *SaveResult, withFrom bool) map[string]any {
 	out := map[string]any{
 		"message":      res.Message,

@@ -12,7 +12,6 @@ import (
 	_ "net/http/pprof"
 )
 
-// resolveUIFS 返回前端静态资源：优先 CHAOS_UI_DIR 环境变量，否则可执行文件同目录 ./ui。
 func resolveUIFS() fs.FS {
 	if dir := os.Getenv("CHAOS_UI_DIR"); dir != "" {
 		if st, err := os.Stat(dir); err == nil && st.IsDir() {

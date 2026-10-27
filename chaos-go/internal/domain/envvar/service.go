@@ -9,9 +9,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// ── 编解码（领域层，纯函数）─────────────────────────────────────
-
-// MarshalEnvToTOML 把快照序列化为 TOML 文本（缺字段在此兜底，保证可解析）。
 func MarshalEnvToTOML(snapshot *EnvSnapshot) (string, error) {
 	if snapshot == nil {
 		return "", fmt.Errorf("快照为空")
@@ -32,7 +29,6 @@ func MarshalEnvToTOML(snapshot *EnvSnapshot) (string, error) {
 	return string(data), nil
 }
 
-// ParseEnvFromTOML 把 TOML 文本解析为快照。
 func ParseEnvFromTOML(content string) (*EnvSnapshot, error) {
 	var snap EnvSnapshot
 	if err := toml.Unmarshal([]byte(content), &snap); err != nil {
@@ -47,7 +43,6 @@ func ParseEnvFromTOML(content string) (*EnvSnapshot, error) {
 	return &snap, nil
 }
 
-// ApplySectionPatch 把一段增量补丁（Set / Unset / Path 增删改）应用到指定段落。
 func ApplySectionPatch(section *EnvSection, patch *EnvSectionPatch) {
 	if patch == nil {
 		return
@@ -82,9 +77,6 @@ func ApplySectionPatch(section *EnvSection, patch *EnvSectionPatch) {
 	}
 }
 
-// ── 用例 ───────────────────────────────────────────────────────
-
-// EnsureVirtualFile 确保环境变量虚拟文件已登记；首次登记时用当前系统变量落一条初始快照。
 func EnsureVirtualFile() (int, error) {
 	file, err := findVirtualFile()
 	if err != nil {
@@ -93,7 +85,7 @@ func EnsureVirtualFile() (int, error) {
 	if file != nil {
 		return file.ID, nil
 	}
-	// 读取失败不阻断登记：先建文件，快照内容为空快照由调用方后续同步补齐。
+
 	snap, _ := ReadAllEnvFromSystem()
 	content, err := MarshalEnvToTOML(snap)
 	if err != nil {
@@ -109,8 +101,6 @@ func EnsureVirtualFile() (int, error) {
 	return created.ID, nil
 }
 
-// commitSnapshot 把快照序列化为 TOML 并落一条快照，返回过程中的非致命告警。
-// 序列化失败时返回 error（阻断调用方）；落快照失败仅作为 warning 累加。
 func commitSnapshot(fileID int, snap *EnvSnapshot) ([]string, error) {
 	content, err := MarshalEnvToTOML(snap)
 	if err != nil {
@@ -122,9 +112,6 @@ func commitSnapshot(fileID int, snap *EnvSnapshot) ([]string, error) {
 	return nil, nil
 }
 
-// Load 读取当前系统环境变量，并附最近一次快照的 id 与时间。
-// scope 为空时返回 system 与 user 两段；为 EnvScopeSystem / EnvScopeUser 时仅读取并返回对应段，
-// 便于 UI 按「用户 / 系统」分区独立加载与刷新（未请求的段不再读取，也避免无谓的权限告警）。
 func Load(scope EnvScope) (*EnvGetResponse, error) {
 	if scope != "" && scope != EnvScopeSystem && scope != EnvScopeUser {
 		return nil, fmt.Errorf("非法的作用域: %s，仅支持 system / user", string(scope))
@@ -162,7 +149,6 @@ func Load(scope EnvScope) (*EnvGetResponse, error) {
 	return resp, nil
 }
 
-// Sync 以当前系统变量为准重落一条快照（不改写系统环境变量）。
 func Sync() ([]string, error) {
 	fileID, err := EnsureVirtualFile()
 	if err != nil {
@@ -182,8 +168,6 @@ func Sync() ([]string, error) {
 	return warnings, nil
 }
 
-// ApplyPatch 按增量补丁改写系统 / 用户两段变量，并落一条快照。
-// 返回的 warnings 为写入与快照过程中的非致命告警（系统写入已生效）。
 func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
 	fileID, err := EnsureVirtualFile()
 	if err != nil {
@@ -214,7 +198,6 @@ func ApplyPatch(req *EnvPatchRequest) ([]string, error) {
 	return warnings, nil
 }
 
-// ReplaceAll 整体替换 system / user 两段变量（nil 表示该段不变），并落一条快照。
 func ReplaceAll(req *EnvPutRequest) ([]string, error) {
 	fileID, err := EnsureVirtualFile()
 	if err != nil {
@@ -249,7 +232,6 @@ func ReplaceAll(req *EnvPutRequest) ([]string, error) {
 	return warnings, nil
 }
 
-// GetSnapshotDetail 返回指定快照的内容与解析后的结构化视图；解析失败时退化为原文 + 错误信息。
 func GetSnapshotDetail(snapID int) (*SnapshotDetail, error) {
 	fileID, err := EnsureVirtualFile()
 	if err != nil {
@@ -277,9 +259,6 @@ func GetSnapshotDetail(snapID int) (*SnapshotDetail, error) {
 	return detail, nil
 }
 
-// ── 供 quickedit 虚拟文件读写回调使用 ───────────────────────────
-
-// ReadVirtualContent 读系统环境变量并序列化为 TOML（quickedit 读取虚拟文件内容）。
 func ReadVirtualContent() (content string, sizeBytes int, err error) {
 	snap, err := ReadAllEnvFromSystem()
 	if err != nil {
@@ -292,7 +271,6 @@ func ReadVirtualContent() (content string, sizeBytes int, err error) {
 	return content, len([]byte(content)), nil
 }
 
-// WriteVirtualContent 解析 TOML 并写入系统环境变量（quickedit 保存虚拟文件内容）。
 func WriteVirtualContent(content string) (warnings []string, err error) {
 	snap, err := ParseEnvFromTOML(content)
 	if err != nil {
@@ -301,15 +279,6 @@ func WriteVirtualContent(content string) (warnings []string, err error) {
 	return WriteAllEnvToSystem(snap)
 }
 
-// ── Windows 系统环境变量读写（经 tools 包原语）─────────────────
-//
-// 作用域映射与落盘编排。低层 win32 原语（提权判断、计算机名 / 用户名、
-// 广播 WM_SETTINGCHANGE）由 pkg/tools/env_var_windows.go 提供，跨平台编译时
-// 由 pkg/tools/env_var_other.go 给出占位实现。
-
-// domainScopeToTools 将领域层作用域（system/user）映射为 tools 包的作用域（Machine/User）。
-// 领域层的 system 对应用户变量注册表项 HKLM\...\Environment，即 .NET 的 Machine 作用域；
-// user 对应 HKCU\Environment，即 .NET 的 User 作用域。
 func domainScopeToTools(scope EnvScope) (tools.EnvScope, bool) {
 	switch scope {
 	case EnvScopeSystem:
@@ -321,7 +290,6 @@ func domainScopeToTools(scope EnvScope) (tools.EnvScope, bool) {
 	}
 }
 
-// readScopeViaTools 通过 tools 包读取某一作用域下的全部环境变量，转为 map。
 func readScopeViaTools(scope EnvScope) (map[string]string, error) {
 	ts, ok := domainScopeToTools(scope)
 	if !ok {
@@ -338,8 +306,6 @@ func readScopeViaTools(scope EnvScope) (map[string]string, error) {
 	return out, nil
 }
 
-// applyScope 将期望变量集合落盘到指定作用域：仅对变化项做 Set，对删除项做 Remove。
-// 返回本次作用域内的警告（非致命错误）列表。
 func applyScope(scope EnvScope, desired, current map[string]string) []string {
 	ts, ok := domainScopeToTools(scope)
 	if !ok {
@@ -367,7 +333,6 @@ func applyScope(scope EnvScope, desired, current map[string]string) []string {
 	return warnings
 }
 
-// ReadAllEnvFromSystem 读取系统 / 用户两级环境变量，组成快照。
 func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
 	sysVars, errSys := readScopeViaTools(EnvScopeSystem)
 	if errSys != nil {
@@ -402,7 +367,6 @@ func ReadAllEnvFromSystem() (*EnvSnapshot, error) {
 	return snap, nil
 }
 
-// WriteAllEnvToSystem 将快照落盘：系统级需管理员；用户级始终尝试；最后广播环境变更。
 func WriteAllEnvToSystem(snap *EnvSnapshot) (warnings []string, err error) {
 	warnings = []string{}
 	originalSystem, _ := readScopeViaTools(EnvScopeSystem)

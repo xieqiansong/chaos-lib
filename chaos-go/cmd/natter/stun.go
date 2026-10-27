@@ -11,22 +11,18 @@ import (
 	"time"
 )
 
-// stunMagicCookie 是 RFC 5389 规定的固定 magic cookie。
 const stunMagicCookie = 0x2112a442
 
-// stunAttrMappedAddress / stunAttrXORMappedAddress 是两种携带映射地址的 STUN 属性。
 const (
 	stunAttrMappedAddress    = 0x0001
 	stunAttrXORMappedAddress = 0x0020
 )
 
-// serverUnavailable 表示当前 STUN 服务器不可用，调用方应轮换到下一个。
 type serverUnavailable struct{ err error }
 
 func (e *serverUnavailable) Error() string { return fmt.Sprintf("STUN server unavailable: %v", e.err) }
 func (e *serverUnavailable) Unwrap() error { return e.err }
 
-// StunClient 通过 STUN 绑定请求获取 NAT 映射后的公网地址。
 // ref: https://www.rfc-editor.org/rfc/rfc5389
 type StunClient struct {
 	servers    []addr
@@ -36,7 +32,6 @@ type StunClient struct {
 	udp        bool
 }
 
-// NewStunClient 创建 STUN 客户端，服务器列表为空时报错。
 func NewStunClient(servers []addr, sourceHost string, sourcePort int, iface string, udp bool) (*StunClient, error) {
 	if len(servers) == 0 {
 		return nil, errors.New("STUN server list is empty")
@@ -50,8 +45,6 @@ func NewStunClient(servers []addr, sourceHost string, sourcePort int, iface stri
 	}, nil
 }
 
-// GetMapping 依次尝试 STUN 服务器，成功返回 (内网地址, 公网地址)。
-// 一轮全部失败时等待 10 秒再重来，与 Python 版一致。
 func (c *StunClient) GetMapping(ctx context.Context) (addr, addr, error) {
 	first := c.servers[0]
 	for {
@@ -60,7 +53,7 @@ func (c *StunClient) GetMapping(ctx context.Context) (addr, addr, error) {
 			return inner, outer, nil
 		}
 		slog.Warn("stun: STUN server is unavailable", "server", c.servers[0].uri(c.udp), "err", err)
-		// 轮换：队首服务器挪到队尾
+
 		head := c.servers[0]
 		c.servers = append(c.servers[1:], head)
 		if c.servers[0].equal(first) {
@@ -72,7 +65,6 @@ func (c *StunClient) GetMapping(ctx context.Context) (addr, addr, error) {
 	}
 }
 
-// getMapping 向队首 STUN 服务器发一次绑定请求并解析响应。
 func (c *StunClient) getMapping(ctx context.Context) (addr, addr, error) {
 	stun := c.servers[0]
 	o := sockOpts{
@@ -89,7 +81,6 @@ func (c *StunClient) getMapping(ctx context.Context) (addr, addr, error) {
 	}
 	defer conn.Close()
 
-	// 连接建立后本地地址才是确定的（端口为 0 时由内核分配）
 	inner, err := addrFromNetAddr(conn.LocalAddr())
 	if err != nil {
 		return addr{}, addr{}, &serverUnavailable{err}
@@ -102,8 +93,8 @@ func (c *StunClient) getMapping(ctx context.Context) (addr, addr, error) {
 	}
 
 	req := make([]byte, 20)
-	binary.BigEndian.PutUint16(req[0:2], 0x0001) // Binding Request
-	binary.BigEndian.PutUint16(req[2:4], 0x0000) // message length
+	binary.BigEndian.PutUint16(req[0:2], 0x0001)
+	binary.BigEndian.PutUint16(req[2:4], 0x0000)
 	binary.BigEndian.PutUint32(req[4:8], stunMagicCookie)
 	copy(req[8:12], []byte("NATR"))
 	binary.BigEndian.PutUint32(req[12:16], rand.Uint32())
@@ -133,7 +124,7 @@ func (c *StunClient) getMapping(ctx context.Context) (addr, addr, error) {
 				return addr{}, addr{}, &serverUnavailable{errors.New("invalid STUN attribute")}
 			}
 			val := payload[4 : 4+attrLen]
-			// 1 字节保留位 + 1 字节地址族 + 2 字节端口 + 4 字节 IP
+
 			port := binary.BigEndian.Uint16(val[2:4])
 			ip := binary.BigEndian.Uint32(val[4:8])
 			if attrType == stunAttrXORMappedAddress {

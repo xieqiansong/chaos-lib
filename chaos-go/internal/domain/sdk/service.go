@@ -8,12 +8,8 @@ import (
 	"path/filepath"
 )
 
-// ErrVersionNotFound 表示请求切换到的版本目录不存在。
 var ErrVersionNotFound = errors.New("sdk: target version not found")
 
-// ── 校验 ────────────────────────────────────────────────────────
-
-// ValidateSources 校验来源数组：kind 必须为 repo / single，root 必填。
 func ValidateSources(raw json.RawMessage) error {
 	for _, it := range parseSources(raw) {
 		if it.Kind != "repo" && it.Kind != "single" {
@@ -26,14 +22,10 @@ func ValidateSources(raw json.RawMessage) error {
 	return nil
 }
 
-// ── 用例 ────────────────────────────────────────────────────────
-
-// ListSources 列出所有未删除的 SDK 类型。
 func ListSources() ([]SdkSource, error) {
 	return ListActiveSdkSources()
 }
 
-// SdkVersions 返回所有启用类型的版本信息，map key = 类型 Name。
 func SdkVersions() (map[string]SdkInfo, error) {
 	srcs, err := ListActiveSdkSources()
 	if err != nil {
@@ -49,7 +41,6 @@ func SdkVersions() (map[string]SdkInfo, error) {
 	return result, nil
 }
 
-// SdkVersion 返回指定类型的版本信息。
 func SdkVersion(typ string) (*SdkInfo, error) {
 	s, err := FindSdkSource(typ)
 	if err != nil {
@@ -59,7 +50,6 @@ func SdkVersion(typ string) (*SdkInfo, error) {
 	return &info, nil
 }
 
-// SwitchVersion 切换指定类型的版本（仅 repo 来源生效）。
 func SwitchVersion(typ, version string) error {
 	s, err := FindSdkSource(typ)
 	if err != nil {
@@ -68,7 +58,6 @@ func SwitchVersion(typ, version string) error {
 	return switchSdkVersion(*s, version)
 }
 
-// CreateSource 登记一个 SDK 类型：名称必填、来源合法、同名不重复。
 func CreateSource(src *SdkSource) error {
 	if src.Name == "" {
 		return ErrNameRequired
@@ -86,7 +75,6 @@ func CreateSource(src *SdkSource) error {
 	return CreateSdkSourceRow(src)
 }
 
-// UpdateSource 按字段映射更新 SDK 类型，返回更新后的记录。
 func UpdateSource(name string, patch SourcePatch) (*SdkSource, error) {
 	s, err := FindSdkSource(name)
 	if err != nil {
@@ -114,11 +102,10 @@ func UpdateSource(name string, patch SourcePatch) (*SdkSource, error) {
 	if err := ApplySdkSourcePatch(name, updates); err != nil {
 		return nil, err
 	}
-	// 回读最新，避免把更新前的快照返回给前端。
+
 	return FindSdkSource(name)
 }
 
-// DeleteSource 软删除指定 SDK 类型。
 func DeleteSource(name string) error {
 	if _, err := FindSdkSource(name); err != nil {
 		return err
@@ -126,10 +113,6 @@ func DeleteSource(name string) error {
 	return SoftDeleteSdkSource(name)
 }
 
-// ── 内部实现 ────────────────────────────────────────────────────
-
-// getSdkInfo 根据 SDK 类型推导版本列表与当前版本。
-// repo：实时扫描 root 子目录；single：取目录名。绝对路径 == Current 标为启用。
 func getSdkInfo(s SdkSource) SdkInfo {
 	var info SdkInfo
 	for _, it := range parseSources(s.Sources) {
@@ -141,7 +124,7 @@ func getSdkInfo(s SdkSource) SdkInfo {
 			}
 			continue
 		}
-		// repo：扫描 root 子目录
+
 		entries, err := os.ReadDir(it.Root)
 		if err != nil {
 			continue
@@ -164,8 +147,6 @@ func getSdkInfo(s SdkSource) SdkInfo {
 	return info
 }
 
-// switchSdkVersion 切换为指定版本：仅对 repo 来源生效，更新 symlink + .current-version + Current 绝对路径。
-// 版本目录不存在返回 ErrVersionNotFound；软链 / 版本文件写入失败返回包装错误。
 func switchSdkVersion(s SdkSource, version string) error {
 	var targetRepo SdkSourceItem
 	found := false

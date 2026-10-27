@@ -1,6 +1,3 @@
-// Command migrate 把 Postgres 全量迁移到 SQLite。
-// 要点：复用 app.go 的 AutoMigrate 模型清单；读用 Unscoped（含软删行）；写用 SkipHooks（原样落盘）；
-// 迁移前硬删目标表，幂等重复运行。用法见原注释或 --help。
 package main
 
 import (
@@ -32,8 +29,6 @@ import (
 	"chaos-go/internal/platform/mqttsync"
 )
 
-// models 是全仓需要迁移的模型清单，必须与 internal/app/app.go 中 AutoMigrate 的参数保持一致。
-// 若日后新增表，请同时更新两处。
 var models = []interface{}{
 	&taskplan.TaskPlan{},
 	&taskplan.Task{},
@@ -137,7 +132,7 @@ func openSQLite(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	// SQLite 写并发低：单写连接 + WAL
+
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
@@ -173,7 +168,7 @@ func migrateOne(src, dst *gorm.DB, model interface{}, batchSize int, truncate bo
 	name := tableName(dst, model)
 
 	if truncate {
-		// Unscoped 硬删除（即便是软删模型也会物理删除），便于重复运行幂等。
+
 		if err := dst.Unscoped().Where("1 = 1").Delete(model).Error; err != nil {
 			return fmt.Errorf("清空目标表失败: %w", err)
 		}
@@ -186,7 +181,6 @@ func migrateOne(src, dst *gorm.DB, model interface{}, batchSize int, truncate bo
 		slicePtr := reflect.New(sliceType)
 		sliceI := slicePtr.Interface()
 
-		// Unscoped 读取：连同已软删除的行一并搬走，保证数据完整。
 		res := src.Unscoped().Limit(batchSize).Offset(offset).Find(sliceI)
 		if res.Error != nil {
 			return fmt.Errorf("读取源表失败: %w", res.Error)
@@ -197,7 +191,6 @@ func migrateOne(src, dst *gorm.DB, model interface{}, batchSize int, truncate bo
 			break
 		}
 
-		// SkipHooks：跳过钩子/插件，原样写入（保留主键、软删标记、时间戳）。
 		if err := dst.Session(&gorm.Session{SkipHooks: true}).Create(sliceI).Error; err != nil {
 			return fmt.Errorf("写入目标表失败: %w", err)
 		}

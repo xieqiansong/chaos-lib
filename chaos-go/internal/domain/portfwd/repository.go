@@ -11,7 +11,6 @@ func isNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
 
-// SshConnExists 判断指定 ID 的 SSH 连接是否存在（未软删）。
 func SshConnExists(id int) (bool, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -27,7 +26,6 @@ func SshConnExists(id int) (bool, error) {
 	return true, nil
 }
 
-// FindSshConnByID 按 ID 加载未软删的 SSH 连接；不存在返回 ErrConnNotFound。
 func FindSshConnByID(id int) (*SshConnection, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -43,7 +41,6 @@ func FindSshConnByID(id int) (*SshConnection, error) {
 	return &conn, nil
 }
 
-// CountPortForwardingsByConn 统计引用该 SSH 连接且未软删的转发规则数。
 func CountPortForwardingsByConn(connID int) (int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -58,7 +55,6 @@ func CountPortForwardingsByConn(connID int) (int64, error) {
 	return count, nil
 }
 
-// FindPortForwardingByID 按 ID 加载未软删的端口转发规则；不存在返回 ErrRuleNotFound。
 func FindPortForwardingByID(id int) (*PortForwarding, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -74,7 +70,6 @@ func FindPortForwardingByID(id int) (*PortForwarding, error) {
 	return &rule, nil
 }
 
-// FindEnabledPortForwardings 返回库中所有「期望运行」（status=true 且未软删）的转发规则。
 func FindEnabledPortForwardings() ([]PortForwarding, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -88,7 +83,6 @@ func FindEnabledPortForwardings() ([]PortForwarding, error) {
 	return rules, nil
 }
 
-// SavePortForwarding 落库转发规则的变更（含 Status 字段）。
 func SavePortForwarding(rule *PortForwarding) error {
 	db := config.GetDB()
 	if db == nil {

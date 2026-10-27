@@ -10,10 +10,8 @@ import (
 	"chaos-go/internal/framework/pagination"
 )
 
-// maxContentLength 单文件内容上限（10MB）。
 const maxContentLength = 10 * 1024 * 1024
 
-// 领域错误哨兵：调用方据此映射 HTTP 状态码。
 var (
 	ErrFileExists      = errors.New("quickedit: 该文件已在管控列表中")
 	ErrPathNotFound    = errors.New("quickedit: 文件路径不存在")
@@ -21,9 +19,6 @@ var (
 	ErrContentTooLarge = errors.New("quickedit: 内容过大，暂不支持")
 )
 
-// ── 用例 ────────────────────────────────────────────────────────
-
-// ListFilesWithSnapshot 列出全部受管控文件（含最近一次快照信息）。
 func ListFilesWithSnapshot() ([]QuickEditFileResponse, error) {
 	files, err := ListFiles()
 	if err != nil {
@@ -36,7 +31,6 @@ func ListFilesWithSnapshot() ([]QuickEditFileResponse, error) {
 	return items, nil
 }
 
-// RegisterFile 登记受管控文件：校验路径存在、查重、读取内容并落首条快照。
 func RegisterFile(name, rawPath, remark string) (*QuickEditFile, *QuickEditSnapshot, error) {
 	absPath, err := filepath.Abs(rawPath)
 	if err != nil {
@@ -76,7 +70,6 @@ func RegisterFile(name, rawPath, remark string) (*QuickEditFile, *QuickEditSnaps
 	return &file, snap, nil
 }
 
-// DeleteFileByID 删除受管控文件记录（不删磁盘文件）。
 func DeleteFileByID(id int) error {
 	if _, err := FindFileByID(id); err != nil {
 		return err
@@ -87,7 +80,6 @@ func DeleteFileByID(id int) error {
 	return nil
 }
 
-// ReadContent 读取受管控文件的当前内容（虚拟文件走回调，其余读磁盘）。
 func ReadContent(id int) (*ContentView, error) {
 	file, err := FindFileByID(id)
 	if err != nil {
@@ -100,7 +92,6 @@ func ReadContent(id int) (*ContentView, error) {
 	return &ContentView{Content: content, FilePath: file.FilePath, SizeBytes: size}, nil
 }
 
-// SaveContent 写入内容并追加一条快照（保存即版本化）。
 func SaveContent(id int, content string) (*SaveResult, error) {
 	file, err := FindFileByID(id)
 	if err != nil {
@@ -123,7 +114,6 @@ func SaveContent(id int, content string) (*SaveResult, error) {
 	return newSaveResult(file, snap, 0, warnings, "更新成功", "环境变量已更新"), nil
 }
 
-// RestoreSnapshot 回滚到指定快照：写回快照内容并追加一条新快照。
 func RestoreSnapshot(fileID, snapID int) (*SaveResult, error) {
 	file, err := FindFileByID(fileID)
 	if err != nil {
@@ -139,7 +129,7 @@ func RestoreSnapshot(fileID, snapID int) (*SaveResult, error) {
 	}
 	afterSnap, snapErr := TakeSnapshot(fileID, snap.Content)
 	if snapErr != nil {
-		// 虚拟文件写入已生效，快照失败只降级为告警；磁盘文件则视为回滚未完成。
+
 		if !isEnvVirtualFile(file.FilePath) {
 			return nil, fmt.Errorf("文件已回滚，但快照失败: %w", snapErr)
 		}
@@ -148,7 +138,6 @@ func RestoreSnapshot(fileID, snapID int) (*SaveResult, error) {
 	return newSaveResult(file, afterSnap, snap.ID, warnings, "回滚成功", "环境变量已回滚"), nil
 }
 
-// ListSnapshotsOf 分页返回某文件的快照列表。
 func ListSnapshotsOf(fileID int, q pagination.Query) ([]QuickEditSnapshotResponse, int64, error) {
 	if _, err := FindFileByID(fileID); err != nil {
 		return nil, 0, err
@@ -160,7 +149,6 @@ func ListSnapshotsOf(fileID int, q pagination.Query) ([]QuickEditSnapshotRespons
 	return toSnapshotResponses(snaps), total, nil
 }
 
-// GetSnapshot 读取单条快照内容。
 func GetSnapshot(fileID, snapID int) (*QuickEditSnapshot, error) {
 	if _, err := FindFileByID(fileID); err != nil {
 		return nil, err
@@ -168,8 +156,6 @@ func GetSnapshot(fileID, snapID int) (*QuickEditSnapshot, error) {
 	return FindSnapshot(fileID, snapID)
 }
 
-// newSaveResult 组装保存 / 回滚结果：刷新文件更新时间并富化响应。
-// afterSnap 为 nil（快照失败且已降级为告警）时快照字段留零值。
 func newSaveResult(file *QuickEditFile, afterSnap *QuickEditSnapshot, fromSnapID int,
 	warnings []string, msg, envMsg string) *SaveResult {
 	file.UpdatedAt = time.Now()

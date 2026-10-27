@@ -8,9 +8,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 复用通用 crud 的 RegisterActions，动作集：list/get/create/update/delete/
-// batchCreate/batchDelete/status；与 Register 的存量路由双轨并存。
 func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[StandardData](rg, "standard-data", crud.Opts[StandardData]{
 		Searchable: []string{"name", "code", "description"},

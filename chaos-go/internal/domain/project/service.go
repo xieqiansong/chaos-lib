@@ -11,9 +11,6 @@ import (
 	"chaos-go/pkg/tools"
 )
 
-// ── 写方向钩子（由 crud.Opts 回调转调，见 handler.go 的 Register）──
-
-// ValidateGroupForCreate 建组前校验名称 / 根目录，并创建根目录。
 func ValidateGroupForCreate(g *ProjectGroup) error {
 	if g.Name == "" {
 		return fmt.Errorf("项目组名称不能为空")
@@ -28,7 +25,6 @@ func ValidateGroupForCreate(g *ProjectGroup) error {
 	return nil
 }
 
-// RelocateProjectsAfterGroupUpdate 组根目录变更后重算各子项目的绝对路径。
 func RelocateProjectsAfterGroupUpdate(g *ProjectGroup) error {
 	children, err := FindActiveProjectsByGroup(g.ID)
 	if err != nil {
@@ -45,12 +41,10 @@ func RelocateProjectsAfterGroupUpdate(g *ProjectGroup) error {
 	return nil
 }
 
-// CascadeDeleteProjects 删组（软删）后级联软删其子项目。
 func CascadeDeleteProjects(g *ProjectGroup) error {
 	return CascadeDeleteProjectsByGroup(g.ID)
 }
 
-// PrepareProjectForCreate 建项目前解析路径、校验目录存在、补全名称与访问时间。
 func PrepareProjectForCreate(p *Project) error {
 	if p.GroupID == 0 {
 		return fmt.Errorf("所属项目组ID不能为空")
@@ -81,8 +75,6 @@ func PrepareProjectForCreate(p *Project) error {
 	return nil
 }
 
-// RemoveProjectDir 删项目（软删）后清空物理目录；
-// 物理删除失败仅记录，DB 记录照常软删（与历史行为一致）。
 func RemoveProjectDir(p *Project) error {
 	if err := tools.RemoveDirSafe(p.AbsolutePath); err != nil {
 		slog.Warn("项目物理目录删除失败（已软删记录）", "path", p.AbsolutePath, "err", err)
@@ -90,10 +82,6 @@ func RemoveProjectDir(p *Project) error {
 	return nil
 }
 
-// ── 列表（派生：已认领 ∪ 磁盘未认领）────────────────────────────
-
-// ListProjectItems 按 groupId / name 过滤项目；指定 groupId 时合并该组根目录下
-// 尚未入库的子目录（Claimed=false）。
 func ListProjectItems(groupID *int, name string) ([]ProjectListItem, error) {
 	projects, err := ListActiveProjects(groupID, name)
 	if err != nil {
@@ -113,8 +101,6 @@ func ListProjectItems(groupID *int, name string) ([]ProjectListItem, error) {
 	return mergeUnclaimed(*group, projects), nil
 }
 
-// mergeUnclaimed 把已认领项目与磁盘未认领子目录合并；
-// 未认领项用负哨兵 ID，避免与已认领项（正 ID）冲突导致前端行 key 重复。
 func mergeUnclaimed(group ProjectGroup, dbProjects []Project) []ProjectListItem {
 	claimedSet := make(map[string]Project, len(dbProjects))
 	for _, p := range dbProjects {
@@ -170,10 +156,6 @@ func mergeUnclaimed(group ProjectGroup, dbProjects []Project) []ProjectListItem 
 	return items
 }
 
-// ── 扩展动作 ────────────────────────────────────────────────────
-
-// MoveProject 移动项目文件夹（同卷 rename / 跨卷 copy）并同步路径字段。
-// 落库失败时撤掉已复制的新目录，避免磁盘与库不一致。
 func MoveProject(id int, req MoveProjectRequest) error {
 	project, err := FindProjectByID(id)
 	if err != nil {
@@ -191,7 +173,7 @@ func MoveProject(id int, req MoveProjectRequest) error {
 	oldAbs := project.AbsolutePath
 	moved := newAbs != oldAbs
 	if moved {
-		// tools.MoveProjectFolder 仅复制、不删源，需显式清理旧目录。
+
 		if err := tools.MoveProjectFolder(oldAbs, newAbs); err != nil {
 			return fmt.Errorf("移动文件夹失败: %w", err)
 		}
@@ -208,7 +190,6 @@ func MoveProject(id int, req MoveProjectRequest) error {
 	return nil
 }
 
-// RecordAccess 记录项目访问时间。
 func RecordAccess(id int) error {
 	if _, err := FindProjectByID(id); err != nil {
 		return err

@@ -11,17 +11,14 @@ import (
 	"time"
 )
 
-// 端口检测结果的三种取值，与 Python 版一致。
 const (
 	portOpen    = 1
 	portClosed  = -1
 	portUnknown = 0
 )
 
-// PortTest 检测端口在 LAN / WAN 侧是否可达。
 type PortTest struct{}
 
-// logAt 按 info 参数选择日志级别：启动时用 info，主循环里用 debug。
 func logAt(info bool) func(string) {
 	if info {
 		return func(s string) { slog.Info(s) }
@@ -29,7 +26,6 @@ func logAt(info bool) func(string) {
 	return func(s string) { slog.Debug(s) }
 }
 
-// TestLAN 从局域网侧测试端口：1 开放 / -1 关闭 / 0 未知。
 func (p *PortTest) TestLAN(ctx context.Context, a addr, sourceIP, iface string, info bool) int {
 	printStatus := logAt(info)
 	o := sockOpts{bindIP: sourceIP, iface: iface, timeout: time.Second}
@@ -48,7 +44,6 @@ func (p *PortTest) TestLAN(ctx context.Context, a addr, sourceIP, iface string, 
 	return portClosed
 }
 
-// TestWAN 从公网侧测试端口。注意只使用 addr 中的端口号，公网 IP 会被忽略。
 func (p *PortTest) TestWAN(ctx context.Context, a addr, sourceIP, iface string, info bool) int {
 	printStatus := logAt(info)
 	ret01 := p.testIfconfigCo(ctx, a.Port, sourceIP, iface)
@@ -69,7 +64,6 @@ func (p *PortTest) TestWAN(ctx context.Context, a addr, sourceIP, iface string, 
 	return portUnknown
 }
 
-// testIfconfigCo 通过 ifconfig.co 的端口检测接口探测（repo: mpolden/echoip）。
 func (p *PortTest) testIfconfigCo(ctx context.Context, port int, sourceIP, iface string) int {
 	req := fmt.Sprintf(
 		"GET /port/%d HTTP/1.0\r\n"+
@@ -101,7 +95,6 @@ func (p *PortTest) testIfconfigCo(ctx context.Context, port int, sourceIP, iface
 	return portClosed
 }
 
-// testTransmission 通过 Transmission 的端口检测接口探测。
 // repo: https://github.com/transmission/portcheck
 func (p *PortTest) testTransmission(ctx context.Context, port int, sourceIP, iface string) int {
 	req := fmt.Sprintf(
@@ -131,7 +124,6 @@ func (p *PortTest) testTransmission(ctx context.Context, port int, sourceIP, ifa
 	return portUnknown
 }
 
-// rawHTTP 用裸 TCP 完成一次 HTTP 请求（精确控制源地址/网卡绑定，不走 net/http）。
 func rawHTTP(ctx context.Context, o sockOpts, target addr, req []byte) ([]byte, error) {
 	conn, err := newDialer(o).DialContext(ctx, "tcp4", target.String())
 	if err != nil {
@@ -168,7 +160,6 @@ func rawHTTP(ctx context.Context, o sockOpts, target addr, req []byte) ([]byte, 
 	}
 }
 
-// httpBody 去掉 HTTP 响应头，返回消息体。
 func httpBody(resp []byte) ([]byte, bool) {
 	idx := bytes.Index(resp, []byte("\r\n\r\n"))
 	if idx < 0 {

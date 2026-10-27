@@ -5,16 +5,8 @@ import (
 	"os"
 )
 
-// 本文件是文件内容的读写实现（基础设施层）：
-//   - 受管控文件可能是「环境变量虚拟文件」，其读写走 envvar 注入的回调
-//   - 其余为磁盘文件，直接读写
-//
-// service 只与这里的函数打交道，不直接 os.ReadFile / os.WriteFile。
-
-// ErrEnvNotReady 虚拟文件读写回调尚未注入（启动未完成）。
 var ErrEnvNotReady = fmt.Errorf("quickedit: 环境变量读写回调未初始化")
 
-// readContent 读取受管控文件的当前内容。
 func readContent(file *QuickEditFile) (content string, sizeBytes int, err error) {
 	if isEnvVirtualFile(file.FilePath) {
 		if EnvReadContent == nil {
@@ -33,8 +25,6 @@ func readContent(file *QuickEditFile) (content string, sizeBytes int, err error)
 	return string(data), len(data), nil
 }
 
-// writeContent 写入受管控文件的内容，返回非致命告警。
-// 虚拟文件写入出错不视为失败（内容可能部分生效），告警交由调用方呈现。
 func writeContent(file *QuickEditFile, content string) (warnings []string, err error) {
 	if isEnvVirtualFile(file.FilePath) {
 		if EnvWriteContent == nil {
@@ -52,7 +42,6 @@ func writeContent(file *QuickEditFile, content string) (warnings []string, err e
 	return nil, nil
 }
 
-// readDiskFile 读取磁盘上任意路径的内容（登记文件前用，不受管控列表约束）。
 func readDiskFile(path string) (data []byte, err error) {
 	data, err = os.ReadFile(path)
 	if err != nil {

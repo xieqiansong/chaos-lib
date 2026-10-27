@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// FindActiveByID 按 ID 加载未删除的记录；不存在返回 ErrRecordNotFound。
 func FindActiveByID(id string) (*StandardData, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -24,7 +23,6 @@ func FindActiveByID(id string) (*StandardData, error) {
 	return &row, nil
 }
 
-// SetStatus 切换指定记录的状态（enabled 字段），返回更新后的完整行。
 func SetStatus(id string, status bool) (*StandardData, error) {
 	db := config.GetDB()
 	if db == nil {

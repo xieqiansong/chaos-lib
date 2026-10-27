@@ -10,15 +10,12 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// errRules 领域错误 → HTTP 状态码映射。
 var errRules = []httpx.ErrRule{
 	{Err: ErrDictTypeNotFound, Status: http.StatusNotFound, Msg: "字典类型不存在"},
 	{Err: ErrDictDataNotFound, Status: http.StatusNotFound, Msg: "字典数据不存在"},
 	{Err: ErrDBUnavailable, Status: http.StatusInternalServerError, Msg: "数据库不可用"},
 }
 
-// RegisterV1 挂载数据字典模块到 /api/v1（POST + Action 风格）。
-// 两张表走通用 CRUD（含 status 启停）；dict-data 另挂 tree / options 两个只读派生动作。
 func RegisterV1(rg *web.RouterGroup) {
 	crud.RegisterActions[DictType](rg, "dict-types", crud.Opts[DictType]{
 		Searchable: []string{"name", "code", "remark"},
@@ -36,12 +33,10 @@ func RegisterV1(rg *web.RouterGroup) {
 		ErrRules: errRules,
 	})
 
-	// 派生查询（只读）
 	g.POST("/tree", treeAction)
 	g.POST("/options", optionsAction)
 }
 
-// treeAction 返回某类型下的字典数据项树（按 ParentID 嵌套）。
 func treeAction(c *web.Context) {
 	var req struct {
 		TypeCode string `json:"typeCode"`
@@ -58,7 +53,6 @@ func treeAction(c *web.Context) {
 	renv.Success(c, nodes)
 }
 
-// optionsAction 返回某类型下启用状态的字典数据项（供其他模块下拉）。
 func optionsAction(c *web.Context) {
 	var req struct {
 		TypeCode string `json:"typeCode"`

@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// FindGroupByID 按 ID 加载未软删的项目组；不存在返回 ErrGroupNotFound。
 func FindGroupByID(id int) (*ProjectGroup, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -24,7 +23,6 @@ func FindGroupByID(id int) (*ProjectGroup, error) {
 	return &g, nil
 }
 
-// FindProjectByID 按 ID 加载未软删的项目；不存在返回 ErrProjectNotFound。
 func FindProjectByID(id int) (*Project, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -40,7 +38,6 @@ func FindProjectByID(id int) (*Project, error) {
 	return &p, nil
 }
 
-// CascadeDeleteProjectsByGroup 删组（软删）后级联软删其子项目。
 func CascadeDeleteProjectsByGroup(groupID int) error {
 	db := config.GetDB()
 	if db == nil {
@@ -52,7 +49,6 @@ func CascadeDeleteProjectsByGroup(groupID int) error {
 		Updates(map[string]interface{}{"is_deleted": 1, "updated_at": now}).Error
 }
 
-// FindActiveProjectsByGroup 返回某项目组下所有未软删的子项目。
 func FindActiveProjectsByGroup(groupID int) ([]Project, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -65,7 +61,6 @@ func FindActiveProjectsByGroup(groupID int) ([]Project, error) {
 	return children, nil
 }
 
-// UpdateProjectAbsolutePath 组根目录变更后重算并写入某子项目的绝对路径。
 func UpdateProjectAbsolutePath(id int, newAbs string) error {
 	db := config.GetDB()
 	if db == nil {
@@ -77,7 +72,6 @@ func UpdateProjectAbsolutePath(id int, newAbs string) error {
 		Updates(map[string]interface{}{"absolute_path": newAbs, "updated_at": now}).Error
 }
 
-// ListActiveProjects 按 groupId / name 过滤，返回未软删项目（按访问时间倒序）。
 func ListActiveProjects(groupID *int, name string) ([]Project, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -97,7 +91,6 @@ func ListActiveProjects(groupID *int, name string) ([]Project, error) {
 	return projects, nil
 }
 
-// UpdateProjectLocation 移动项目后写回 group_id / 绝对路径 / 相对路径。
 func UpdateProjectLocation(id, groupID int, newAbs, newRel string) error {
 	db := config.GetDB()
 	if db == nil {
@@ -114,7 +107,6 @@ func UpdateProjectLocation(id, groupID int, newAbs, newRel string) error {
 		}).Error
 }
 
-// TouchProjectAccess 记录项目访问时间。
 func TouchProjectAccess(id int) error {
 	db := config.GetDB()
 	if db == nil {

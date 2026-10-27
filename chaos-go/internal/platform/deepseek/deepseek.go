@@ -17,7 +17,6 @@ const (
 	defaultModel   = "deepseek-chat"
 	chatPath       = "/chat/completions"
 
-	// 单次请求上限，避免长文拖累延迟与费用
 	requestTimeout = 60 * time.Second
 )
 
@@ -44,9 +43,6 @@ type chatResponse struct {
 	} `json:"error"`
 }
 
-// Chat 调用 DeepSeek 聊天接口，返回模型回复文本。
-// system 为固定的角色/评分标准提示（每次调用相同，省 token），user 为本次具体输入。
-// 密钥取自服务端配置 DeepSeek.APIKey，绝不暴露到前端。
 func Chat(system, user string) (string, error) {
 	apiKey := config.GetConfig().DeepSeek.APIKey
 	if apiKey == "" {

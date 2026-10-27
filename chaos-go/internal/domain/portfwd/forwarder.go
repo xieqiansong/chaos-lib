@@ -15,20 +15,17 @@ import (
 )
 
 const (
-	// connectRetry 单条接入连接等待对端就绪的上限
 	connectRetry = 15 * time.Second
-	// keepAlivePeriod SSH 隧道保活探测间隔
+
 	keepAlivePeriod = 30 * time.Second
-	// dialRetryInterval 失败后的重试间隔
+
 	dialRetryInterval = time.Second
-	// localDialTimeout 远程转发时本机连接目标服务的超时
+
 	localDialTimeout = 5 * time.Second
 )
 
 var errTunnelClosed = errors.New("隧道已停止")
 
-// PortForwarder 管理所有 SSH 隧道转发任务，进程内单例（GlobalPortForwarder）。
-// 任务以规则 id 为键：本地转发与远程转发可能使用相同端口号（分处本机与服务器侧），端口不能作为唯一键。
 type PortForwarder struct {
 	forwards map[int]*ForwardTask
 	mu       sync.RWMutex
@@ -36,8 +33,6 @@ type PortForwarder struct {
 	cancel   context.CancelFunc
 }
 
-// ForwardTask 一条转发规则的运行时状态。
-// 监听器来源随方向不同：local 用本机 net.Listen；remote 用 ssh.Client.Listen（位于 SSH 服务器侧，随客户端生命周期失效）。
 type ForwardTask struct {
 	ruleId     int
 	direction  string
@@ -63,7 +58,6 @@ type ForwardTask struct {
 	connections map[net.Conn]struct{}
 }
 
-// ForwardStatus 运行中转发任务的快照。
 type ForwardStatus struct {
 	RuleId    int
 	Direction string
@@ -79,11 +73,6 @@ func NewPortForwarder() *PortForwarder {
 	return &PortForwarder{forwards: make(map[int]*ForwardTask), ctx: ctx, cancel: cancel}
 }
 
-// AddForward 按方向建立转发任务并完成监听。
-//   - 本地转发（local）/ 远程转发（remote）：先完成 SSH 认证再监听；
-//   - 直接转发（direct）：不经 SSH 隧道，直接在本机监听并拨向目标。
-//
-// 认证失败或监听失败都不留下半启动状态。
 func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection) error {
 	if err := rule.normalize(); err != nil {
 		return err
@@ -95,8 +84,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	if exists {
 		return fmt.Errorf("该端口转发已启动")
 	}
-	// 本机侧监听端口由本机独占：local 与 direct 都在本机监听，
-	// 同一 (方向, 监听地址) 已被其他规则占用时提前给出明确错误。
+
 	if isLocalSideListen(rule.Direction) {
 		pf.mu.RLock()
 		for _, other := range pf.forwards {
@@ -141,7 +129,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 		}
 		task.setListener(listener)
 	} else {
-		// local 与 direct 都在本机监听
+
 		listener, err := net.Listen("tcp", task.listenAddr)
 		if err != nil {
 			taskCancel()
@@ -171,7 +159,7 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	} else {
 		go pf.localAcceptLoop(task)
 	}
-	// 直接转发无 SSH 隧道，无需保活探测
+
 	if rule.Direction != DirectionDirect {
 		go pf.keepAliveLoop(task)
 	}
@@ -186,7 +174,6 @@ func (pf *PortForwarder) AddForward(rule *PortForwarding, sshConn *SshConnection
 	return nil
 }
 
-// RemoveForward 停止转发：取消上下文 → 关闭监听 → 关闭活动连接 → 关闭 SSH 客户端。
 func (pf *PortForwarder) RemoveForward(ruleId int) error {
 	pf.mu.Lock()
 	task, exists := pf.forwards[ruleId]
@@ -212,7 +199,6 @@ func (pf *PortForwarder) RemoveForward(ruleId int) error {
 	return nil
 }
 
-// Status 返回该规则是否正在转发，以及最近一次错误。
 func (pf *PortForwarder) Status(ruleId int) (bool, string) {
 	pf.mu.RLock()
 	task, exists := pf.forwards[ruleId]
@@ -225,7 +211,6 @@ func (pf *PortForwarder) Status(ruleId int) (bool, string) {
 	return true, task.lastErr
 }
 
-// ListForwards 返回当前所有运行中的转发任务。
 func (pf *PortForwarder) ListForwards() []ForwardStatus {
 	pf.mu.RLock()
 	tasks := make([]*ForwardTask, 0, len(pf.forwards))
@@ -251,7 +236,6 @@ func (pf *PortForwarder) ListForwards() []ForwardStatus {
 	return statuses
 }
 
-// StopAll 停止全部转发（进程退出时调用）。
 func (pf *PortForwarder) StopAll() {
 	pf.cancel()
 	pf.mu.Lock()
@@ -273,10 +257,6 @@ func (pf *PortForwarder) StopAll() {
 	}
 }
 
-// RecoverForwardsOnBoot 进程启动时按库里的「期望运行」集合（status=true）重建隧道：
-// 重启后内存为空，凡是库里标记为运行中的规则都应尝试重连，而不是像旧逻辑那样直接清零。
-// 恢复失败的（如 SSH 暂不可达、凭据当时无效）保持 status=true，交由 SelfHealForwards 周期重试，
-// 这样库里"期望运行"的语义与内存实际状态解耦——展示状态始终以内存为准。
 func RecoverForwardsOnBoot() {
 	rules, err := FindEnabledPortForwardings()
 	if err != nil {
@@ -309,9 +289,6 @@ func RecoverForwardsOnBoot() {
 	}
 }
 
-// SelfHealForwards 周期自愈：扫描库里"期望运行"（status=true）但内存中实际未运行的规则，
-// 重新发起 AddForward。覆盖启动恢复失败、运行时隧道意外消亡、以及认证失败（reconnectOff）后
-// 凭据被修正等需要再次建连的场景。已在运行的规则直接跳过。
 func SelfHealForwards() {
 	rules, err := FindEnabledPortForwardings()
 	if err != nil {
@@ -340,8 +317,6 @@ func SelfHealForwards() {
 		}
 	}
 }
-
-// ── 内部实现 ──────────────────────────────────────────────────────
 
 func (task *ForwardTask) track(conn net.Conn) {
 	task.connsMu.Lock()
@@ -403,7 +378,6 @@ func (task *ForwardTask) stopped() bool {
 	return task.ctx.Err() != nil
 }
 
-// localAcceptLoop 本机监听：listener 一次创建、跨重连存活，因此这里持续 accept。
 func (pf *PortForwarder) localAcceptLoop(task *ForwardTask) {
 	listener := task.getListener()
 	if listener == nil {
@@ -424,8 +398,6 @@ func (pf *PortForwarder) localAcceptLoop(task *ForwardTask) {
 	}
 }
 
-// remoteListenLoop 服务器侧监听：listener 与 SSH 客户端生命周期绑定，
-// 一旦失效（断线或客户端重建）就在当前客户端上重新申请监听，保证重连后自动恢复。
 func (pf *PortForwarder) remoteListenLoop(task *ForwardTask) {
 	for {
 		if task.stopped() {
@@ -449,7 +421,7 @@ func (pf *PortForwarder) remoteListenLoop(task *ForwardTask) {
 			}
 			slog.Warn("SSH 远程监听失败，稍后重试",
 				"ruleId", task.ruleId, "listen", task.listenAddr, "err", err)
-			// 监听失败往往意味着当前客户端已不可用，主动换一条连接
+
 			pf.reconnect(task)
 			time.Sleep(dialRetryInterval)
 			continue
@@ -470,7 +442,6 @@ func (pf *PortForwarder) remoteListenLoop(task *ForwardTask) {
 	}
 }
 
-// serveRemoteListener 在给定 listener 上 accept，直到该 listener 失效。
 func (pf *PortForwarder) serveRemoteListener(task *ForwardTask, listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
@@ -482,7 +453,6 @@ func (pf *PortForwarder) serveRemoteListener(task *ForwardTask, listener net.Lis
 	}
 }
 
-// handleConnection 把接入连接与对端连接对接后双向转发。
 func (pf *PortForwarder) handleConnection(task *ForwardTask, listenConn net.Conn) {
 	defer func() {
 		task.untrack(listenConn)
@@ -519,10 +489,6 @@ func (pf *PortForwarder) handleConnection(task *ForwardTask, listenConn net.Conn
 	<-done
 }
 
-// dialOtherSide 按方向选择对端连接方式：
-// local —— 远端目标由 SSH 服务器侧解析（等价 ssh -L，经 SSH 通道）；
-// remote —— 目标在本机侧解析（等价 ssh -R，本机直连）；
-// direct —— 直接转发，目标在本机侧解析（纯 TCP 直连）。
 func (task *ForwardTask) dialOtherSide() (net.Conn, error) {
 	if task.direction == DirectionLocal {
 		return task.dialTargetViaSSH()
@@ -530,7 +496,6 @@ func (task *ForwardTask) dialOtherSide() (net.Conn, error) {
 	return task.dialDirectTarget()
 }
 
-// dialDirectTarget 目标在本机侧解析（远程转发与直接转发共用）：本机直连目标服务。
 func (task *ForwardTask) dialDirectTarget() (net.Conn, error) {
 	deadline := time.Now().Add(connectRetry)
 	lastErr := error(errTunnelClosed)
@@ -554,7 +519,6 @@ func (task *ForwardTask) dialDirectTarget() (net.Conn, error) {
 	}
 }
 
-// dialTargetViaSSH 本地转发的对端：经 SSH 通道打开 direct-tcpip（目标地址在服务器侧解析）。
 func (task *ForwardTask) dialTargetViaSSH() (net.Conn, error) {
 	deadline := time.Now().Add(connectRetry)
 	lastErr := error(errTunnelClosed)
@@ -569,7 +533,7 @@ func (task *ForwardTask) dialTargetViaSSH() (net.Conn, error) {
 				return conn, nil
 			}
 			lastErr = err
-			// 通道打开失败通常意味着隧道已断，立刻尝试重连一次
+
 			task.owner.reconnect(task)
 		}
 
@@ -611,8 +575,6 @@ func (pf *PortForwarder) keepAliveLoop(task *ForwardTask) {
 	}
 }
 
-// reconnect 重建 SSH 客户端；认证类错误不重试（避免反复失败刷日志）。
-// 远程转发的监听器与客户端绑定，因此换客户端后需要让监听循环重建它。
 func (pf *PortForwarder) reconnect(task *ForwardTask) {
 	task.clientMu.Lock()
 	if task.reconnectOff || task.client == nil {
@@ -643,7 +605,7 @@ func (pf *PortForwarder) reconnect(task *ForwardTask) {
 	task.clientMu.Unlock()
 
 	if task.direction == DirectionRemote {
-		// 旧监听器绑在旧客户端上已失效，关掉它让 remoteListenLoop 用新客户端重新 Listen
+
 		task.closeListener()
 	}
 	if old != nil {
@@ -653,7 +615,6 @@ func (pf *PortForwarder) reconnect(task *ForwardTask) {
 	slog.Info("SSH 隧道已重连", "ruleId", task.ruleId, "direction", task.direction)
 }
 
-// isAuthError 判断是否为认证/凭据类错误（不重试），区别于网络类错误（可重试）。
 func isAuthError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "unable to authenticate") ||

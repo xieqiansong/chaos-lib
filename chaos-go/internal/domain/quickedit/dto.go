@@ -2,7 +2,6 @@ package quickedit
 
 import "time"
 
-// QuickEditFileResponse 文件列表/详情响应（附带最近一次快照信息）。
 type QuickEditFileResponse struct {
 	ID               int
 	Name             string
@@ -14,7 +13,6 @@ type QuickEditFileResponse struct {
 	LastSnapshotTime time.Time
 }
 
-// QuickEditSnapshotResponse 快照列表项。
 type QuickEditSnapshotResponse struct {
 	ID        int
 	FileID    int
@@ -22,15 +20,12 @@ type QuickEditSnapshotResponse struct {
 	CreatedAt time.Time
 }
 
-// ContentView 文件内容视图。
 type ContentView struct {
 	Content   string `json:"content"`
 	FilePath  string `json:"filePath"`
 	SizeBytes int    `json:"sizeBytes"`
 }
 
-// SaveResult 保存 / 回滚的结果：新快照 + 富化后的文件信息 + 非致命告警。
-// FromSnapshotID 仅回滚场景使用（来源快照）。
 type SaveResult struct {
 	Message        string
 	Data           *QuickEditFileResponse
@@ -40,7 +35,6 @@ type SaveResult struct {
 	Warnings       []string
 }
 
-// buildFileResponse 富化文件响应：补上最近一次快照信息。
 func buildFileResponse(file QuickEditFile) QuickEditFileResponse {
 	resp := QuickEditFileResponse{
 		ID:        file.ID,
@@ -57,7 +51,6 @@ func buildFileResponse(file QuickEditFile) QuickEditFileResponse {
 	return resp
 }
 
-// toSnapshotResponses 把快照列表转换为列表项视图。
 func toSnapshotResponses(snaps []QuickEditSnapshot) []QuickEditSnapshotResponse {
 	items := make([]QuickEditSnapshotResponse, 0, len(snaps))
 	for _, s := range snaps {

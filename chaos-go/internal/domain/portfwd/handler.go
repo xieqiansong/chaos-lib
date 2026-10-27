@@ -11,7 +11,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// ruleErrRules 转发启停的领域错误 → HTTP 状态码映射表（未命中回落 500）。
 var ruleErrRules = []httpx.ErrRule{
 	{Err: ErrRuleNotFound, Status: http.StatusNotFound, Msg: "端口转发不存在"},
 	{Err: ErrAlreadyRunning, Status: http.StatusBadRequest},
@@ -20,12 +19,10 @@ var ruleErrRules = []httpx.ErrRule{
 	{Err: ErrInvalidRule, Status: http.StatusBadRequest},
 }
 
-// connErrRules SSH 连接测试的领域错误映射表（未命中回落 400：连不上多为参数 / 凭据问题）。
 var connErrRules = []httpx.ErrRule{
 	{Err: ErrConnNotFound, Status: http.StatusNotFound, Msg: "SSH 连接不存在"},
 }
 
-// sshOpts / pfOpts / pfToggle 两个资源的 CRUD 与启停选项，存量 /api 与 v1 动作路由共用。
 var sshOpts = crud.Opts[SshConnection]{
 	Searchable:   []string{"name", "host", "username", "remark"},
 	Sortable:     []string{"id", "name", "host", "username"},
@@ -48,18 +45,12 @@ var pfToggle = &crud.ToggleOpts{
 	ErrRules: ruleErrRules,
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 两个资源的标准 CRUD + port-forwards 的 status 由通用 crud 生成；
-// ssh-conns 的 test 自定义动作一并迁为 POST 动作。
 func RegisterV1(rg *web.RouterGroup) {
 	ssh := crud.RegisterActions[SshConnection](rg, "ssh-conns", sshOpts, nil)
 	ssh.POST("/test", testSshV1)
 	crud.RegisterActions[PortForwarding](rg, "port-forwards", pfOpts, pfToggle)
 }
 
-// ── 自定义路由 ──────────────────────────────────────────────────
-
-// testSshConnection 测试 SSH 连接可达性与凭据有效性（POST /ssh-conns/:id/test）。
 func testSshConnection(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -68,7 +59,6 @@ func testSshConnection(c *web.Context) {
 	doTestSsh(c, id)
 }
 
-// testSshV1 是 testSshConnection 的「POST + Action」版（POST /api/v1/ssh-conns/test，body {id}）。
 func testSshV1(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`

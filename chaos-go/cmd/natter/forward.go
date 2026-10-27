@@ -16,13 +16,11 @@ const (
 	fwdMaxConcurrent = 128
 )
 
-// Forwarder 端口转发统一接口。
 type Forwarder interface {
 	StartForward(ip string, port int, toIP string, toPort int, udp bool) error
 	StopForward()
 }
 
-// noopForwarder 标记非真实转发（none / test）。
 type noopForwarder interface{ isNoop() }
 
 func isNoopForwarder(f Forwarder) bool {
@@ -38,7 +36,6 @@ func checkForwardTarget(ip string, port int, toIP string, toPort int) error {
 	return nil
 }
 
-// ForwardNone 空实现。
 type ForwardNone struct{}
 
 func (*ForwardNone) isNoop() {}
@@ -47,7 +44,6 @@ func (*ForwardNone) StartForward(string, int, string, int, bool) error {
 }
 func (*ForwardNone) StopForward() {}
 
-// ForwardTestServer 启动测试应答服务。
 type ForwardTestServer struct {
 	mu     sync.Mutex
 	closer io.Closer
@@ -55,7 +51,6 @@ type ForwardTestServer struct {
 
 func (*ForwardTestServer) isNoop() {}
 
-// StartForward 启动测试服务（TCP HTML / UDP 回显）。
 func (f *ForwardTestServer) StartForward(ip string, port int, _ string, _ int, udp bool) error {
 	lc := newListenConfig(sockOpts{reuse: true})
 	bind := listenAddr("", port)
@@ -139,7 +134,6 @@ func (f *ForwardTestServer) StopForward() {
 	}
 }
 
-// ForwardSocket 纯 Go TCP/UDP 转发。
 type ForwardSocket struct {
 	mu       sync.Mutex
 	closer   io.Closer
@@ -314,7 +308,6 @@ func (f *ForwardSocket) StopForward() {
 	}
 }
 
-// relay 双向搬运两条连接。
 func relay(a, b net.Conn) {
 	var wg sync.WaitGroup
 	wg.Add(2)

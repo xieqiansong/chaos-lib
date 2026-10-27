@@ -11,7 +11,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// linkErrRules 启停相关领域错误 → HTTP 状态码映射表（未命中回落 500）。
 var linkErrRules = []httpx.ErrRule{
 	{Err: ErrLinkNotFound, Status: http.StatusNotFound, Msg: "文件连接不存在"},
 	{Err: ErrAlreadyEnabled, Status: http.StatusBadRequest},
@@ -20,11 +19,10 @@ var linkErrRules = []httpx.ErrRule{
 	{Err: ErrTargetExists, Status: http.StatusBadRequest},
 }
 
-// fileLinkOpts / fileLinkToggle 标准 CRUD 与启停选项，存量 /api 与 v1 动作路由共用。
 var fileLinkOpts = crud.Opts[FileLink]{
 	Searchable: []string{"source_path", "target_path", "remark"},
 	Sortable:   []string{"id", "sort"},
-	// Status 只能走 /status（带建删联接点副作用），禁止通用 PATCH 改写
+
 	Protected:    []string{"status"},
 	BeforeCreate: ValidateForCreate,
 }
@@ -33,16 +31,11 @@ var fileLinkToggle = &crud.ToggleOpts{
 	ErrRules: linkErrRules,
 }
 
-// RegisterV1 把本资源以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// CRUD + status（启停）由通用 crud 生成，动作名：list/get/create/update/delete/batchCreate/batchDelete/status。
-// statusOf 为读方向自定义动作：列表加载后前端逐行并发调用，按文件系统实时计算单条 LinkStatus。
 func RegisterV1(rg *web.RouterGroup) {
 	fl := crud.RegisterActions[FileLink](rg, "file-links", fileLinkOpts, fileLinkToggle)
 	fl.POST("/statusOf", statusOfV1)
 }
 
-// statusOfV1 逐行状态刷新接口（POST /api/v1/file-links/statusOf，body {id}）。
-// 对应前端「列表加载完成后单独刷新每一行状态」的需求；返回 { LinkStatus }。
 func statusOfV1(c *web.Context) {
 	var req struct {
 		ID int `json:"id"`

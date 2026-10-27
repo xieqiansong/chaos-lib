@@ -1,11 +1,3 @@
-// Package scheduler 是「内置任务」的调度运行时：任务由插件在代码里声明
-// （plugin.Registration.Tasks），由本包按 cron 表达式统一运行，并提供最近一次的执行状态。
-//
-// 与 internal/domain/cronjob 的分工：
-//   - 内置任务（scheduler）：随代码发布、无需数据库、不落 cron_jobs 表，由插件自身拥有；
-//   - 用户任务（cronjob）：用户在界面上创建，落 cron_jobs 表，支持 HTTP / Shell 动作。
-//
-// 内置任务必须幂等且可重入安全：默认同一任务上次未结束时跳过本轮（SkipIfBusy）。
 package scheduler
 
 import (
@@ -19,35 +11,29 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// TaskSpec 是一个内置任务的静态声明。
-// 除 Name / Cron / Run 外的字段都有默认值：Timeout 默认 30s，SkipIfBusy 默认 true。
 type TaskSpec struct {
-	Name string // 展示名，同时作为状态与日志标识（需唯一）
-	// Cron 支持 5 字段（分 时 日 月 周）与 6 字段（秒 分 时 日 月 周），与 cronjob 一致。
+	Name string
+
 	Cron       string
-	Timeout    time.Duration                   // 单次执行超时；<=0 时取 30s
-	RunOnStart bool                            // 启动后立即执行一次（默认等第一次 cron 触发）
-	SkipIfBusy bool                            // 上一次未结束时跳过本轮；false 表示排队等待
-	Run        func(ctx context.Context) error // 任务体；返回 error 会记录到状态
+	Timeout    time.Duration
+	RunOnStart bool
+	SkipIfBusy bool
+	Run        func(ctx context.Context) error
 }
 
-// TaskStatus 是内置任务的运行时状态快照，供只读接口展示。
 type TaskStatus struct {
 	Name           string     `json:"Name"`
 	Cron           string     `json:"Cron"`
 	Running        bool       `json:"Running"`
 	LastRunAt      *time.Time `json:"LastRunAt"`
 	LastDurationMs int64      `json:"LastDurationMs"`
-	LastStatus     string     `json:"LastStatus"` // ok / failed / ""
+	LastStatus     string     `json:"LastStatus"`
 	LastError      string     `json:"LastError"`
 	NextRun        *time.Time `json:"NextRun"`
 }
 
-// parser 与 cronjob 保持一致：支持可选的秒字段。
 var parser = cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 
-// task 是运行期任务：runMu 保证同一任务串行执行，statusMu 只保护状态快照，
-// 两者分离可使状态查询不被长任务阻塞。
 type task struct {
 	spec     TaskSpec
 	entryID  cron.EntryID
@@ -62,8 +48,6 @@ var (
 	tasks        []*task
 )
 
-// StartBuiltin 注册并启动全部内置任务。重复调用无副作用（已启动则直接返回）。
-// 单条任务声明非法（缺名 / cron 非法）只跳过该任务，不影响其它任务。
 func StartBuiltin(specs []TaskSpec) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -102,7 +86,6 @@ func StartBuiltin(specs []TaskSpec) {
 	}
 }
 
-// BuiltinStatuses 返回全部内置任务的状态快照（按声明顺序）。
 func BuiltinStatuses() []TaskStatus {
 	mu.RLock()
 	c, list := cronInstance, tasks
@@ -129,7 +112,6 @@ func BuiltinStatuses() []TaskStatus {
 	return out
 }
 
-// run 执行一次任务：默认在上一轮未结束时跳过，失败/panic/超时只记录状态，不上抛。
 func (t *task) run() {
 	if !t.runMu.TryLock() {
 		if t.spec.SkipIfBusy {
@@ -177,7 +159,6 @@ func (t *task) setRunning(v bool) {
 	t.statusMu.Unlock()
 }
 
-// safeRun 把任务 panic 转成 error，避免调度器 goroutine 退出。
 func safeRun(ctx context.Context, fn func(context.Context) error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

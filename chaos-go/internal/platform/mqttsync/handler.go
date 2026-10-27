@@ -11,7 +11,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// mqttSyncOpts 标准 CRUD 选项，存量 /api 与 v1 动作路由共用。
 var mqttSyncOpts = crud.Opts[MqttSyncMessage]{
 	Searchable:   []string{"channel", "node_id", "payload"},
 	Sortable:     []string{"id", "created_at"},
@@ -20,22 +19,16 @@ var mqttSyncOpts = crud.Opts[MqttSyncMessage]{
 	AfterCreate:  BroadcastMessage,
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// CRUD 走通用 crud（list/get/create/update/delete/batchCreate/batchDelete）；
-// 自定义动作：status（状态查询）、deleteChannel（按主题删除）亦迁移为 POST 动作。
 func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[MqttSyncMessage](rg, "mqtt-syncs", mqttSyncOpts, nil)
 	g.POST("/status", status)
 	g.POST("/deleteChannel", deleteChannelV1)
 }
 
-// status 处理状态查询（GET /api/mqtt-syncs/status 与 POST /api/v1/mqtt-syncs/status 共用）。
 func status(c *web.Context) {
 	renv.Success(c, Status())
 }
 
-// deleteChannel 处理 DELETE /api/mqtt-syncs/channel?name=xxx：
-// 将该主题下的全部消息软删除（IsDeleted = true），仍保留在库中以便审计。
 func deleteChannel(c *web.Context) {
 	name := c.Query("name")
 	if name == "" {
@@ -51,7 +44,6 @@ func deleteChannel(c *web.Context) {
 	renv.Success(c, map[string]any{"channel": name, "deleted": deleted})
 }
 
-// deleteChannelV1 是 deleteChannel 的「POST + Action」版（POST /api/v1/mqtt-syncs/deleteChannel，body {name}）。
 func deleteChannelV1(c *web.Context) {
 	var req struct {
 		Name string `json:"name"`

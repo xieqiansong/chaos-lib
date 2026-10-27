@@ -9,12 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// ErrDBUnavailable 表示数据库单例不可用。
 var ErrDBUnavailable = errors.New("taskplan: database unavailable")
 
-// ── 计划树 / 子孙归集 ──
-
-// CollectDescendantPlanIDs 收集 rootID 及其所有子孙 ID（含自身）。
 func CollectDescendantPlanIDs(rootID int) ([]int, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -38,9 +34,6 @@ func CollectDescendantPlanIDs(rootID int) ([]int, error) {
 	return ids, walk(rootID)
 }
 
-// ── 计划查询 ──
-
-// FindActiveTaskPlan 按 ID 加载未删除的计划；不存在返回 ErrPlanNotFound。
 func FindActiveTaskPlan(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -56,7 +49,6 @@ func FindActiveTaskPlan(id int) (*TaskPlan, error) {
 	return &plan, nil
 }
 
-// GetTaskPlanByID 按 ID 加载计划（忽略逻辑删除，用于更新后回读）；不存在返回 ErrPlanNotFound。
 func GetTaskPlanByID(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -72,7 +64,6 @@ func GetTaskPlanByID(id int) (*TaskPlan, error) {
 	return &plan, nil
 }
 
-// CreateTaskPlanRow 新增计划。
 func CreateTaskPlanRow(plan *TaskPlan) error {
 	db := config.GetDB()
 	if db == nil {
@@ -81,7 +72,6 @@ func CreateTaskPlanRow(plan *TaskPlan) error {
 	return db.Create(plan).Error
 }
 
-// UpdateTaskPlanColumns 按字段映射更新计划（限定未删除）。
 func UpdateTaskPlanColumns(id int, updates map[string]interface{}) error {
 	db := config.GetDB()
 	if db == nil {
@@ -90,7 +80,6 @@ func UpdateTaskPlanColumns(id int, updates map[string]interface{}) error {
 	return db.Model(&TaskPlan{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// SaveTaskPlan 全量保存计划（用于状态机迁移后回写）。
 func SaveTaskPlan(plan *TaskPlan) error {
 	db := config.GetDB()
 	if db == nil {
@@ -99,7 +88,6 @@ func SaveTaskPlan(plan *TaskPlan) error {
 	return db.Save(plan).Error
 }
 
-// CountChildPlans 统计某计划的直属子计划数（未删除）。
 func CountChildPlans(id int) (int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -112,7 +100,6 @@ func CountChildPlans(id int) (int64, error) {
 	return c, nil
 }
 
-// CountActiveTasks 统计某计划的进行中任务数。
 func CountActiveTasks(planID int) (int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -125,7 +112,6 @@ func CountActiveTasks(planID int) (int64, error) {
 	return c, nil
 }
 
-// UpdatePlanColumnsByIDs 批量按字段映射更新计划（用于挂起/恢复/优先级）。
 func UpdatePlanColumnsByIDs(ids []int, updates map[string]interface{}) error {
 	db := config.GetDB()
 	if db == nil {
@@ -134,7 +120,6 @@ func UpdatePlanColumnsByIDs(ids []int, updates map[string]interface{}) error {
 	return db.Model(&TaskPlan{}).Where("id IN ?", ids).Updates(updates).Error
 }
 
-// ListPlans 列出计划（按 planType/status 可选过滤，均为未删除）。
 func ListPlans(planType, status string) ([]TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -154,7 +139,6 @@ func ListPlans(planType, status string) ([]TaskPlan, error) {
 	return plans, nil
 }
 
-// ListPlanTreeRows 列出构建树所需的计划投影列（未删除）。
 func ListPlanTreeRows() ([]TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -168,9 +152,6 @@ func ListPlanTreeRows() ([]TaskPlan, error) {
 	return plans, nil
 }
 
-// ── 任务查询 ──
-
-// FindActiveTask 按 ID 加载未删除的任务；不存在返回 ErrTaskNotFound。
 func FindActiveTask(id int) (*Task, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -186,7 +167,6 @@ func FindActiveTask(id int) (*Task, error) {
 	return &task, nil
 }
 
-// FindActiveTaskForPlan 返回某计划进行中的任务（不存在时 ok=false）。
 func FindActiveTaskForPlan(planID int) (*Task, bool) {
 	db := config.GetDB()
 	if db == nil {
@@ -199,7 +179,6 @@ func FindActiveTaskForPlan(planID int) (*Task, bool) {
 	return &task, true
 }
 
-// FindTaskAt 返回某计划在特定 started_at 的任务（不存在时 ok=false）。
 func FindTaskAt(planID int, t time.Time) (*Task, bool) {
 	db := config.GetDB()
 	if db == nil {
@@ -212,7 +191,6 @@ func FindTaskAt(planID int, t time.Time) (*Task, bool) {
 	return &task, true
 }
 
-// SaveTask 全量保存任务。
 func SaveTask(task *Task) error {
 	db := config.GetDB()
 	if db == nil {
@@ -221,7 +199,6 @@ func SaveTask(task *Task) error {
 	return db.Save(task).Error
 }
 
-// UpdateTaskColumns 按字段映射更新任务。
 func UpdateTaskColumns(id int, updates map[string]interface{}) error {
 	db := config.GetDB()
 	if db == nil {
@@ -230,7 +207,6 @@ func UpdateTaskColumns(id int, updates map[string]interface{}) error {
 	return db.Model(&Task{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// CreateTask 新增任务。
 func CreateTask(task *Task) error {
 	db := config.GetDB()
 	if db == nil {
@@ -239,7 +215,6 @@ func CreateTask(task *Task) error {
 	return db.Create(task).Error
 }
 
-// ListTasksByPlan 列出某计划的全部任务（未删除）。
 func ListTasksByPlan(planID int) ([]Task, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -252,9 +227,6 @@ func ListTasksByPlan(planID int) ([]Task, error) {
 	return tasks, nil
 }
 
-// ── 事务类操作 ──
-
-// CompleteActiveTasksForPlan 在事务内将某计划进行中的任务标记完成，并将计划置为 completed。
 func CompleteActiveTasksForPlan(planID int, now time.Time) error {
 	db := config.GetDB()
 	if db == nil {
@@ -274,8 +246,6 @@ func CompleteActiveTasksForPlan(planID int, now time.Time) error {
 	return tx.Commit().Error
 }
 
-// SoftDeletePlanAndTasks 软删除计划（及其任务）。cascade 为真时连同全部子孙计划一并删除。
-// 返回 cascade 模式下被删除的计划数量。
 func SoftDeletePlanAndTasks(planID int, cascade bool) (int, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -289,7 +259,7 @@ func SoftDeletePlanAndTasks(planID int, cascade bool) (int, error) {
 		}
 		tx := db.Begin()
 		if len(ids) > 0 {
-			// Delete 在 soft_delete 插件下即软删（UPDATE ... SET is_deleted = 1）
+
 			if err := tx.Where("plan_id IN ?", ids).Delete(&Task{}).Error; err != nil {
 				tx.Rollback()
 				return 0, err
@@ -318,9 +288,6 @@ func SoftDeletePlanAndTasks(planID int, cascade bool) (int, error) {
 	return 0, tx.Commit().Error
 }
 
-// ── 调度扫描（被 SweepScheduledTaskPlans 调用）──
-
-// ListScheduledPlans 列出指定类型、状态、未挂起且未删除的计划。
 func ListScheduledPlans(planType TaskPlanType, status TaskPlanStatus) ([]TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -334,7 +301,6 @@ func ListScheduledPlans(planType TaskPlanType, status TaskPlanStatus) ([]TaskPla
 	return plans, nil
 }
 
-// CountActiveUpcomingTasks 统计某计划未来的进行中任务数（started_at > now）。
 func CountActiveUpcomingTasks(planID int, now time.Time) (int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -349,7 +315,6 @@ func CountActiveUpcomingTasks(planID int, now time.Time) (int64, error) {
 	return c, nil
 }
 
-// FindLatestTaskByPlan 返回某计划最近一次（按 started_at 倒序）任务。
 func FindLatestTaskByPlan(planID int) (*Task, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -362,10 +327,6 @@ func FindLatestTaskByPlan(planID int) (*Task, error) {
 	return &last, nil
 }
 
-// ── 待办列表（联表查询）──
-
-// QueryPendingTasks 返回进行中任务及其计划信息的分页列表。
-// early=true 时不过滤未来任务；planID/name 为可选过滤；sort/order 为白名单排序覆盖。
 func QueryPendingTasks(now time.Time, early bool, planID int, name, sort, order string, q pagination.Query) ([]PendingTask, int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -374,7 +335,6 @@ func QueryPendingTasks(now time.Time, early bool, planID int, name, sort, order 
 	base := db.Table("tasks").
 		Joins("JOIN task_plans ON task_plans.id = tasks.plan_id").
 		Where("tasks.status = ?", TaskStatusActive).
-		// 联表走 Table（无模型 schema），soft_delete 插件不生效，两张表的软删条件仍须显式书写
 		Where("tasks.is_deleted = ?", 0).
 		Where("task_plans.is_deleted = ?", 0).
 		Where("task_plans.is_suspended = ?", false)
@@ -450,9 +410,6 @@ func QueryPendingTasks(now time.Time, early bool, planID int, name, sort, order 
 	return result, total, nil
 }
 
-// ── 统计查询 ──
-
-// DailyCompletionRows 返回 [cutoff, now] 区间内已完成任务的 completed_at 时间。
 func DailyCompletionRows(cutoff time.Time) ([]time.Time, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -478,7 +435,6 @@ func DailyCompletionRows(cutoff time.Time) ([]time.Time, error) {
 	return out, nil
 }
 
-// ActiveStartRows 返回 [start, end+1天) 区间内进行中任务的 started_at 时间。
 func ActiveStartRows(start, end time.Time) ([]time.Time, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -504,13 +460,11 @@ func ActiveStartRows(start, end time.Time) ([]time.Time, error) {
 	return out, nil
 }
 
-// ContributionRow 贡献热力图的单条聚合行。
 type ContributionRow struct {
 	PlanID    int
 	StartedAt time.Time
 }
 
-// ContributionRows 返回指定计划集合内、started_at >= start 的已完成任务的 (plan_id, started_at)。
 func ContributionRows(planIDs []int, start time.Time) ([]ContributionRow, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -528,7 +482,6 @@ func ContributionRows(planIDs []int, start time.Time) ([]ContributionRow, error)
 	return rows, nil
 }
 
-// FindActiveUnsuspendedPlanByID 按 ID 加载未删除且未挂起的计划；不存在返回 ErrPlanNotFound。
 func FindActiveUnsuspendedPlanByID(id int) (*TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -544,7 +497,6 @@ func FindActiveUnsuspendedPlanByID(id int) (*TaskPlan, error) {
 	return &plan, nil
 }
 
-// FindActiveUnsuspendedPlansByName 按名称加载未删除且未挂起的计划（可多个）。
 func FindActiveUnsuspendedPlansByName(name string) ([]TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -557,7 +509,6 @@ func FindActiveUnsuspendedPlansByName(name string) ([]TaskPlan, error) {
 	return plans, nil
 }
 
-// ListChildren 列出某计划的直属子计划（未删除且未挂起）。
 func ListChildren(planID int) ([]TaskPlan, error) {
 	db := config.GetDB()
 	if db == nil {

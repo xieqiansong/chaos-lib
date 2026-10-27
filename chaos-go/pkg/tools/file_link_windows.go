@@ -11,9 +11,6 @@ import (
 	"strings"
 )
 
-// GetLinkInfo 读取路径的链接信息（Windows 下通过 PowerShell Get-Item）。
-// 路径不存在 / 无权限时返回 error；普通文件或目录正常返回（IsLink=false）。
-// 路径通过环境变量 CHAOS_LINK_PATH 传入，避免路径中含空格 / 中文 / 引号时的转义问题。
 func GetLinkInfo(path string) (*LinkInfo, error) {
 	const script = `
 $item = Get-Item -LiteralPath $env:CHAOS_LINK_PATH -Force
@@ -42,15 +39,12 @@ $item = Get-Item -LiteralPath $env:CHAOS_LINK_PATH -Force
 	return &info, nil
 }
 
-// CreateJunction 通过 PowerShell `New-Item -ItemType Junction` 创建目录联接点（Junction）。
-// linkPath 本身不能已存在（已存在则报错）；其多级父目录不存在时会自动创建。
-// targetPath 为目标文件夹。路径均通过环境变量传入，规避空格 / 中文 / 引号转义。
 func CreateJunction(linkPath, targetPath string) error {
-	// 已存在则报错，避免静默覆盖已有路径
+
 	if _, err := os.Lstat(linkPath); err == nil {
 		return fmt.Errorf("链接路径已存在: %s", linkPath)
 	}
-	// 确保父目录存在：New-Item 不会自动创建多级父目录
+
 	if parent := filepath.Dir(linkPath); parent != "" {
 		if err := os.MkdirAll(parent, 0o755); err != nil {
 			return fmt.Errorf("创建父目录失败: %v", err)

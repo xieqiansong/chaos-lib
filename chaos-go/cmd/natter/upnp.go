@@ -10,20 +10,17 @@ import (
 	"time"
 )
 
-// UPnP 相关超时。
 const (
 	upnpSockTimeout = 3 * time.Second
 	upnpSSDPTimeout = 1 * time.Second
 )
 
-// 支持端口映射的 UPnP 服务类型。
 var upnpForwardTypes = map[string]bool{
 	"urn:schemas-upnp-org:service:WANIPConnection:1":  true,
 	"urn:schemas-upnp-org:service:WANIPConnection:2":  true,
 	"urn:schemas-upnp-org:service:WANPPPConnection:1": true,
 }
 
-// 设备描述 XML 的解析规则。
 var (
 	serviceRe     = regexp.MustCompile(`(?s)<service\s*>(.*?)</service\s*>`)
 	serviceTypeRe = regexp.MustCompile(`<serviceType\s*>([^<]*?)</serviceType\s*>`)
@@ -32,14 +29,12 @@ var (
 	controlURLRe  = regexp.MustCompile(`<controlURL\s*>([^<]*?)</controlURL\s*>`)
 	eventSubURLRe = regexp.MustCompile(`<eventSubURL\s*>([^<]*?)</eventSubURL\s*>`)
 
-	// locationRe 从 SSDP 响应里提取 LOCATION 头。
 	locationRe = regexp.MustCompile(`LOCATION: *(http://[^\[]\S+)\s+`)
-	// soapErrRe 从 SOAP 响应里提取错误码与错误描述。
+
 	errCodeRe = regexp.MustCompile(`<errorCode\s*>([^<]*?)</errorCode\s*>`)
 	errDescRe = regexp.MustCompile(`<errorDescription\s*>([^<]*?)</errorDescription\s*>`)
 )
 
-// UPnPService 是设备上的一个 UPnP 服务。
 type UPnPService struct {
 	device      *UPnPDevice
 	ServiceType string
@@ -53,17 +48,14 @@ type UPnPService struct {
 	timeout   time.Duration
 }
 
-// isValid 判断服务描述是否完整。
 func (s *UPnPService) isValid() bool {
 	return s.ServiceType != "" && s.ServiceID != "" && s.ControlURL != ""
 }
 
-// isForward 判断服务是否支持端口映射。
 func (s *UPnPService) isForward() bool {
 	return upnpForwardTypes[s.ServiceType] && s.ServiceID != "" && s.ControlURL != ""
 }
 
-// ForwardPort 调用 AddPortMapping 建立端口映射；返回 false 表示服务端返回了错误。
 func (s *UPnPService) ForwardPort(ctx context.Context, host string, port int, destHost string, destPort int, udp bool, duration int) (bool, error) {
 	if !s.isForward() {
 		return false, fmt.Errorf("unsupported service type: %s", s.ServiceType)
@@ -128,7 +120,6 @@ func (s *UPnPService) ForwardPort(ctx context.Context, host string, port int, de
 	return true, nil
 }
 
-// UPnPDevice 是一个 UPnP 设备（通常是路由器）。
 type UPnPDevice struct {
 	ipaddr     string
 	xmlURLs    []string
@@ -140,7 +131,6 @@ type UPnPDevice struct {
 	timeout   time.Duration
 }
 
-// loadServices 拉取所有描述 XML 并解析出服务列表。
 func (d *UPnPDevice) loadServices(ctx context.Context) {
 	if len(d.services) > 0 {
 		return
@@ -160,7 +150,6 @@ func (d *UPnPDevice) loadServices(ctx context.Context) {
 	}
 }
 
-// httpGet 取回 URL 的响应体。
 func (d *UPnPDevice) httpGet(ctx context.Context, u string) ([]byte, error) {
 	host, port, path, err := splitURL(u)
 	if err != nil {
@@ -188,7 +177,6 @@ func (d *UPnPDevice) httpGet(ctx context.Context, u string) ([]byte, error) {
 	return body, nil
 }
 
-// getSrvDict 解析一个描述 XML，返回 serviceId -> 服务。
 func (d *UPnPDevice) getSrvDict(ctx context.Context, u string) map[string]*UPnPService {
 	out := map[string]*UPnPService{}
 	raw, err := d.httpGet(ctx, u)
@@ -227,7 +215,6 @@ func (d *UPnPDevice) getSrvDict(ctx context.Context, u string) map[string]*UPnPS
 	return out
 }
 
-// UPnPClient 负责发现路由器并维护端口映射。
 type UPnPClient struct {
 	ssdpAddr    addr
 	router      *UPnPDevice
@@ -246,7 +233,6 @@ type UPnPClient struct {
 	}
 }
 
-// NewUPnPClient 创建 UPnP 客户端。
 func NewUPnPClient(bindIP, bindIface string) *UPnPClient {
 	return &UPnPClient{
 		ssdpAddr:    addr{"239.255.255.250", 1900},
@@ -256,7 +242,6 @@ func NewUPnPClient(bindIP, bindIface string) *UPnPClient {
 	}
 }
 
-// DiscoverRouter 发送 SSDP M-SEARCH 并挑选出可用的路由器。
 func (c *UPnPClient) DiscoverRouter(ctx context.Context) (*UPnPDevice, error) {
 	devs, err := c.discover(ctx)
 	if err != nil {
@@ -280,7 +265,6 @@ func (c *UPnPClient) DiscoverRouter(ctx context.Context) (*UPnPDevice, error) {
 	return c.router, nil
 }
 
-// discover 组播两个 M-SEARCH 请求并收集响应里的 LOCATION。
 func (c *UPnPClient) discover(ctx context.Context) ([]*UPnPDevice, error) {
 	bind := listenAddr(c.bindIP, 0)
 	lc := newListenConfig(sockOpts{reuse: true, bindIP: c.bindIP, iface: c.bindIface, udp: true})
@@ -349,7 +333,6 @@ func (c *UPnPClient) discover(ctx context.Context) ([]*UPnPDevice, error) {
 	return devs, nil
 }
 
-// Forward 建立端口映射并记住参数以便续约。
 func (c *UPnPClient) Forward(ctx context.Context, host string, port int, destHost string, destPort int, udp bool, duration int) (bool, error) {
 	if c.router == nil || c.router.forwardSrv == nil {
 		return false, fmt.Errorf("no router is available")
@@ -365,7 +348,6 @@ func (c *UPnPClient) Forward(ctx context.Context, host string, port int, destHos
 	return ok, nil
 }
 
-// Renew 用上次的参数续约端口映射。
 func (c *UPnPClient) Renew(ctx context.Context) (bool, error) {
 	if !c.fwd.started {
 		return false, fmt.Errorf("UPnP forward not started")

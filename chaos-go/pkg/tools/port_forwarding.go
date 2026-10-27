@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// PortForwarder 端口转发管理器
 type PortForwarder struct {
 	forwards map[int]*ForwardTask
 	mu       sync.RWMutex
@@ -18,7 +17,6 @@ type PortForwarder struct {
 	cancel   context.CancelFunc
 }
 
-// ForwardTask 单个转发任务
 type ForwardTask struct {
 	localPort     int
 	remoteAddr    string
@@ -31,7 +29,6 @@ type ForwardTask struct {
 	connections   map[net.Conn]struct{}
 }
 
-// NewPortForwarder 创建新的端口转发管理器
 func NewPortForwarder() *PortForwarder {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &PortForwarder{
@@ -41,18 +38,15 @@ func NewPortForwarder() *PortForwarder {
 	}
 }
 
-// AddForward 添加端口转发（带自动重试）
 func (pf *PortForwarder) AddForward(localPort int, remoteAddr string) error {
 	pf.mu.Lock()
 	defer pf.mu.Unlock()
 
-	// 检查是否已存在
 	if _, exists := pf.forwards[localPort]; exists {
 		slog.Info("端口已存在转发，跳过", "localPort", localPort)
 		return nil
 	}
 
-	// 创建监听
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", localPort))
 	if err != nil {
 		return fmt.Errorf("监听端口 %d 失败: %v", localPort, err)
@@ -72,17 +66,14 @@ func (pf *PortForwarder) AddForward(localPort int, remoteAddr string) error {
 
 	pf.forwards[localPort] = task
 
-	// 启动重试监控器
 	go pf.startRetryMonitor(task, taskCtx)
 
-	// 启动转发服务
 	go pf.startForwarding(task, taskCtx)
 
 	slog.Info("已添加端口转发", "localPort", localPort, "remoteAddr", remoteAddr, "autoRetry", true)
 	return nil
 }
 
-// RemoveForward 删除端口转发（直接断开所有连接）
 func (pf *PortForwarder) RemoveForward(localPort int) error {
 	pf.mu.Lock()
 
@@ -92,15 +83,12 @@ func (pf *PortForwarder) RemoveForward(localPort int) error {
 		return nil
 	}
 
-	// 停止重试
 	close(task.stopRetry)
 	task.retryTicker.Stop()
 
-	// 停止任务
 	task.cancel()
 	task.listener.Close()
 
-	// 立即断开所有现有连接
 	task.activeConnsMu.Lock()
 	for conn := range task.connections {
 		conn.Close()
@@ -114,11 +102,9 @@ func (pf *PortForwarder) RemoveForward(localPort int) error {
 	return nil
 }
 
-// startRetryMonitor 启动重试监控器
 func (pf *PortForwarder) startRetryMonitor(task *ForwardTask, ctx context.Context) {
 	defer task.retryTicker.Stop()
 
-	// 初始立即尝试连接
 	pf.tryConnectRemote(task, ctx)
 
 	for {
@@ -133,7 +119,6 @@ func (pf *PortForwarder) startRetryMonitor(task *ForwardTask, ctx context.Contex
 	}
 }
 
-// tryConnectRemote 尝试连接远程服务
 func (pf *PortForwarder) tryConnectRemote(task *ForwardTask, ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -151,7 +136,6 @@ func (pf *PortForwarder) tryConnectRemote(task *ForwardTask, ctx context.Context
 	slog.Info("远程服务可达", "remoteAddr", task.remoteAddr)
 }
 
-// startForwarding 开始转发流量
 func (pf *PortForwarder) startForwarding(task *ForwardTask, ctx context.Context) {
 	defer task.listener.Close()
 
@@ -178,7 +162,6 @@ func (pf *PortForwarder) startForwarding(task *ForwardTask, ctx context.Context)
 	}
 }
 
-// handleConnectionWithRetry 带重试的连接处理
 func (pf *PortForwarder) handleConnectionWithRetry(localConn net.Conn, task *ForwardTask, wg *sync.WaitGroup) {
 	defer localConn.Close()
 	defer wg.Done()
@@ -202,10 +185,8 @@ func (pf *PortForwarder) handleConnectionWithRetry(localConn net.Conn, task *For
 
 	slog.Info("开始转发", "localAddr", localConn.RemoteAddr(), "remoteAddr", task.remoteAddr)
 
-	// 双向转发
 	done := make(chan struct{}, 2)
 
-	// 本地 -> 远程
 	go func() {
 		_, err := io.Copy(remoteConn, localConn)
 		if err != nil && err != io.EOF {
@@ -226,7 +207,6 @@ func (pf *PortForwarder) handleConnectionWithRetry(localConn net.Conn, task *For
 	slog.Info("连接关闭", "localAddr", localConn.RemoteAddr())
 }
 
-// connectWithRetry 带重试的远程连接
 func (pf *PortForwarder) connectWithRetry(remoteAddr string, retryInterval time.Duration) (net.Conn, error) {
 	var lastErr error
 
@@ -254,7 +234,6 @@ func (pf *PortForwarder) connectWithRetry(remoteAddr string, retryInterval time.
 	}
 }
 
-// ListForwards 列出所有转发
 func (pf *PortForwarder) ListForwards() {
 	pf.mu.RLock()
 	defer pf.mu.RUnlock()
@@ -269,7 +248,6 @@ func (pf *PortForwarder) ListForwards() {
 	}
 }
 
-// StopAll 停止所有转发
 func (pf *PortForwarder) StopAll() {
 	pf.cancel()
 	pf.mu.Lock()
@@ -286,7 +264,6 @@ func (pf *PortForwarder) StopAll() {
 
 var GlobalPortForwarder = NewPortForwarder()
 
-// ListForwardsInfo 返回所有转发的信息列表
 func (pf *PortForwarder) ListForwardsInfo() []struct {
 	LocalPort  int    ``
 	RemoteAddr string ``

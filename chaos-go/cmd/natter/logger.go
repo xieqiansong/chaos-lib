@@ -31,7 +31,6 @@ func levelRep(l slog.Level) string {
 	}
 }
 
-// natterHandler 自定义 slog.Handler，格式沿用 Python 版。
 type natterHandler struct {
 	mu    *sync.Mutex
 	w     io.Writer
@@ -76,7 +75,6 @@ func (h *natterHandler) Handle(_ context.Context, r slog.Record) error {
 func (h *natterHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
 func (h *natterHandler) WithGroup(string) slog.Handler      { return h }
 
-// colorEnabled 沿用 Python 版的判断：stderr 是终端且 TERM 含 256color。
 func colorEnabled() bool {
 	if !strings.Contains(os.Getenv("TERM"), "256color") {
 		return false
@@ -88,7 +86,6 @@ func colorEnabled() bool {
 	return fi.Mode()&os.ModeCharDevice != 0
 }
 
-// setupLogger 安装 natter 风格日志；verbose 时降到 debug 级别。
 func setupLogger(verbose bool) {
 	level := slog.LevelInfo
 	if verbose {
@@ -102,7 +99,6 @@ func setupLogger(verbose bool) {
 	}))
 }
 
-// sleepCtx 等待指定时长，期间 ctx 取消则立即返回。
 func sleepCtx(ctx context.Context, d time.Duration) error {
 	t := time.NewTimer(d)
 	defer t.Stop()

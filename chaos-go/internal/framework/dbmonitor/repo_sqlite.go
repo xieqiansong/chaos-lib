@@ -11,7 +11,6 @@ import (
 
 func sqliteDB() *gorm.DB { return config.GetDB() }
 
-// dbstatAvailable 探测 SQLite 是否支持 dbstat 虚拟表（per-table 大小依赖它）。
 func dbstatAvailable(db *gorm.DB) bool {
 	var n int
 	err := db.Raw("SELECT 1 FROM dbstat LIMIT 1").Scan(&n).Error
@@ -111,13 +110,12 @@ func tableDetailSQLite(name string) (*TableDetail, error) {
 	detail.Name = name
 	sizeOK := dbstatAvailable(db)
 
-	// 列
 	type colRow struct {
-		Name  string  `gorm:"column:name"`
-		Type  string  `gorm:"column:type"`
-		Notn  int     `gorm:"column:notnull"`
-		Dflt  *string `gorm:"column:dflt_value"`
-		Pk    int     `gorm:"column:pk"`
+		Name string  `gorm:"column:name"`
+		Type string  `gorm:"column:type"`
+		Notn int     `gorm:"column:notnull"`
+		Dflt *string `gorm:"column:dflt_value"`
+		Pk   int     `gorm:"column:pk"`
 	}
 	var cols []colRow
 	if err := db.Raw(fmt.Sprintf("PRAGMA table_info(%q)", name)).Scan(&cols).Error; err != nil {
@@ -129,7 +127,6 @@ func tableDetailSQLite(name string) (*TableDetail, error) {
 		})
 	}
 
-	// 索引
 	type idxRow struct {
 		Name   string `gorm:"column:name"`
 		Unique int    `gorm:"column:unique"`
@@ -153,7 +150,6 @@ func tableDetailSQLite(name string) (*TableDetail, error) {
 	}
 	detail.IndexCount = len(detail.Indexes)
 
-	// 统计汇总
 	if sizeOK {
 		var tbl, idx int64
 		db.Raw("SELECT COALESCE(SUM(pgsize),0) FROM dbstat WHERE name=?", name).Scan(&tbl)

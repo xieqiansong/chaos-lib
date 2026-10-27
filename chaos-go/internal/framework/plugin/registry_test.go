@@ -2,7 +2,6 @@ package plugin
 
 import "testing"
 
-// reset 清空全局登记，保证用例间互不干扰（测试与被测同包，可直接访问未导出 regs）。
 func reset() { regs = nil }
 
 func TestBuildMissingDependency(t *testing.T) {
@@ -24,7 +23,7 @@ func TestBuildCycle(t *testing.T) {
 
 func TestBuildDependencyOrder(t *testing.T) {
 	reset()
-	// b 无依赖；a 依赖 b；c 依赖 a。期望 b → a → c。
+
 	Register(Registration{Meta: Meta{ID: "a", Dependencies: []string{"b"}}})
 	Register(Registration{Meta: Meta{ID: "b"}})
 	Register(Registration{Meta: Meta{ID: "c", Dependencies: []string{"a"}}})

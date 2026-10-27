@@ -1,19 +1,3 @@
-// Package cronjob 是「定时任务」模块：cron 调度 + 动作执行 + 运行日志。
-//
-// 与标准数据（internal/standarddata）同构，遵循业务模块脚手架基线：
-// 纯 CRUD 交给通用 crud（反射生成五路由，免写标准 handler），本业务特有的
-// 扩展能力（启停 / 立即执行 / 运行历史 / cron 预览）作为自定义子路由由本包自实现并挂载；
-// 字段校验与调度器同步则通过 crud 的写方向钩子注入（钩子失败即回滚，不落库也不进调度器）。
-//
-// 分层（见 chaos-lib/AGENTS.md「分层契约」）：
-//   - model.go：实体 + 动作配置结构
-//   - repository.go：数据访问
-//   - scheduler.go：cron 调度运行时
-//   - executor.go：动作执行（HTTP / Shell）
-//   - seed.go：默认任务
-//   - service.go：校验 + 用例编排
-//   - dto.go：响应契约
-//   - handler.go：参数解析 + 状态码映射 + 路由注册
 package cronjob
 
 import (
@@ -28,12 +12,10 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// jobErrRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeJobError。
 var jobErrRules = []httpx.ErrRule{
 	{Err: ErrJobNotFound, Status: http.StatusNotFound, Msg: "定时任务不存在"},
 }
 
-// cronJobOpts / cronJobToggle 标准 CRUD 与启停选项，存量 /api 与 v1 动作路由共用。
 var cronJobOpts = crud.Opts[CronJob]{
 	Searchable:  []string{"name", "cron_expr", "action_type"},
 	Sortable:    []string{"id", "name", "enabled", "created_at"},
@@ -43,12 +25,11 @@ var cronJobOpts = crud.Opts[CronJob]{
 	AfterDelete: RemoveJobOnDelete,
 }
 var cronJobToggle = &crud.ToggleOpts{
-	// 启用与否直接决定调度器是否挂载该任务，故启停带副作用，不走通用 PATCH。
+
 	Setter:   func(id int, status bool) (any, error) { return SetEnabled(id, status) },
 	ErrRules: jobErrRules,
 }
 
-// request 结构：自定义动作的入参，存量 /api 与 v1 共用字段语义。
 type runReq struct {
 	ID int `json:"id"`
 }
@@ -62,8 +43,6 @@ type previewReq struct {
 	Count    int    `json:"count"`
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 标准 CRUD + status（启停）由通用 crud 生成；自定义动作 run / runs / preview / builtinList 一并迁为 POST 动作。
 func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[CronJob](rg, "cron-jobs", cronJobOpts, cronJobToggle)
 	g.POST("/run", runV1)
@@ -72,17 +51,10 @@ func RegisterV1(rg *web.RouterGroup) {
 	g.POST("/builtinList", builtinListV1)
 }
 
-// ── 内置任务（只读） ──────────────────────────────────────────────
-
-// builtinListV1 返回由插件在代码中提供的内置任务状态。
-// 这些任务不落 cron_jobs 表，因此不提供新增 / 编辑 / 删除 / 启停动作。
 func builtinListV1(c *web.Context) {
 	renv.Success(c, BuiltinTasks())
 }
 
-// ── 立即执行 ──────────────────────────────────────────────────────
-
-// run 立即手动触发一次（POST /cron-jobs/:id/run），返回本次运行记录。
 func run(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -91,7 +63,6 @@ func run(c *web.Context) {
 	doRun(c, id)
 }
 
-// runV1 是 run 的「POST + Action」版（POST /api/v1/cron-jobs/run，body {id}）。
 func runV1(c *web.Context) {
 	var req runReq
 	if err := envelope.Bind(c, &req); err != nil {
@@ -110,9 +81,6 @@ func doRun(c *web.Context, id int) {
 	renv.Success(c, latest)
 }
 
-// ── 运行历史 ──────────────────────────────────────────────────────
-
-// runs 查询某任务的运行历史（GET /cron-jobs/:id/runs，分页）。
 func runs(c *web.Context) {
 	id, ok := httpx.ParseID(c)
 	if !ok {
@@ -121,7 +89,6 @@ func runs(c *web.Context) {
 	doRuns(c, id, pagination.Parse(c))
 }
 
-// runsV1 是 runs 的「POST + Action」版（POST /api/v1/cron-jobs/runs，body {id,page,pageSize}）。
 func runsV1(c *web.Context) {
 	var req runsReq
 	if err := envelope.Bind(c, &req); err != nil {
@@ -147,9 +114,6 @@ func doRuns(c *web.Context, id int, q pagination.Query) {
 	renv.Success(c, pagination.New(list, total, q))
 }
 
-// ── cron 预览 ─────────────────────────────────────────────────────
-
-// preview 校验 cron 表达式并返回未来若干次触发时间（POST /cron-jobs/preview，body {cronExpr,count}）。
 func preview(c *web.Context) {
 	var req previewReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -159,7 +123,6 @@ func preview(c *web.Context) {
 	doPreview(c, req)
 }
 
-// previewV1 是 preview 的「POST + Action」版（POST /api/v1/cron-jobs/preview，信封 data 同结构）。
 func previewV1(c *web.Context) {
 	var req previewReq
 	if err := envelope.Bind(c, &req); err != nil {

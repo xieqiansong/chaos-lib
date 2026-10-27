@@ -11,9 +11,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 动作：list / get / switch / listSources / createSource / updateSource / deleteSource；
-// 主键（type/name）与补丁字段取自信封 data。
 func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/sdks")
 	g.POST("/list", func(c *web.Context) {
@@ -105,7 +102,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	})
 }
 
-// GetSdkVersions 返回所有启用 SDK 类型的版本信息，map key = 类型 Name。
 func GetSdkVersions(c *web.Context) {
 	result, err := SdkVersions()
 	if err != nil {
@@ -115,7 +111,6 @@ func GetSdkVersions(c *web.Context) {
 	renv.Success(c, result)
 }
 
-// GetSdkVersion 返回指定类型的版本信息。
 func GetSdkVersion(c *web.Context) {
 	info, err := SdkVersion(c.Param("type"))
 	if err != nil {
@@ -125,7 +120,6 @@ func GetSdkVersion(c *web.Context) {
 	renv.Success(c, info)
 }
 
-// UpdateSdkVersion 切换版本：仅对 repo 来源生效。
 func UpdateSdkVersion(c *web.Context) {
 	var req struct {
 		Version string
@@ -145,9 +139,6 @@ func UpdateSdkVersion(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// ── SDK 类型 CRUD ──
-
-// ListSdkSources 列出所有未删除的 SDK 类型。
 func ListSdkSources(c *web.Context) {
 	srcs, err := ListSources()
 	if err != nil {
@@ -157,7 +148,6 @@ func ListSdkSources(c *web.Context) {
 	renv.Success(c, srcs)
 }
 
-// CreateSdkSource 新增 SDK 类型。
 func CreateSdkSource(c *web.Context) {
 	var req SdkSource
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -175,7 +165,6 @@ func CreateSdkSource(c *web.Context) {
 	renv.Success(c, req)
 }
 
-// UpdateSdkSource 编辑 SDK 类型（Sources/Current/Enabled/Note）。
 func UpdateSdkSource(c *web.Context) {
 	var patch SourcePatch
 	if err := c.ShouldBindJSON(&patch); err != nil {
@@ -190,7 +179,6 @@ func UpdateSdkSource(c *web.Context) {
 	renv.Success(c, updated)
 }
 
-// DeleteSdkSource 软删除 SDK 类型。
 func DeleteSdkSource(c *web.Context) {
 	if err := DeleteSource(c.Param("name")); err != nil {
 		httpx.MapError(c, err, sdkErrRules)
@@ -199,7 +187,6 @@ func DeleteSdkSource(c *web.Context) {
 	renv.Success(c, nil)
 }
 
-// sdkErrRules 领域错误 → HTTP 状态码映射表，取代原先内联在 handler 里的 writeError。
 var sdkErrRules = []httpx.ErrRule{
 	{Err: ErrSdkNotFound, Status: http.StatusNotFound, Msg: "SDK type not found"},
 	{Err: ErrInvalidInput, Status: http.StatusBadRequest},

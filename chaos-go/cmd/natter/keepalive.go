@@ -15,7 +15,6 @@ import (
 
 const keepAliveTimeout = 3 * time.Second
 
-// KeepAlive 维持 NAT 映射：周期性向保活服务器发包并读取响应。
 type KeepAlive struct {
 	host       string
 	port       int
@@ -28,7 +27,6 @@ type KeepAlive struct {
 	reconn bool
 }
 
-// NewKeepAlive 创建保活对象。
 func NewKeepAlive(host string, port int, sourceHost string, sourcePort int, iface string, udp bool) *KeepAlive {
 	return &KeepAlive{
 		host: host, port: port,
@@ -37,7 +35,6 @@ func NewKeepAlive(host string, port int, sourceHost string, sourcePort int, ifac
 	}
 }
 
-// Disconnect 关闭连接并标记下次需要重连。
 func (k *KeepAlive) Disconnect() {
 	if k.conn != nil {
 		_ = k.conn.Close()
@@ -70,7 +67,6 @@ func (k *KeepAlive) connect(ctx context.Context) error {
 	return nil
 }
 
-// KeepAlive 执行一次保活：必要时先建连，然后发送并读取响应。
 func (k *KeepAlive) KeepAlive(ctx context.Context) error {
 	if k.conn == nil {
 		if err := k.connect(ctx); err != nil {
@@ -126,17 +122,16 @@ func (k *KeepAlive) keepAliveTCP() error {
 	}
 }
 
-// keepAliveUDP 发送一个 DNS 查询，读到超时为止。
 func (k *KeepAlive) keepAliveUDP() error {
-	qname := "\x09keepalive\x06natter\x00" // 9keepalive 6natter 0
+	qname := "\x09keepalive\x06natter\x00"
 	req := make([]byte, 12+len(qname)+4)
-	binary.BigEndian.PutUint16(req[0:2], uint16(rand.Intn(65536))) // 事务 ID
-	binary.BigEndian.PutUint16(req[2:4], 0x0100)                   // 标准查询
-	binary.BigEndian.PutUint16(req[4:6], 0x0001)                   // QDCOUNT
-	// ANCOUNT / NSCOUNT / ARCOUNT 保持 0
+	binary.BigEndian.PutUint16(req[0:2], uint16(rand.Intn(65536)))
+	binary.BigEndian.PutUint16(req[2:4], 0x0100)
+	binary.BigEndian.PutUint16(req[4:6], 0x0001)
+
 	copy(req[12:], qname)
-	binary.BigEndian.PutUint16(req[12+len(qname):], 0x0001) // QTYPE: A
-	binary.BigEndian.PutUint16(req[14+len(qname):], 0x0001) // QCLASS: IN
+	binary.BigEndian.PutUint16(req[12+len(qname):], 0x0001)
+	binary.BigEndian.PutUint16(req[14+len(qname):], 0x0001)
 
 	if err := k.conn.SetDeadline(time.Now().Add(keepAliveTimeout)); err != nil {
 		return err
@@ -156,7 +151,7 @@ func (k *KeepAlive) keepAliveUDP() error {
 				if !got {
 					return err
 				}
-				// fix: Windows 上保活 socket 会导致 STUN socket 超时
+
 				if runtime.GOOS == "windows" {
 					k.Disconnect()
 				}

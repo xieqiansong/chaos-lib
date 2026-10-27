@@ -6,23 +6,20 @@ import (
 	"chaos-go/internal/framework/crud"
 )
 
-// 物品类型
 const (
-	ItemTypeDurable    = 1 // 耐用品
-	ItemTypeConsumable = 2 // 消耗品
+	ItemTypeDurable    = 1
+	ItemTypeConsumable = 2
 )
 
-// 物品状态
 const (
-	StatusInUse     = "in_use"    // 在用
-	StatusIdle      = "idle"      // 闲置
-	StatusLent      = "lent"      // 借出
-	StatusRepairing = "repairing" // 维修
-	StatusBroken    = "broken"    // 损坏
-	StatusDisposed  = "disposed"  // 已处置
+	StatusInUse     = "in_use"
+	StatusIdle      = "idle"
+	StatusLent      = "lent"
+	StatusRepairing = "repairing"
+	StatusBroken    = "broken"
+	StatusDisposed  = "disposed"
 )
 
-// 流水类型
 const (
 	RecordPurchase  = "purchase"
 	RecordConsume   = "consume"
@@ -37,7 +34,6 @@ const (
 	RecordRemove    = "remove"
 )
 
-// Category 分类字典（支持父子级）。
 type Category struct {
 	crud.BaseModel
 	ParentID  int     `json:"ParentID"`
@@ -48,7 +44,6 @@ type Category struct {
 
 func (Category) TableName() string { return "item_category" }
 
-// Location 存放位置字典（支持父子级）。
 type Location struct {
 	crud.BaseModel
 	ParentID  int    `json:"ParentID"`
@@ -58,7 +53,6 @@ type Location struct {
 
 func (Location) TableName() string { return "item_location" }
 
-// Item 物品主表：耐用品与消耗品统一存储，靠 ItemType 区分。
 type Item struct {
 	crud.BaseModel
 	Name              string     `json:"Name"`
@@ -88,7 +82,6 @@ type Item struct {
 
 func (Item) TableName() string { return "items" }
 
-// ItemRecord 变动流水：所有"发生过的事"都记这里，是库存真相。
 type ItemRecord struct {
 	crud.BaseModel
 	ItemID     int       `json:"ItemID"`
@@ -101,7 +94,6 @@ type ItemRecord struct {
 
 func (ItemRecord) TableName() string { return "item_records" }
 
-// ItemAssembly 装配关系：配件作为独立 item 装入主机。
 type ItemAssembly struct {
 	crud.BaseModel
 	HostID      int        `json:"HostID"`
@@ -116,5 +108,4 @@ type ItemAssembly struct {
 
 func (ItemAssembly) TableName() string { return "item_assemblies" }
 
-// strPtr 便捷构造 *string。
 func strPtr(s string) *string { return &s }

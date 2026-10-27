@@ -13,8 +13,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ── 模型 ──────────────────────────────────────────────────────────
-
 type BrowserHistory struct {
 	ID            string  `gorm:"primaryKey"`
 	LastVisitTime float64 ``
@@ -34,13 +32,10 @@ type BrowserHistoryVisit struct {
 	VisitTime        float64 ``
 }
 
-// ── Handlers ──────────────────────────────────────────────────────
-
 func GetBrowserHistories(c *web.Context) {
 	q := pagination.Parse(c)
 	search := c.Query("search")
 
-	// 统一分页：page/size 由 pagination 模块解析（size 强制约束在 [1, MaxSize]）
 	base := config.GetDB().Model(&BrowserHistory{})
 	if search != "" {
 		like := "%" + search + "%"
@@ -51,10 +46,10 @@ func GetBrowserHistories(c *web.Context) {
 	var histories []BrowserHistory
 	total, err := pagination.Paginate(base, &histories, q)
 	if err != nil {
-		renv.Error(c, 500, "查询失败: " + err.Error())
+		renv.Error(c, 500, "查询失败: "+err.Error())
 		return
 	}
-	// 响应统一为 { items, total, page, size }
+
 	renv.Success(c, pagination.New(histories, total, q))
 }
 
@@ -76,7 +71,7 @@ func SaveBrowserHistory(c *web.Context) {
 	}
 	res := config.GetDB().Debug().Clauses(clause.OnConflict{UpdateAll: true}).Create(&histories)
 	if err := res.Error; err != nil {
-		renv.Error(c, 500, "数据库写入失败: " + err.Error())
+		renv.Error(c, 500, "数据库写入失败: "+err.Error())
 		return
 	}
 	renv.Success(c, nil)
@@ -109,7 +104,7 @@ func SaveBrowserHistoryVisits(c *web.Context) {
 	}
 	res := config.GetDB().Clauses(clause.OnConflict{UpdateAll: true}).Create(&uniqueList)
 	if err := res.Error; err != nil {
-		renv.Error(c, 500, "数据库写入失败: " + err.Error())
+		renv.Error(c, 500, "数据库写入失败: "+err.Error())
 		return
 	}
 	renv.Success(c, nil)

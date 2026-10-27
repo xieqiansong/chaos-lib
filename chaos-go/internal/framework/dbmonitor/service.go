@@ -13,10 +13,6 @@ func isSQLite() bool {
 	return config.GetConfig().Database.Type == "sqlite"
 }
 
-// validTableName 仅做基本准入校验：拒绝空名与会破坏路由分段 /
-// 解析的控制字符。真正的 SQL 注入防护由调用方统一使用 %q 标识符
-// 引号转义（SQLite 双引号标识符，内部双引号再翻倍）来兜底，因此这里
-// 不应再用严格正则误伤含连字符、空格、点、Unicode 的合法表名。
 func validTableName(name string) bool {
 	if name == "" {
 		return false
@@ -28,8 +24,6 @@ func validTableName(name string) bool {
 	}
 	return true
 }
-
-// ── 分派 ──
 
 func collectTables() ([]TableStat, error) {
 	if isSQLite() {
@@ -58,7 +52,7 @@ func getTableDetail(name string) (*TableDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	// nil slice 会被编码成 JSON null，前端按数组消费会崩；统一归一化为空数组。
+
 	if detail.Columns == nil {
 		detail.Columns = []ColumnInfo{}
 	}
@@ -68,14 +62,10 @@ func getTableDetail(name string) (*TableDetail, error) {
 	return detail, nil
 }
 
-// ── 用例 ────────────────────────────────────────────────────────
-
-// Overview 返回库级总览（类型 / 版本 / 总大小 / 表数 / 总行数）。
 func Overview() (*DbOverview, error) {
 	return getOverview()
 }
 
-// TableDetailOf 返回单表详情（统计 + 列 + 索引）。
 func TableDetailOf(name string) (*TableDetail, error) {
 	if !validTableName(name) {
 		return nil, ErrInvalidTableName
@@ -90,8 +80,6 @@ func TableDetailOf(name string) (*TableDetail, error) {
 	return detail, nil
 }
 
-// ListTableStats 返回表统计的分页列表（行数为精确 COUNT(*)）：
-// 按表名过滤（在排序与分页前生效，并计入 total），再按 sort / order 排序后分页。
 func ListTableStats(name, sortKey, order string, q pagination.Query) ([]TableStat, int64, error) {
 	all, err := collectTables()
 	if err != nil {
@@ -117,9 +105,6 @@ func ListTableStats(name, sortKey, order string, q pagination.Query) ([]TableSta
 	return items, total, nil
 }
 
-// ── 过滤与排序 ──────────────────────────────────────────────────
-
-// filterTables 按表名子串过滤（大小写不敏感）；name 为空时原样返回。
 func filterTables(tables []TableStat, name string) []TableStat {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -135,7 +120,6 @@ func filterTables(tables []TableStat, name string) []TableStat {
 	return filtered
 }
 
-// sortTables 按给定键与方向排序；未识别的键按表名排。
 func sortTables(tables []TableStat, sortKey, order string) {
 	desc := strings.EqualFold(order, "desc")
 	less := func(i, j int) bool {
@@ -152,7 +136,7 @@ func sortTables(tables []TableStat, sortKey, order string) {
 			ai, bi = a.TotalBytes, b.TotalBytes
 		case "index_count":
 			ai, bi = int64(a.IndexCount), int64(b.IndexCount)
-		default: // name
+		default:
 			if a.Name != b.Name {
 				if desc {
 					return a.Name > b.Name

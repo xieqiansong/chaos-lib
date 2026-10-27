@@ -18,16 +18,12 @@ const (
 	cronLookahead     = 1
 	cronSweepCap      = 50
 
-	// defaultRootPlanName 贡献热力图未指定根计划时的默认名称。
 	defaultRootPlanName = "每日任务"
-	// AI 评分的输入长度上限（控制 token 规模）。
+
 	maxOriginalLen = 4096
 	maxAnswerLen   = 1024
 )
 
-// ── 树 / 任务生成 / 完成（领域层）────────────────────────────────
-
-// buildTaskPlanTree 由扁平计划列表组装成树（按 OrderNum/ID 稳定排序）。
 func buildTaskPlanTree(plans []TaskPlan) []TaskPlanTree {
 	childrenMap := make(map[int][]TaskPlan)
 	var roots []TaskPlan
@@ -72,7 +68,6 @@ func buildTaskPlanTree(plans []TaskPlan) []TaskPlanTree {
 	return result
 }
 
-// filterPlansWithAncestors 按关键字过滤计划，并保留命中项的完整祖先链（保证树形结构不散）。
 func filterPlansWithAncestors(plans []TaskPlan, keyword string) []TaskPlan {
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" {
@@ -122,9 +117,6 @@ func filterPlansWithAncestors(plans []TaskPlan, keyword string) []TaskPlan {
 	return filtered
 }
 
-// generateTask 根据计划类型生成一条任务。
-// cron：解析表达式并委托 createCronTask；interval：按 FSRS 推算下次到期并回写计划记忆参数；
-// todo：直接以 now 作为 startedAt 创建。rating 仅 interval 类型生效。
 func generateTask(plan *TaskPlan, now time.Time, rating *FsrsRating) (*Task, error) {
 	now = now.Truncate(time.Second)
 	task := Task{
@@ -147,7 +139,7 @@ func generateTask(plan *TaskPlan, now time.Time, rating *FsrsRating) (*Task, err
 
 	case TaskPlanTypeInterval:
 		if rating != nil {
-			// 评分驱动 FSRS：还原卡片 → 推进一次 → 下次到期作为新任务的 startedAt
+
 			result := NextReview(CardFromPlan(plan), now, *rating)
 			task.StartedAt = &result.Due
 			result.ApplyToPlan(plan, now)
@@ -161,8 +153,6 @@ func generateTask(plan *TaskPlan, now time.Time, rating *FsrsRating) (*Task, err
 	return &task, nil
 }
 
-// finishTask 标记任务完成、驱动 FSRS（interval 类型）并生成下一条任务。
-// 返回生成的下一条任务（可能为 nil）。task、plan 需已加载。
 func finishTask(task *Task, plan *TaskPlan, rating *FsrsRating) (*Task, error) {
 	now := time.Now()
 	task.Status = TaskStatusDone
@@ -193,8 +183,6 @@ func finishTask(task *Task, plan *TaskPlan, rating *FsrsRating) (*Task, error) {
 	return nextTask, nil
 }
 
-// computePostponeUpdates 计算单条任务的延期更新字段，返回 updates、是否可延期与跳过原因。
-// 仅 active 状态且所属 plan 为 todo/interval 类型的任务可延期，平移 started_at 与 deadline。
 func computePostponeUpdates(task *Task, days int) (map[string]interface{}, bool, string) {
 	if task.Status != TaskStatusActive {
 		return nil, false, "任务已完成或已取消"
@@ -220,10 +208,6 @@ func computePostponeUpdates(task *Task, days int) (map[string]interface{}, bool,
 	return updates, true, ""
 }
 
-// ── 调度扫描 ────────────────────────────────────────────────────
-
-// SweepScheduledTaskPlans 扫描已开启的 cron / interval 计划并生成任务，
-// 现由定时任务模块（/api/systemJobs/sweep）按 cron 触发，不再自动注册到后台调度器。
 func SweepScheduledTaskPlans() {
 	sweepCronPlans()
 	sweepIntervalPlans()
@@ -292,7 +276,6 @@ func sweepIntervalPlans() {
 	}
 }
 
-// createCronTask 为 cron 计划在指定 startedAt 创建一条任务（已存在则直接返回）。
 func createCronTask(plan *TaskPlan, startedAt time.Time) (*Task, error) {
 	if existing, ok := FindTaskAt(plan.ID, startedAt); ok {
 		return existing, nil
@@ -311,9 +294,6 @@ func createCronTask(plan *TaskPlan, startedAt time.Time) (*Task, error) {
 	return &task, nil
 }
 
-// ── 计划用例 ────────────────────────────────────────────────────
-
-// CreatePlan 创建任务计划；待办类型须带 startedAt，并顺带生成首条任务。
 func CreatePlan(req CreatePlanRequest) (*PlanResponse, error) {
 	planType := req.PlanType
 	if planType == "" {
@@ -370,7 +350,6 @@ func CreatePlan(req CreatePlanRequest) (*PlanResponse, error) {
 	return resp, nil
 }
 
-// UpdatePlan 按字段映射更新计划，返回更新后的计划。
 func UpdatePlan(id int, req UpdatePlanRequest) (*TaskPlan, error) {
 	if _, err := FindActiveTaskPlan(id); err != nil {
 		return nil, err
@@ -414,7 +393,6 @@ func UpdatePlan(id int, req UpdatePlanRequest) (*TaskPlan, error) {
 	return plan, nil
 }
 
-// StartPlan 开启计划：置为 started，若尚无进行中的任务则生成首条。
 func StartPlan(id int) (*PlanStateResponse, error) {
 	plan, err := FindActiveTaskPlan(id)
 	if err != nil {
@@ -454,7 +432,6 @@ func StartPlan(id int) (*PlanStateResponse, error) {
 	return resp, nil
 }
 
-// CompletePlan 完成计划：仅 started 状态可完成，同时结束其进行中的任务。
 func CompletePlan(id int) (*TaskPlan, error) {
 	plan, err := FindActiveTaskPlan(id)
 	if err != nil {
@@ -472,7 +449,6 @@ func CompletePlan(id int) (*TaskPlan, error) {
 	return plan, nil
 }
 
-// ArchivePlan 归档计划：仅 completed 状态可归档。
 func ArchivePlan(id int) (*TaskPlan, error) {
 	plan, err := FindActiveTaskPlan(id)
 	if err != nil {
@@ -489,7 +465,6 @@ func ArchivePlan(id int) (*TaskPlan, error) {
 	return plan, nil
 }
 
-// DeletePlan 删除计划；非级联时若存在子计划或未完成任务则拒绝。
 func DeletePlan(id int, cascade bool) (*DeletePlanResponse, error) {
 	if _, err := FindActiveTaskPlan(id); err != nil {
 		return nil, err
@@ -521,22 +496,18 @@ func DeletePlan(id int, cascade bool) (*DeletePlanResponse, error) {
 	return resp, nil
 }
 
-// SuspendPlans 挂起计划及其子孙。
 func SuspendPlans(id int) error {
 	return updateDescendants(id, map[string]interface{}{"is_suspended": true}, "挂起失败")
 }
 
-// ResumePlans 恢复计划及其子孙。
 func ResumePlans(id int) error {
 	return updateDescendants(id, map[string]interface{}{"is_suspended": false}, "恢复失败")
 }
 
-// SetPlanPriority 批量设置计划及其子孙的优先级。
 func SetPlanPriority(id int, priority int) error {
 	return updateDescendants(id, map[string]interface{}{"priority": priority}, "更新优先级失败")
 }
 
-// updateDescendants 收集子孙后批量更新给定列。
 func updateDescendants(id int, columns map[string]interface{}, errMsg string) error {
 	if _, err := FindActiveTaskPlan(id); err != nil {
 		return err
@@ -561,7 +532,6 @@ func cloneColumns(src map[string]interface{}) map[string]interface{} {
 	return dst
 }
 
-// PlanTree 返回计划树；keyword 非空时按名称 / 备注过滤并保留祖先链。
 func PlanTree(keyword string) ([]TaskPlanTree, error) {
 	plans, err := ListPlanTreeRows()
 	if err != nil {
@@ -570,7 +540,6 @@ func PlanTree(keyword string) ([]TaskPlanTree, error) {
 	return buildTaskPlanTree(filterPlansWithAncestors(plans, keyword)), nil
 }
 
-// PlanTasks 列出某计划下的任务。
 func PlanTasks(id int) ([]Task, error) {
 	if _, err := FindActiveTaskPlan(id); err != nil {
 		return nil, err
@@ -578,7 +547,6 @@ func PlanTasks(id int) ([]Task, error) {
 	return ListTasksByPlan(id)
 }
 
-// FetchPlanRaw 拉取计划关联原文（服务端代理，规避浏览器跨域）。
 func FetchPlanRaw(id int) (*PlanRaw, error) {
 	plan, err := FindActiveTaskPlan(id)
 	if err != nil {
@@ -594,9 +562,6 @@ func FetchPlanRaw(id int) (*PlanRaw, error) {
 	return &PlanRaw{RawLink: *plan.RawLink, Content: content}, nil
 }
 
-// ── 任务用例 ────────────────────────────────────────────────────
-
-// CompleteTaskByID 完成任务：interval 类型须带评分（驱动 FSRS），返回任务视图（含下一条）。
 func CompleteTaskByID(id int, rating *int) (TaskView, error) {
 	task, err := FindActiveTask(id)
 	if err != nil {
@@ -633,7 +598,6 @@ func CompleteTaskByID(id int, rating *int) (TaskView, error) {
 	return resp, nil
 }
 
-// PostponeTaskByID 单条延期。
 func PostponeTaskByID(id, days int) error {
 	task, err := FindActiveTask(id)
 	if err != nil {
@@ -649,7 +613,6 @@ func PostponeTaskByID(id, days int) error {
 	return nil
 }
 
-// PostponeTasks 批量延期：逐条处理，返回汇总与逐项结果（部分失败不影响其余项）。
 func PostponeTasks(ids []int, days int) (*BatchPostponeResult, error) {
 	res := &BatchPostponeResult{Results: make([]PostponeItemResult, 0, len(ids))}
 	for _, id := range ids {
@@ -674,7 +637,6 @@ func PostponeTasks(ids []int, days int) (*BatchPostponeResult, error) {
 	return res, nil
 }
 
-// CancelTaskByID 取消任务（仅 cron / interval 支持），并生成下一条任务。
 func CancelTaskByID(id int) (TaskView, error) {
 	task, err := FindActiveTask(id)
 	if err != nil {
@@ -706,9 +668,6 @@ func CancelTaskByID(id int) (TaskView, error) {
 	return resp, nil
 }
 
-// ── 复习用例 ────────────────────────────────────────────────────
-
-// reviewScoreSystemPrompt 是固定的角色与评分标准提示（每次调用相同，省 token）。
 const reviewScoreSystemPrompt = `你是一位严谨的「主动回忆(active recall)」学习评分员。用户会提供两段内容：
 1) 【原文】：需要学习/记忆的材料。
 2) 【我的回忆】：用户在未看原文情况下回忆写下的内容（关键词、要点或短句）。
@@ -730,7 +689,6 @@ const reviewScoreSystemPrompt = `你是一位严谨的「主动回忆(active rec
   "suggestedRating": 3
 }`
 
-// ReviewPlan 提交复习：评分驱动 FSRS（interval 类型），回忆内容与 AI 结果写入任务 remark。
 func ReviewPlan(id int, req ReviewRequest) (*ReviewResponse, error) {
 	if req.Rating < int(RatingAgain) || req.Rating > int(RatingEasy) {
 		return nil, &InvalidStateError{Msg: "无效的评分，有效值: 1=Again, 2=Hard, 3=Good, 4=Easy"}
@@ -747,7 +705,7 @@ func ReviewPlan(id int, req ReviewRequest) (*ReviewResponse, error) {
 	if foundTask, ok := FindActiveTaskForPlan(id); ok {
 		task = *foundTask
 	} else {
-		// 没有进行中的任务：按需生成一条（等价于「现在就复习一次」）
+
 		if plan.Status != TaskPlanStatusStarted && plan.Status != TaskPlanStatusCreated {
 			return nil, &InvalidStateError{Msg: "当前状态无法发起复习"}
 		}
@@ -758,7 +716,6 @@ func ReviewPlan(id int, req ReviewRequest) (*ReviewResponse, error) {
 		task = *generated
 	}
 
-	// 持久化用户的回忆内容 + AI 评分结果（JSON 格式写入 tasks.remark）
 	remarkObj := map[string]interface{}{"answer": req.Answer}
 	if req.AI != nil {
 		remarkObj["ai"] = req.AI
@@ -796,14 +753,13 @@ func ReviewPlan(id int, req ReviewRequest) (*ReviewResponse, error) {
 	return resp, nil
 }
 
-// ScoreReview 用 DeepSeek 对「回忆答案」相对「原文」做覆盖度评分。
 func ScoreReview(original, answer string) (*ReviewScore, error) {
 	original = strings.TrimSpace(original)
 	answer = strings.TrimSpace(answer)
 	if original == "" {
 		return nil, &InvalidStateError{Msg: "缺少原文内容，无法评分"}
 	}
-	// 控制 token 规模，避免长文拖累延迟与费用
+
 	if len(original) > maxOriginalLen {
 		original = original[:maxOriginalLen] + "\n…（原文过长已截断）"
 	}
@@ -821,7 +777,7 @@ func ScoreReview(original, answer string) (*ReviewScore, error) {
 	if err := json.Unmarshal([]byte(raw), &score); err != nil {
 		return nil, fmt.Errorf("AI 返回解析失败")
 	}
-	// 规整建议档位到 FSRS 四档；异常时用覆盖度兜底映射
+
 	if score.Coverage < 0 {
 		score.Coverage = 0
 	}
@@ -843,9 +799,6 @@ func ScoreReview(original, answer string) (*ReviewScore, error) {
 	return &score, nil
 }
 
-// ── 统计用例 ────────────────────────────────────────────────────
-
-// DailyStats 返回最近 days 天（含今天）的每日完成数。
 func DailyStats(days int) ([]DailyPoint, error) {
 	today := todayStart()
 	cutoff := today.AddDate(0, 0, -days)
@@ -862,7 +815,6 @@ func DailyStats(days int) ([]DailyPoint, error) {
 	return result, nil
 }
 
-// ActiveStats 返回 [start, end] 区间内每日「任务开始」数。
 func ActiveStats(start, end time.Time) ([]DailyPoint, error) {
 	rows, err := ActiveStartRows(start, end)
 	if err != nil {
@@ -877,14 +829,9 @@ func ActiveStats(start, end time.Time) ([]DailyPoint, error) {
 	return result, nil
 }
 
-// ContributionStats 返回近一年每日完成任务数（GitHub 风格贡献热力图）。
-// 每天归属按任务的开始时间（started_at）划分，而非完成时间：定时 / 周期任务在当日达成
-// 就应计入当日，即使实际完成动作跨到了第二天。
-// planID > 0 时以该计划为根；否则按 rootName（默认「每日任务」）查找根计划。
-// 统计项 = 根计划的直接子计划（每个子项单独统计，不合并）；子计划为空时退化为根计划自身。
 func BuildContributionStats(planID int, rootName string) (*ContributionStats, error) {
 	today := todayStart()
-	// 往前多取一天，由前端对齐到整周（周日）后渲染
+
 	start := today.AddDate(-1, 0, 1)
 
 	var roots []TaskPlan
@@ -922,7 +869,6 @@ func BuildContributionStats(planID int, rootName string) (*ContributionStats, er
 		}
 	}
 
-	// 归集各统计项的子树计划：planID -> 选项下标
 	owner := make(map[int]int)
 	for idx := range options {
 		ids, err := CollectDescendantPlanIDs(options[idx].ID)
@@ -969,7 +915,6 @@ func BuildContributionStats(planID int, rootName string) (*ContributionStats, er
 	}, nil
 }
 
-// buildContributionItem 按天补齐 [start, today]，生成单个统计项的贡献序列。
 func buildContributionItem(id int, name string, start, today time.Time, counts map[string]int) ContributionItem {
 	days := make([]DailyPoint, 0, 366)
 	total := 0
@@ -981,8 +926,6 @@ func buildContributionItem(id int, name string, start, today time.Time, counts m
 	}
 	return ContributionItem{ID: id, Name: name, Total: total, Days: days}
 }
-
-// ── 统计辅助 ────────────────────────────────────────────────────
 
 func todayStart() time.Time {
 	now := time.Now()

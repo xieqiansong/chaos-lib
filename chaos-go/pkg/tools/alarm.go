@@ -31,30 +31,25 @@ func New(text string) error {
 	return &errorString{text}
 }
 
-// 发邮件
 func Email(text string) error {
 	alarm("EMAIL", text)
 	return &errorString{text}
 }
 
-// 发短信
 func Sms(text string) error {
 	alarm("SMS", text)
 	return &errorString{text}
 }
 
-// 发微信
 func WeChat(text string) error {
 	alarm("WX", text)
 	return &errorString{text}
 }
 
-// 告警方法
 func alarm(level string, str string) {
-	// 当前时间
+
 	currentTime := time.Now().Format("2006-01-02 15:04:05")
 
-	// 定义 文件名、行号、方法名
 	fileName, line, functionName := "?", 0, "?"
 
 	pc, fileName, line, ok := runtime.Caller(2)
@@ -84,15 +79,12 @@ func alarm(level string, str string) {
 	fmt.Println(errorJsonInfo)
 
 	if level == "EMAIL" {
-		// 执行发邮件
 
 	} else if level == "SMS" {
-		// 执行发短信
 
 	} else if level == "WX" {
-		// 执行发微信
 
 	} else if level == "INFO" {
-		// 执行记日志
+
 	}
 }

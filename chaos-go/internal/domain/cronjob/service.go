@@ -9,15 +9,11 @@ import (
 	"chaos-go/internal/framework/scheduler"
 )
 
-// preview 参数边界：请求未给或越界时回落到默认条数。
 const (
 	defaultPreviewCount = 5
 	maxPreviewCount     = 20
 )
 
-// ── 校验 ────────────────────────────────────────────────────────
-
-// validateJob 校验任务字段：名称 / cron 表达式 / 超时 / 动作配置。
 func validateJob(job *CronJob) error {
 	if strings.TrimSpace(job.Name) == "" {
 		return errors.New("任务名称不能为空")
@@ -34,7 +30,6 @@ func validateJob(job *CronJob) error {
 	return validateAction(job)
 }
 
-// validateAction 按动作类型校验 ActionConfig（JSON 文本）内容是否完整。
 func validateAction(job *CronJob) error {
 	switch job.ActionType {
 	case ActionTypeHTTP:
@@ -60,10 +55,6 @@ func validateAction(job *CronJob) error {
 	}
 }
 
-// ── 用例 ────────────────────────────────────────────────────────
-
-// OnSaved 在 create / update 事务内、提交前执行：先校验（失败即回滚，
-// 既不写库也不进调度器），通过后再把最新状态同步进 cron 调度器。
 func OnSaved(job *CronJob) error {
 	if err := validateJob(job); err != nil {
 		return err
@@ -72,13 +63,11 @@ func OnSaved(job *CronJob) error {
 	return nil
 }
 
-// RemoveJobOnDelete 删除后把任务移出调度器。
 func RemoveJobOnDelete(job *CronJob) error {
 	RemoveJob(job.ID)
 	return nil
 }
 
-// CronJobViews 整批转换为响应视图（crud.Opts.ToResponse）。
 func CronJobViews(rows []*CronJob) any {
 	out := make([]CronJobView, 0, len(rows))
 	for _, job := range rows {
@@ -87,7 +76,6 @@ func CronJobViews(rows []*CronJob) any {
 	return out
 }
 
-// SetEnabled 启停任务：改库后同步调度器，返回富化视图。
 func SetEnabled(id int, enabled bool) (*CronJobView, error) {
 	job, err := FindJobByID(id)
 	if err != nil {
@@ -102,7 +90,6 @@ func SetEnabled(id int, enabled bool) (*CronJobView, error) {
 	return &view, nil
 }
 
-// ExecuteNow 立即执行一次任务，返回本次运行记录（避免回查「最新一条」的并发偏差）。
 func ExecuteNow(id int) (*CronJobRun, error) {
 	job, err := FindJobByID(id)
 	if err != nil {
@@ -111,7 +98,6 @@ func ExecuteNow(id int) (*CronJobRun, error) {
 	return ExecuteJob(&job)
 }
 
-// PreviewRuns 校验 cron 表达式并返回未来若干次触发时间（count 越界时回落默认值）。
 func PreviewRuns(expr string, count int) ([]time.Time, error) {
 	if count <= 0 || count > maxPreviewCount {
 		count = defaultPreviewCount
@@ -119,13 +105,10 @@ func PreviewRuns(expr string, count int) ([]time.Time, error) {
 	return NextRuns(expr, count)
 }
 
-// BuiltinTasks 返回插件在代码中声明的内置任务状态（只读，不落 cron_jobs 表）。
-// 内置任务与用户任务的边界：前者随代码发布、由 scheduler 运行；后者由用户在此模块创建。
 func BuiltinTasks() []scheduler.TaskStatus {
 	return scheduler.BuiltinStatuses()
 }
 
-// nextRunOf 计算任务的下次执行时间；未启用 / 已删除 / 表达式非法时为空。
 func nextRunOf(job *CronJob) *time.Time {
 	if !job.Enabled || job.Deleted() {
 		return nil

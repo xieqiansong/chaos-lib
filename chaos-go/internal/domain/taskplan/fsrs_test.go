@@ -5,11 +5,9 @@ import (
 	"time"
 )
 
-// 冒烟测试：FSRS 换用官方实现后，验证调度行为仍然合理（不校验具体数值，只校验方向性）。
 func TestNextReview(t *testing.T) {
 	now := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
 
-	// 新卡片：四档评分都要给出晚于 now 的到期时间，且 Easy 不早于 Good、Good 不早于 Hard
 	newDues := map[FsrsRating]time.Time{}
 	for _, r := range []FsrsRating{RatingAgain, RatingHard, RatingGood, RatingEasy} {
 		card := CardFromPlan(&TaskPlan{})
@@ -31,14 +29,13 @@ func TestNextReview(t *testing.T) {
 		t.Fatalf("Good 的到期时间不应早于 Hard")
 	}
 
-	// 复习态卡片：5 天后按 Good 复习，稳定性应增长、复习次数 +1
 	last := now.AddDate(0, 0, -5)
 	plan := &TaskPlan{
 		FsrsStability:    5,
 		FsrsDifficulty:   5,
 		FsrsReps:         3,
 		FsrsLapses:       0,
-		FsrsState:        2, // Review
+		FsrsState:        2,
 		FsrsLastReviewAt: &last,
 	}
 	res := NextReview(CardFromPlan(plan), now, RatingGood)
@@ -55,7 +52,6 @@ func TestNextReview(t *testing.T) {
 	t.Logf("复习态 → stability=%.4f difficulty=%.4f reps=%d state=%d after=%v",
 		plan.FsrsStability, plan.FsrsDifficulty, plan.FsrsReps, plan.FsrsState, res.Due.Sub(now))
 
-	// Again 应触发 lapse 并进入重新学习
 	plan2 := &TaskPlan{FsrsStability: 10, FsrsDifficulty: 5, FsrsReps: 5, FsrsState: 2, FsrsLastReviewAt: &last}
 	res2 := NextReview(CardFromPlan(plan2), now, RatingAgain)
 	res2.ApplyToPlan(plan2, now)

@@ -27,42 +27,35 @@ var (
 	nodeMu      sync.RWMutex
 	localNodeID string
 
-	// 加密状态：Start 后一次性确定，之后只读（高频路径不加锁读取）
 	encryptMu        sync.RWMutex
 	encryptKey       []byte
 	effectiveEncrypt bool
 )
 
-// NodeID 返回本机节点标识（Start 后稳定）。
 func NodeID() string {
 	nodeMu.RLock()
 	defer nodeMu.RUnlock()
 	return localNodeID
 }
 
-// IsConnected 返回当前 broker 连接状态。
 func IsConnected() bool {
 	connectedMu.RLock()
 	defer connectedMu.RUnlock()
 	return connected
 }
 
-// setConnected 更新连接状态，线程安全。
 func setConnected(v bool) {
 	connectedMu.Lock()
 	connected = v
 	connectedMu.Unlock()
 }
 
-// envelope 是加密后的外层信封；无 enc 字段的报文视为明文旧消息（兼容滚动升级）。
 type envelope struct {
 	V    int    `json:"v"`
 	Enc  string `json:"enc"`
-	Data string `json:"data"` // base64(nonce || ciphertext+tag)
+	Data string `json:"data"`
 }
 
-// loadKey 将 configs/config.yaml 中的 mqtt.encrypt_key 解析为 32 字节密钥。
-// 支持 hex（64 字符）或 base64（解出 32 字节）两种编码；无效返回 nil。
 func loadKey(raw string) []byte {
 	s := strings.TrimSpace(raw)
 	if s == "" {
@@ -77,8 +70,6 @@ func loadKey(raw string) []byte {
 	return nil
 }
 
-// initCrypto 依据配置确定本会话是否真正启用加密。
-// Encrypt=true 且密钥有效 → 启用；否则明文降级（密钥无效时记错误日志，仍照常运行）。
 func initCrypto(cfg config.MqttConfig) {
 	encryptMu.Lock()
 	defer encryptMu.Unlock()
@@ -99,14 +90,12 @@ func initCrypto(cfg config.MqttConfig) {
 	encryptKey = key
 }
 
-// EffectiveEncrypt 返回本会话是否真正启用加密（发布与状态读取用，线程安全）。
 func EffectiveEncrypt() bool {
 	encryptMu.RLock()
 	defer encryptMu.RUnlock()
 	return effectiveEncrypt
 }
 
-// seal 用 AES-256-GCM 加密明文内层报文，返回外层信封 JSON 字节。
 func seal(plain []byte) ([]byte, error) {
 	encryptMu.RLock()
 	key := encryptKey
@@ -131,17 +120,14 @@ func seal(plain []byte) ([]byte, error) {
 	return json.Marshal(env)
 }
 
-// open 解密外层信封，返回内层明文报文。
-// 若报文不含 enc 字段（明文旧消息），则原样返回，兼容集群滚动升级。
-// 解密失败（篡改 / 无密钥注入）返回错误，调用方应丢弃该消息。
 func open(wrapped []byte) ([]byte, error) {
 	var env envelope
 	if err := json.Unmarshal(wrapped, &env); err != nil {
-		// 非 JSON（极少见）：按明文兼容处理
+
 		return wrapped, nil
 	}
 	if env.Enc != "aes-256-gcm" {
-		// 明文旧消息：直接返回原始字节，交由业务层解析 wireMessage
+
 		return wrapped, nil
 	}
 	encryptMu.RLock()
@@ -169,12 +155,11 @@ func open(wrapped []byte) ([]byte, error) {
 	nonce, ct := raw[:ns], raw[ns:]
 	plain, err := gcm.Open(nil, nonce, ct, nil)
 	if err != nil {
-		return nil, err // 篡改 / 无密钥 → 失败
+		return nil, err
 	}
 	return plain, nil
 }
 
-// normalizePrefix 确保前缀以 "/" 结尾，便于拼接 topic。
 func normalizePrefix(p string) string {
 	if !strings.HasSuffix(p, "/") {
 		return p + "/"
@@ -182,7 +167,6 @@ func normalizePrefix(p string) string {
 	return p
 }
 
-// loadNodeID 从持久化层加载（或生成）节点标识并写入内存态；数据库不可用时跳过启动。
 func loadNodeID() error {
 	id, err := GetOrCreateNodeID()
 	if err != nil {
@@ -192,8 +176,6 @@ func loadNodeID() error {
 	return nil
 }
 
-// Start 在 main 中调用：仅 Enabled 时连接 broker 并订阅整个集群前缀。
-// 任何失败都只记录、不 panic、不阻塞启动。
 func Start() {
 	cfg := config.GetConfig().Mqtt
 	if !cfg.Enabled {
@@ -222,7 +204,7 @@ func Start() {
 	opts.SetDefaultPublishHandler(onMessage)
 	opts.SetOnConnectHandler(func(_ mqtt.Client) {
 		setConnected(true)
-		// 订阅集群前缀下的全部主题
+
 		if token := client.Subscribe(prefix+"#", 1, nil); token.Wait() && token.Error() != nil {
 			slog.Warn("MQTT 订阅失败", "topic", prefix+"#", "err", token.Error())
 			return
@@ -243,7 +225,6 @@ func Start() {
 	}
 }
 
-// clientID 计算 MQTT 客户端 ID，缺省 chaos-<nodeID>。
 func clientID(cfg config.MqttConfig) string {
 	if cfg.ClientID != "" {
 		return cfg.ClientID
@@ -251,7 +232,6 @@ func clientID(cfg config.MqttConfig) string {
 	return "chaos-" + NodeID()
 }
 
-// onMessage 是订阅回调：解析报文、丢弃本机回声、去重落库。
 func onMessage(_ mqtt.Client, msg mqtt.Message) {
 	prefix := normalizePrefix(config.GetConfig().Mqtt.Prefix)
 	channel := strings.TrimPrefix(msg.Topic(), prefix)
@@ -270,7 +250,7 @@ func onMessage(_ mqtt.Client, msg mqtt.Message) {
 		slog.Warn("MQTT 报文缺少 id，已丢弃", "topic", msg.Topic())
 		return
 	}
-	// 丢弃本机回声：发布路径已即时落库
+
 	if m.NodeID != "" && m.NodeID == NodeID() {
 		return
 	}
@@ -281,8 +261,6 @@ func onMessage(_ mqtt.Client, msg mqtt.Message) {
 	slog.Info("MQTT 收到对端消息", "channel", channel, "node", m.NodeID)
 }
 
-// Publish 把消息发布到 prefix+channel（尽力而为）。broker 未连接时返回 ErrNotConnected，
-// 调用方据此仅记日志、保留本地落库结果。
 func Publish(m wireMessage) error {
 	if client == nil || !client.IsConnected() {
 		return ErrNotConnected
@@ -306,28 +284,22 @@ func Publish(m wireMessage) error {
 	return token.Error()
 }
 
-// Prefix 返回已规范化的公共主题前缀（末尾带 "/"），供业务拼接完整 topic。
 func Prefix() string {
 	return normalizePrefix(config.GetConfig().Mqtt.Prefix)
 }
 
-// PublishLocal 本地落库后立即广播（与 SendMessage 行为一致）：本地可见、对端可收。
-// 本机订阅回声因 node_id 一致会被 onMessage 静默丢弃，故不会重复落库，也不会触发告警。
 func PublishLocal(m wireMessage) error {
 	if _, err := saveMessage(m); err != nil {
 		slog.Error("MQTT 消息本地落库失败", "channel", m.Channel, "err", err)
 	}
 	if err := Publish(m); err != nil {
-		// broker 离线：本地已落库，仅记日志，不回滚
+
 		slog.Warn("MQTT 发布失败（本地已落库）", "channel", m.Channel, "err", err)
 		return err
 	}
 	return nil
 }
 
-// NewWireMessage 构造一条本机发出的业务报文（自动填充 id / node_id / ts）。
-// 用于把外部数据封装进 wireMessage 后通过 Publish 广播；本机订阅因 node_id 一致会被
-// 静默丢弃（onMessage 的回声过滤），从而不会触发「报文缺少 id」之类的告警。
 func NewWireMessage(channel, payload string) wireMessage {
 	return wireMessage{
 		ID:      tools.UUID(),

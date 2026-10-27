@@ -1,8 +1,5 @@
 package envvar
 
-// 包内私有的纯工具（与业务无关的字符串 / map 处理，无 IO、无全局状态）。
-// 仅 envvar 使用；若后续其它包需要，再提升到 pkg/tools。
-
 func splitAndTrim(s, sep string) []string {
 	if s == "" {
 		return []string{}

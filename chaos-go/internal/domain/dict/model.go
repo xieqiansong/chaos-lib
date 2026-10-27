@@ -4,8 +4,6 @@ import (
 	"chaos-go/internal/framework/crud"
 )
 
-// DictType 字典类型：一组枚举的容器，由业务模块通过 Code 引用。
-// 例如 存放位置(item_location) / 物品分类(item_category) / 购入来源(purchase_source)。
 type DictType struct {
 	crud.BaseModel
 	Name   string `json:"Name" gorm:"size:50;not null"`
@@ -17,8 +15,6 @@ type DictType struct {
 
 func (DictType) TableName() string { return "dict_type" }
 
-// DictData 字典数据项：某一 DictType 下的具体可选项；ParentID 支持父子级（如 家 > 书房）。
-// Label 给用户看，Value 存进业务表；其他模块统一按 TypeCode + Value 引用。
 type DictData struct {
 	crud.BaseModel
 	TypeCode string `json:"TypeCode" gorm:"size:64;not null;index"`

@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// 领域错误
 var (
 	ErrItemNotFound     = errors.New("items: 物品不存在")
 	ErrCategoryNotFound = errors.New("items: 分类不存在")
@@ -21,7 +20,6 @@ var (
 
 func db() *gorm.DB { return config.GetDB() }
 
-// WithinTx 在事务中执行 fn；fn 返回错误则整体回滚。
 func WithinTx(fn func(tx *gorm.DB) error) error {
 	d := db()
 	if d == nil {
@@ -29,8 +27,6 @@ func WithinTx(fn func(tx *gorm.DB) error) error {
 	}
 	return d.Transaction(fn)
 }
-
-// ── 读取（repository 是包内唯一数据访问出口）──────────────────────
 
 func GetItem(tx *gorm.DB, id int) (*Item, error) {
 	var it Item
@@ -51,7 +47,6 @@ func CreateItem(tx *gorm.DB, it *Item) error            { return tx.Create(it).E
 func CreateRecord(tx *gorm.DB, r *ItemRecord) error     { return tx.Create(r).Error }
 func CreateAssembly(tx *gorm.DB, a *ItemAssembly) error { return tx.Create(a).Error }
 
-// CurrentAssembly 取配件当前在位的装配关系（removed_at 为 NULL）。
 func CurrentAssembly(tx *gorm.DB, componentID int, hostID *int) (*ItemAssembly, error) {
 	var a ItemAssembly
 	q := tx.Where("component_id = ? AND removed_at IS NULL", componentID)
@@ -67,7 +62,6 @@ func CurrentAssembly(tx *gorm.DB, componentID int, hostID *int) (*ItemAssembly, 
 	return &a, nil
 }
 
-// CurrentAssembliesByHost 取主机当前所有在位配件。
 func CurrentAssembliesByHost(tx *gorm.DB, hostID int) ([]ItemAssembly, error) {
 	var list []ItemAssembly
 	if err := tx.Where("host_id = ? AND removed_at IS NULL", hostID).Find(&list).Error; err != nil {
@@ -76,9 +70,6 @@ func CurrentAssembliesByHost(tx *gorm.DB, hostID int) ([]ItemAssembly, error) {
 	return list, nil
 }
 
-// ── 派生查询（只读，供 handler 直接调用）──────────────────────────
-
-// ComponentView 主机当前配置中的单个配件视图。
 type ComponentView struct {
 	ComponentID int
 	Name        string
@@ -91,7 +82,6 @@ type ComponentView struct {
 	InstalledAt time.Time
 }
 
-// HostConfig 一台主机当前完整配置（仅在位配件）。
 func HostConfig(hostID int) ([]ComponentView, error) {
 	d := db()
 	if d == nil {
@@ -109,7 +99,6 @@ func HostConfig(hostID int) ([]ComponentView, error) {
 	return rows, nil
 }
 
-// AssemblyHistory 配件的流转历史视图。
 type AssemblyHistory struct {
 	HostID      int
 	HostName    string
@@ -119,7 +108,6 @@ type AssemblyHistory struct {
 	State       string
 }
 
-// ComponentHistory 某个配件的流转历史（联表不触发软删插件，需显式写 is_deleted = 0）。
 func ComponentHistory(componentID int) ([]AssemblyHistory, error) {
 	d := db()
 	if d == nil {
@@ -137,7 +125,6 @@ func ComponentHistory(componentID int) ([]AssemblyHistory, error) {
 	return rows, nil
 }
 
-// CategoryStat 按分类统计在册物品与总价值（不含已处置）。
 type CategoryStat struct {
 	CategoryID   int
 	CategoryName *string
@@ -162,7 +149,6 @@ func CategoryStats() ([]CategoryStat, error) {
 	return rows, nil
 }
 
-// LowStock 消耗品库存告急列表。
 func LowStock() ([]Item, error) {
 	d := db()
 	if d == nil {
@@ -176,7 +162,6 @@ func LowStock() ([]Item, error) {
 	return list, nil
 }
 
-// WarrantySoon 保修 N 天内到期提醒。
 func WarrantySoon(days int) ([]Item, error) {
 	d := db()
 	if d == nil {
@@ -192,7 +177,6 @@ func WarrantySoon(days int) ([]Item, error) {
 	return list, nil
 }
 
-// ReplenishCycle 消耗品补货周期预测。
 type ReplenishCycle struct {
 	ItemID          int
 	ItemName        string
@@ -202,7 +186,6 @@ type ReplenishCycle struct {
 	NextBuyEstimate *time.Time
 }
 
-// ReplenishForecast 基于 replenish 流水预测下次补货时间（窗口函数改为 Go 计算，方言无关）。
 func ReplenishForecast() ([]ReplenishCycle, error) {
 	d := db()
 	if d == nil {

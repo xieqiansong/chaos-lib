@@ -11,17 +11,13 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// metaToQuery 把信封 meta 桥接为查询参数，使既有的 query 解析逻辑（分页 / 过滤 / 排序）在 v1 下复用。
-// 实现已上收到 framework/envelope.MetaToQuery，本处仅为路由注册处的可读性保留薄封装。
 func metaToQuery(c *web.Context) {
 	envelope.MetaToQuery(c)
 }
 
-// RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
 func RegisterV1(rg *web.RouterGroup) {
 	g := rg.Group("/task-plans")
 
-	// 仅用 id 的动作：复用既有 handler（已支持信封 data.id）。
 	g.POST("/get", GetTaskPlan)
 	g.POST("/start", StartTaskPlan)
 	g.POST("/complete", CompleteTaskPlan)
@@ -32,7 +28,6 @@ func RegisterV1(rg *web.RouterGroup) {
 	g.POST("/listTasks", ListPlanTasks)
 	g.POST("/getRaw", GetTaskPlanRaw)
 
-	// 查询类动作：注入 meta 为查询参数后复用既有 handler。
 	g.POST("/list", func(c *web.Context) { metaToQuery(c); ListTaskPlans(c) })
 	g.POST("/tree", func(c *web.Context) { metaToQuery(c); GetTaskPlanTree(c) })
 
@@ -49,14 +44,11 @@ func RegisterV1(rg *web.RouterGroup) {
 	ai := g.Group("/ai")
 	ai.POST("/reviewScore", aiReviewScoreV1)
 
-	// 带 body 的动作：从信封 data 绑定后调用 service。
 	g.POST("/create", planCreateV1)
 	g.POST("/update", planUpdateV1)
 	g.POST("/setPriority", planSetPriorityV1)
 	g.POST("/review", planReviewV1)
 }
-
-// ── 带 body 的 v1 动作 ──────────────────────────────────────────
 
 func planCreateV1(c *web.Context) {
 	var req CreatePlanRequest

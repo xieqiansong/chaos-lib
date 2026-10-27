@@ -7,8 +7,6 @@ import (
 	"chaos-go/internal/framework/config"
 )
 
-// saveMessage 按 MsgID 去重写入数据库（已存在则跳过）；返回落库后的记录。
-// 发布路径（本机先落库）与订阅路径（对端消息落库）共用，保证不重复。
 func saveMessage(m wireMessage) (MqttSyncMessage, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -20,27 +18,23 @@ func saveMessage(m wireMessage) (MqttSyncMessage, error) {
 		Channel: m.Channel,
 		Payload: m.Payload,
 	}
-	// FirstOrCreate 基于 MsgID 唯一索引去重，防止 QoS 重投重复落库。
+
 	err := db.Where(MqttSyncMessage{MsgID: m.ID}).
 		Attrs(MqttSyncMessage{NodeID: m.NodeID, Channel: m.Channel, Payload: m.Payload}).
 		FirstOrCreate(&rec).Error
 	return rec, err
 }
 
-// ListLatestPerChannel 返回每个 channel 的最新一条消息（按 created_at 倒序），无分页。
-// 旧消息全部保留在数据库，仅界面展示最新一条；DTO 转换见 service.ListLatest。
 func ListLatestPerChannel() ([]MqttSyncMessage, error) {
 	return ListLatestPerChannelLike("")
 }
 
-// ListLatestPerChannelLike 返回 channel 匹配指定前缀的每个 channel 最新一条消息。
-// prefix 为空时等价于 ListLatestPerChannel（全部 channel）。
 func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	db := config.GetDB()
 	if db == nil {
 		return nil, ErrDBUnavailable
 	}
-	// 子查询走 Table（无模型 schema），soft_delete 插件不生效，故此处仍显式过滤
+
 	sub := db.Table("mqtt_sync_messages").
 		Select("MAX(id)").
 		Where("is_deleted = ?", 0).
@@ -58,19 +52,16 @@ func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	return msgs, nil
 }
 
-// DeleteChannelByName 将指定主题下的全部消息软删除（IsDeleted = true），返回受影响行数。
 func DeleteChannelByName(name string) (int64, error) {
 	db := config.GetDB()
 	if db == nil {
 		return 0, ErrDBUnavailable
 	}
-	// Delete 在 soft_delete 插件下即软删（UPDATE ... SET is_deleted = 1）
+
 	res := db.Where("channel = ?", name).Delete(&MqttSyncMessage{})
 	return res.RowsAffected, res.Error
 }
 
-// GetOrCreateNodeID 从 mqtt_sync_node 表加载节点标识；不存在则生成并持久化，返回该标识。
-// 数据库不可用时返回 ErrDBUnavailable；持久化失败仅警告并返回内存态 id，不阻断启动。
 func GetOrCreateNodeID() (string, error) {
 	db := config.GetDB()
 	if db == nil {

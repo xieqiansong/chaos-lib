@@ -2,7 +2,6 @@ package mqttsync
 
 import "time"
 
-// MessageDTO 是返回给前端的消息视图，附带 IsSelf 便于界面区分本机消息。
 type MessageDTO struct {
 	ID        int       `json:"ID"`
 	MsgID     string    `json:"MsgID"`
@@ -14,7 +13,6 @@ type MessageDTO struct {
 	UpdatedAt time.Time `json:"UpdatedAt"`
 }
 
-// StatusInfo 连接状态视图。
 type StatusInfo struct {
 	Enabled   bool   `json:"enabled"`
 	Connected bool   `json:"connected"`
@@ -24,7 +22,6 @@ type StatusInfo struct {
 	Encrypt   bool   `json:"encrypt"`
 }
 
-// toDTO 转换为前端视图；IsSelf 依据本机节点标识计算。
 func toDTO(m MqttSyncMessage) MessageDTO {
 	return MessageDTO{
 		ID:        m.ID,
@@ -38,7 +35,6 @@ func toDTO(m MqttSyncMessage) MessageDTO {
 	}
 }
 
-// toMessageDTOs 是 crud 的 ToResponse 回调：把 []*MqttSyncMessage 整批转为 []MessageDTO。
 func toMessageDTOs(rows []*MqttSyncMessage) any {
 	out := make([]MessageDTO, 0, len(rows))
 	for _, m := range rows {

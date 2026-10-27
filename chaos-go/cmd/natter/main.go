@@ -1,7 +1,3 @@
-// Natter Go 实现：在全锥 NAT 后打洞，把本地端口暴露到公网。
-// 对应 Python 版 chaos-python/util/natter.py（v2.2.1），流程一致：
-// STUN 拿公网地址 → 保活连接维持映射 → 转发入站流量 → 可选 UPnP。
-// 用法：go run ./cmd/natter -t 192.168.1.10 -p 8080
 package main
 
 import (
@@ -27,17 +23,14 @@ var (
 	errNatterRetry = errors.New("natter retry")
 )
 
-// exitManager 收集退出清理动作。
 type exitManager struct {
 	fns []func()
 }
 
 var atExit = &exitManager{}
 
-// Set 注册退出清理动作。
 func (e *exitManager) Set(fn func()) { e.fns = append(e.fns, fn) }
 
-// Run 逆序执行并清空。
 func (e *exitManager) Run() {
 	for i := len(e.fns) - 1; i >= 0; i-- {
 		e.fns[i]()
@@ -45,7 +38,6 @@ func (e *exitManager) Run() {
 	e.fns = nil
 }
 
-// stringList 支持可重复 flag 参数。
 type stringList []string
 
 func (s *stringList) String() string { return strings.Join(*s, " ") }
@@ -71,7 +63,6 @@ type options struct {
 	toPort          int
 }
 
-// defaultStunServers TCP 模式默认 STUN 服务器。
 var defaultStunServers = []string{
 	"fwa.lifesizecloud.com",
 	"global.turn.twilio.com",
@@ -85,7 +76,6 @@ var defaultStunServers = []string{
 	"stun.telnyx.com",
 }
 
-// defaultUDPStunServers UDP 模式额外前置的 STUN 服务器。
 var defaultUDPStunServers = []string{
 	"stun.miwifi.com",
 	"stun.chat.bilibili.com",
@@ -192,7 +182,6 @@ func parseFlags() (*options, error) {
 	return opt, nil
 }
 
-// runOnce 跑一遍 Natter 全流程；返回 errNatterRetry 重试、errNatterExit 正常退出。
 func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	defer atExit.Run()
 
@@ -209,7 +198,6 @@ func runOnce(ctx context.Context, opt *options, showTitle bool) error {
 	interval := time.Duration(opt.interval) * time.Second
 	udp := opt.udpMode
 
-	// -i 既可以是 IP 也可以是网卡名
 	bindIP := opt.bindIP
 	bindIface := ""
 	if err := validateIP(bindIP); err != nil {

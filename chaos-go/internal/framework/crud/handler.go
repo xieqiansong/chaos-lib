@@ -13,7 +13,6 @@ import (
 	"chaos-go/internal/framework/web"
 )
 
-// handler[T] 持有资源选项，按方法分发。
 type handler[T any] struct {
 	opts Opts[T]
 }
@@ -27,7 +26,6 @@ func (h *handler[T]) sortable(field string) bool {
 	return false
 }
 
-// viewOne 单条：包成 1 元素切片复用同一个批量回调，再取首元素。
 func (h *handler[T]) viewOne(row *T) any {
 	if h.opts.ToResponse == nil {
 		return row
@@ -35,7 +33,6 @@ func (h *handler[T]) viewOne(row *T) any {
 	return firstElem(h.opts.ToResponse([]*T{row}))
 }
 
-// runHook 执行写方向回调；返回 error 时调用方负责回滚并响应。
 func (h *handler[T]) runHook(hook func(row *T) error, row *T) error {
 	if hook == nil {
 		return nil
@@ -43,7 +40,6 @@ func (h *handler[T]) runHook(hook func(row *T) error, row *T) error {
 	return hook(row)
 }
 
-// listMeta 信封 meta 中的列表查询参数（对应规范 list 动作）。
 type listMeta struct {
 	Page     int            `json:"page"`
 	PageSize int            `json:"pageSize"`
@@ -51,21 +47,15 @@ type listMeta struct {
 	Order    string         `json:"order"`
 	Filter   map[string]any `json:"filter"`
 	Keyword  string         `json:"keyword"`
-	// Like：字段级模糊搜索（v1 对应前端 DataTable 的 search），仅对 Searchable 列生效，
-	// 与存量 GET 的「按字段 LIKE」语义一致（存量按 query 参数逐字段 LIKE）。
+
 	Like map[string]any `json:"like"`
 }
 
-// RegisterActions 在路由组 rg 下为 prefix 注册「POST + Action」风格路由（详见《接口规范.md》），
-// 复用同一套 handler[T] 业务逻辑。动作集：list / get / create / update / delete /
-// batchCreate / batchDelete / status（status 需提供 toggle）。
-// Register 已随接口重构下线，此处只保留「POST + Action」单一风格路由。
 func RegisterActions[T any](rg *web.RouterGroup, prefix string, opts Opts[T], toggle *ToggleOpts) *web.RouterGroup {
 	h := &handler[T]{opts: opts}
 	g := rg.Group("/" + prefix)
 	if opts.V1ListHandler != nil {
-		// 自定义列表实现通常沿用「从 query 读分页 / 过滤」的既有逻辑（如 projects / notes），
-		// 故先用 envelope.MetaToQuery 把信封 meta 桥接为查询参数，再交给它，保证 v1 语义与存量一致。
+
 		g.POST("/list", func(c *web.Context) {
 			envelope.MetaToQuery(c)
 			opts.V1ListHandler(c)
@@ -75,7 +65,7 @@ func RegisterActions[T any](rg *web.RouterGroup, prefix string, opts Opts[T], to
 	}
 	g.POST("/get", h.getAction)
 	if opts.V1CreateHandler != nil {
-		// 自定义创建（如笔记的文件优先创建）：绕过基线 createAction 及其 BeforeCreate 校验。
+
 		g.POST("/create", opts.V1CreateHandler)
 	} else {
 		g.POST("/create", h.createAction)

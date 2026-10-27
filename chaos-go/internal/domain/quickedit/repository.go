@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// TakeSnapshot 写入一条内容快照（供本包与 envvar 共用）。
 func TakeSnapshot(fileID int, content string) (*QuickEditSnapshot, error) {
 	snapshot := QuickEditSnapshot{
 		FileID:    fileID,
@@ -27,7 +26,6 @@ func TakeSnapshot(fileID int, content string) (*QuickEditSnapshot, error) {
 	return &snapshot, nil
 }
 
-// FindFileByID 按 ID 加载文件记录；不存在返回 ErrFileNotFound。
 func FindFileByID(id int) (*QuickEditFile, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -43,7 +41,6 @@ func FindFileByID(id int) (*QuickEditFile, error) {
 	return &file, nil
 }
 
-// GetLatestSnapshot 返回某文件最近一次快照。
 func GetLatestSnapshot(fileID int) (*QuickEditSnapshot, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -57,7 +54,6 @@ func GetLatestSnapshot(fileID int) (*QuickEditSnapshot, error) {
 	return &latest, nil
 }
 
-// ListFiles 返回全部文件（按创建时间倒序）。
 func ListFiles() ([]QuickEditFile, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -70,7 +66,6 @@ func ListFiles() ([]QuickEditFile, error) {
 	return files, nil
 }
 
-// FindFileByPath 按绝对路径查重。
 func FindFileByPath(absPath string) (*QuickEditFile, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -83,7 +78,6 @@ func FindFileByPath(absPath string) (*QuickEditFile, error) {
 	return &existing, nil
 }
 
-// CreateFile 登记一个新文件。
 func CreateFile(file *QuickEditFile) error {
 	db := config.GetDB()
 	if db == nil {
@@ -92,7 +86,6 @@ func CreateFile(file *QuickEditFile) error {
 	return db.Create(file).Error
 }
 
-// DeleteFile 物理删除某文件记录。
 func DeleteFile(id int) error {
 	db := config.GetDB()
 	if db == nil {
@@ -101,7 +94,6 @@ func DeleteFile(id int) error {
 	return db.Delete(&QuickEditFile{}, "id = ?", id).Error
 }
 
-// UpdateFileUpdatedAt 刷新文件更新时间。
 func UpdateFileUpdatedAt(id int, t time.Time) error {
 	db := config.GetDB()
 	if db == nil {
@@ -110,7 +102,6 @@ func UpdateFileUpdatedAt(id int, t time.Time) error {
 	return db.Model(&QuickEditFile{}).Where("id = ?", id).Update("updated_at", t).Error
 }
 
-// ListSnapshots 分页返回某文件的快照列表（按时间倒序）。
 func ListSnapshots(fileID int, q pagination.Query) ([]QuickEditSnapshot, int64, error) {
 	db := config.GetDB()
 	if db == nil {
@@ -128,7 +119,6 @@ func ListSnapshots(fileID int, q pagination.Query) ([]QuickEditSnapshot, int64, 
 	return snaps, total, nil
 }
 
-// FindSnapshot 按 (fileID, snapID) 加载单条快照；不存在返回 ErrSnapshotNotFound。
 func FindSnapshot(fileID, snapID int) (*QuickEditSnapshot, error) {
 	db := config.GetDB()
 	if db == nil {
