@@ -23,8 +23,12 @@ func FindJobByID(id int) (CronJob, error) {
 
 // FindEnabledJobs 读取所有启用且未删除的任务（调度器启动时加载）。
 func FindEnabledJobs() ([]CronJob, error) {
+	db := config.GetDB()
+	if db == nil {
+		return nil, ErrDBUnavailable
+	}
 	var jobs []CronJob
-	if err := config.GetDB().Where("enabled = ?", true).Find(&jobs).Error; err != nil {
+	if err := db.Where("enabled = ?", true).Find(&jobs).Error; err != nil {
 		return nil, err
 	}
 	return jobs, nil

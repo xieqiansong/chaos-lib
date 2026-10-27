@@ -235,6 +235,7 @@ func Start() {
 	})
 
 	client = mqtt.NewClient(opts)
+	slog.Info("MQTT 正在连接 broker（失败会在后台重试）", "broker", cfg.Broker)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		setConnected(false)
 		slog.Warn("MQTT 连接失败（应用继续运行，本地功能不受影响）", "broker", cfg.Broker, "err", token.Error())

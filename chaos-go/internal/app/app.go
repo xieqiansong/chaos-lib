@@ -43,11 +43,11 @@ func Run(webFS fs.FS) error {
 	config.InitLog()
 	slog.Info("日志初始化完成")
 
-	// 数据库连接 & 自动迁移
+	// 数据库连接 & 自动迁移。数据库不可用时不阻断启动：跳过迁移，应用以降级模式运行；
+	// 依赖数据库的接口会在请求期返回错误，后续 GetDB 会重新尝试建连。
 	db := config.GetDB()
 	if db == nil {
-		slog.Error("数据库连接失败，无法继续启动")
-		return nil
+		slog.Warn("数据库连接失败，跳过迁移并以降级模式启动")
 	}
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
@@ -61,13 +61,15 @@ func Run(webFS fs.FS) error {
 		return err
 	}
 
-	slog.Info("数据库连接成功，执行自动迁移")
-	migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（含 dbmonitor 无模型、datacache 的 DataCache 等）
-	migrateModels = append(migrateModels,
-		&apilog.ApiLog{},
-	)
-	if err := config.AutoMigrate(db, migrateModels...); err != nil {
-		slog.Error("数据库迁移失败", "err", err)
+	if db != nil {
+		slog.Info("数据库连接成功，执行自动迁移")
+		migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（含 dbmonitor 无模型、datacache 的 DataCache 等）
+		migrateModels = append(migrateModels,
+			&apilog.ApiLog{},
+		)
+		if err := config.AutoMigrate(db, migrateModels...); err != nil {
+			slog.Error("数据库迁移失败", "err", err)
+		}
 	}
 
 	setupPprof(&cfg.Pprof)
@@ -77,9 +79,18 @@ func Run(webFS fs.FS) error {
 	apilog.Start()
 	slog.Info("接口访问日志记录器启动完成")
 
-	// 多节点 MQTT 同步：未启用或 broker 不可达时不阻塞启动
-	mqttsync.Start()
-	slog.Info("多节点 MQTT 同步启动完成")
+	// 多节点 MQTT 同步：未启用、broker 不可达、数据库不可用均不阻塞启动。
+	// Start 内部对 broker 是「连接重试 + 阻塞等待」的语义，故放到后台 goroutine，
+	// 由 paho 的 ConnectRetry 持续重连，HTTP 服务不受影响。
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("MQTT 同步启动 panic", "panic", r)
+			}
+		}()
+		mqttsync.Start()
+	}()
+	slog.Info("多节点 MQTT 同步转入后台启动")
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent

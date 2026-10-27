@@ -54,7 +54,13 @@ func flushLoop() {
 		if len(batch) == 0 {
 			return
 		}
-		if err := config.GetDB().Create(batch).Error; err != nil {
+		db := config.GetDB()
+		if db == nil {
+			// 数据库不可用：丢弃本批日志，避免 nil 解引用导致进程崩溃。
+			batch = batch[:0]
+			return
+		}
+		if err := db.Create(batch).Error; err != nil {
 			slog.Error("api 日志批量落库失败", "err", err)
 		}
 		batch = batch[:0]

@@ -11,6 +11,9 @@ import (
 // ErrJobNotFound 定时任务不存在（或已软删）。
 var ErrJobNotFound = errors.New("cronjob: 定时任务不存在")
 
+// ErrDBUnavailable 表示数据库不可用（启动期调度器加载任务时用于降级）。
+var ErrDBUnavailable = errors.New("cronjob: database unavailable")
+
 // ActionType 是定时任务到点后要执行的动作类型。
 type ActionType string
 
