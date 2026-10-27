@@ -31,18 +31,6 @@ export interface CronJobRun {
     Error: string
 }
 
-// 内置任务：由插件在代码中声明，不落 cron_jobs 表，因此只读（无增删改/启停）。
-export interface BuiltinTask {
-    Name: string
-    Cron: string
-    Running: boolean
-    LastRunAt: string | null
-    LastDurationMs: number
-    LastStatus: string
-    LastError: string
-    NextRun: string | null
-}
-
 const rest = useRestApi<CronJob>('cron-jobs')
 
 export const cronJobApi = {
@@ -59,6 +47,4 @@ export const cronJobApi = {
     // cron 表达式校验 + 未来若干次触发时间预览
     preview: (cronExpr: string, count = 5): Promise<{ valid: boolean; error?: string; nextRuns: string[] }> =>
         action('cron-jobs', 'preview', {cronExpr, count}),
-    // 插件内置任务状态（只读）
-    builtinList: (): Promise<BuiltinTask[]> => action<BuiltinTask[]>('cron-jobs', 'builtinList'),
 }

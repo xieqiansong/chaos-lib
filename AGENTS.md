@@ -19,9 +19,7 @@
 - 业务路由在 `RegisterV1(rg *web.RouterGroup)` 内挂载，不在 `router.go` / `routehub` 内联；handler 入参为 `*web.Context`（已无 gin）。
 - 通用 CRUD 用 `crud.RegisterActions[T](rg, "<prefix>", crud.Opts[T]{...}, *crud.ToggleOpts)`；`Opts` / `ToggleOpts` 的回调体只转调 service。
 - 业务动作：解析用 `envelope.Bind`，错误映射用 `httpx.MapError`，响应用 `renv.Success` / `renv.Error`。
-- 内置周期任务（随代码发布、无需数据库）在 `plugin.go` 的 `Tasks` 声明（`scheduler.TaskSpec`：名称 / cron / 超时 / 幂等 Run），由 `framework/scheduler` 统一运行，不写 `cron_jobs` 表；用户自定义任务才走 `internal/domain/cronjob`（落库，HTTP / Shell 动作）。
-- 数据库连接由 `internal/framework/database` 插件统一持有：业务代码仍用 `config.GetDB()`，连不上时返回 nil（由接口层报错）；依赖数据库初始化的插件在 `Dependencies` 声明 `database`，需要「库恢复后补初始化」时用 `database.OnReady`。
-- 长阻塞的常驻服务在 `plugin.go` 的 `Start` 里起 goroutine（互斥 + panic 恢复），`Start` 本身必须快速返回。
+- 后台任务不用 `scheduler.Register`（已移除）；在 `plugin.go` 的 `Start` 里起 goroutine（互斥 + panic 恢复）。cron 或触发 HTTP / 命令的任务走 `internal/domain/cronjob`。
 - 循环依赖用 `Meta.SoftDeps` + 运行时函数变量注入，不在 `init()` 互相 import。
 - 被重写 / 扩展的存量模块须迁移到上述基线。
 

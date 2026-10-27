@@ -28,15 +28,21 @@ import (
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
-	"chaos-go/internal/platform/mqttsync"
+	_ "chaos-go/internal/platform/mqttsync"
 	_ "chaos-go/internal/platform/stunpf"
 	_ "chaos-go/internal/platform/stunsync"
+	"context"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
-// Run 装配并启动 chaos-go 应用，阻塞至 HTTP Server 退出。
+// Run 装配并启动 chaos-go 应用，阻塞至 HTTP Server 退出（收到 SIGINT/SIGTERM 时优雅退出）。
 // webFS 为前端静态资源文件系统（由调用方解析后传入）。
 func Run(webFS fs.FS) error {
 	cfg := config.LoadConfig()
@@ -66,25 +72,15 @@ func Run(webFS fs.FS) error {
 	apilog.Start()
 	slog.Info("接口访问日志记录器启动完成")
 
-	// 多节点 MQTT 同步：未启用、broker 不可达、数据库不可用均不阻塞启动。
-	// Start 内部对 broker 是「连接重试 + 阻塞等待」的语义，故放到后台 goroutine，
-	// 由 paho 的 ConnectRetry 持续重连，HTTP 服务不受影响。
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				slog.Error("MQTT 同步启动 panic", "panic", r)
-			}
-		}()
-		mqttsync.Start()
-	}()
-	slog.Info("多节点 MQTT 同步转入后台启动")
+	// 多节点 MQTT 同步：连接由 mqttsync 插件的 Start 钩子接管（立即返回，重连在内部 goroutine），
+	// 未启用 / broker 不可达 / 数据库未就绪都不会阻塞启动。
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
 
 	// 插件生命周期启动（按依赖拓扑序）。单个插件失败只记录错误，不阻断其它插件与 HTTP 服务；
-	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发用户任务调度。
+	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发用户任务调度，mqttsync 的 Start 触发 MQTT 连接。
 	if err := plugin.StartAll(regs); err != nil {
 		slog.Error("部分插件启动失败，继续以降级模式运行", "err", err)
 	}
@@ -94,9 +90,36 @@ func Run(webFS fs.FS) error {
 	slog.Info("内置任务启动完成")
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
-	r := router.SetupRouter(webFS)
+	srv := &http.Server{Addr: cfg.Server.GetAddress(), Handler: router.SetupRouter(webFS)}
 
-	return http.ListenAndServe(cfg.Server.GetAddress(), r)
+	// 优雅退出：SIGINT / SIGTERM → 先停止接收请求，再逆序停止插件
+	//（断开 MQTT、释放端口转发监听、停止 cron 调度），最后进程退出。
+	sigCtx, stopSignal := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignal()
+
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- srv.ListenAndServe() }()
+
+	select {
+	case err := <-serveErr:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-sigCtx.Done():
+		slog.Info("收到退出信号，开始优雅退出")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("HTTP 服务关闭超时", "err", err)
+	}
+	if err := plugin.StopAll(regs); err != nil {
+		slog.Warn("部分插件停止失败", "err", err)
+	}
+	slog.Info("已退出")
+	return nil
 }
 
 func setupPprof(cfg *config.PprofConfig) {

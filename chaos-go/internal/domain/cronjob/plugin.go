@@ -1,7 +1,6 @@
 package cronjob
 
 import (
-	"chaos-go/internal/framework/database"
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/web"
 )
@@ -14,20 +13,14 @@ func init() {
 			ID:           "cronjob",
 			Name:         "定时任务",
 			Version:      "1.0.0",
-			Dependencies: []string{"database"},
+			Dependencies: []string{"systemjob"},
 		},
 		Models: []any{&CronJob{}, &CronJobRun{}},
 		RegisterRoutes: func(rg *web.RouterGroup) {
 			RegisterV1(rg)
 		},
 		Start: func() error {
-			// Start 幂等：数据库已就绪则立即加载用户任务；
-			// 未就绪则登记回调，由 database 插件在连接成功后补加载。
-			if database.Ready() {
-				Start()
-			} else {
-				database.OnReady(Start)
-			}
+			Start()
 			return nil
 		},
 	})

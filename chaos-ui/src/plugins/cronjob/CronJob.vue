@@ -7,12 +7,12 @@
 //   2. 「运行 / 历史」是标准 CRUD 之外的动作，经 #actions 插槽追加到操作列。
 //   3. 下次执行时间（NextRun）由后端按 cron 表达式实时计算，不落库 —— 前端只负责渲染。
 //   4. 工具栏的 cron 表达式校验沿用自定义 /preview 接口，避免填错表达式却要到点才发现。
-import {onMounted, ref, watch} from 'vue'
+import {ref, watch} from 'vue'
 import {showSuccess, showError, showWarning} from '@/utils/message'
 import {format as formatDate, parseISO} from 'date-fns'
 import DataTable from '@/components/DataTable.vue'
 import type {DataTableColumn, FormField} from '@/components/dataTable/types'
-import {cronJobApi, type BuiltinTask, type CronJob, type CronJobRun} from './api'
+import {cronJobApi, type CronJob, type CronJobRun} from './api'
 
 // 兼容 App.vue 向动态视图透传的 search-text（本页用 DataTable 自带搜索，故未使用）
 defineProps<{ searchText?: string }>()
@@ -154,30 +154,6 @@ function duration(start: string, end: string | null): string {
   return (ms / 1000).toFixed(1) + 's'
 }
 
-function fmtDurationMs(ms: number): string {
-  if (!ms) return '—'
-  if (ms < 1000) return ms + 'ms'
-  return (ms / 1000).toFixed(1) + 's'
-}
-
-// 内置任务（只读）：由插件在代码中声明，后端 scheduler 统一运行，不落库。
-const builtinTasks = ref<BuiltinTask[]>([])
-const builtinLoading = ref(false)
-
-async function loadBuiltin() {
-  builtinLoading.value = true
-  try {
-    builtinTasks.value = await cronJobApi.builtinList()
-  } catch (e: any) {
-    showError(e?.message || '加载内置任务失败')
-    builtinTasks.value = []
-  } finally {
-    builtinLoading.value = false
-  }
-}
-
-onMounted(loadBuiltin)
-
 // 动作配置（JSON 文本）在表格里的摘要：http 显示「方法 URL」，命令显示命令本身
 function actionSummary(row: CronJob): string {
   try {
@@ -229,43 +205,6 @@ function actionSummary(row: CronJob): string {
       </template>
     </DataTable>
 
-    <div class="builtin-tasks">
-      <div class="builtin-head">
-        <div>
-          <span class="builtin-title">内置任务</span>
-          <span class="text-secondary text-xs">由插件在代码中声明，只读</span>
-        </div>
-        <el-button size="small" text :loading="builtinLoading" @click="loadBuiltin">刷新</el-button>
-      </div>
-      <el-table :data="builtinTasks" v-loading="builtinLoading" border stripe size="small">
-        <el-table-column prop="Name" label="名称" min-width="160"/>
-        <el-table-column prop="Cron" label="Cron" width="150"/>
-        <el-table-column label="上次执行" width="170">
-          <template #default="{ row }">{{ fmtTime(row.LastRunAt) }}</template>
-        </el-table-column>
-        <el-table-column label="耗时" width="90">
-          <template #default="{ row }">{{ fmtDurationMs(row.LastDurationMs) }}</template>
-        </el-table-column>
-        <el-table-column label="上次结果" width="100">
-          <template #default="{ row }">
-            <el-tag v-if="row.Running" size="small" type="warning">运行中</el-tag>
-            <el-tooltip v-else-if="row.LastStatus === 'failed'" :content="row.LastError" placement="top">
-              <el-tag size="small" type="danger">失败</el-tag>
-            </el-tooltip>
-            <el-tag v-else size="small" :type="(statusMap[row.LastStatus]?.type as any) || 'info'">
-              {{ statusMap[row.LastStatus]?.text || '—' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="下次执行" width="170">
-          <template #default="{ row }">{{ fmtTime(row.NextRun) }}</template>
-        </el-table-column>
-      </el-table>
-      <div class="builtin-hint text-secondary text-xs">
-        内置任务随代码发布；未启用时仍按计划触发但内部直接跳过，执行失败只记录状态，不影响其它任务。
-      </div>
-    </div>
-
     <el-dialog v-model="showHistory" :title="`运行历史 — ${historyJobName}`" width="736px">
       <el-table :data="runs" v-loading="runsLoading" border stripe size="small" max-height="50vh">
         <el-table-column label="开始时间" width="170">
@@ -311,25 +250,5 @@ function actionSummary(row: CronJob): string {
   background: var(--el-fill-color-light, #f5f7fa);
   padding: 6px 8px;
   border-radius: 4px;
-}
-
-.builtin-tasks {
-  margin-top: var(--space-lg);
-}
-
-.builtin-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-.builtin-title {
-  font-weight: 600;
-  margin-right: var(--space-sm);
-}
-
-.builtin-hint {
-  margin-top: var(--space-xs);
 }
 </style>

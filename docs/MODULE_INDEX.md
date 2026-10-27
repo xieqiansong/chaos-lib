@@ -22,8 +22,7 @@
 | 任务管理（待办/cron/任务树） | `internal/domain/taskplan` | 业务 | `src/plugins/taskplan` | `/taskPlan` | `task-plan` | 含父子任务树 |
 | 待办任务 | `internal/domain/taskplan` | 业务 | `src/plugins/taskplan` | `/pendingTask` | `task-plan` | 同模块不同页 |
 | FSRS 间隔复习 | `internal/domain/taskplan`（`fsrs.go`） | 业务 | `src/plugins/taskplan` | `/taskPlan` | `task-plan` | AI 评分走 `platform/deepseek` |
-| 定时任务（robfig/cron） | `internal/domain/cronjob` | 业务 | `src/plugins/cronjob` | `/cronJob` | `cron-jobs` | 仅用户自定义任务（落库）；插件内置任务只读展示于同页 |
-| 内置任务调度 | `internal/framework/scheduler` | 框架（非插件） | 同上（只读分区） | `/cronJob` | `cron-jobs`（`builtinList`） | 运行插件 `Tasks` 声明的周期任务，不落库 |
+| 定时任务（robfig/cron） | `internal/domain/cronjob` | 业务 | `src/plugins/cronjob` | `/cronJob` | `cron-job` | 独立模块，与 taskplan 无耦合 |
 | 看板统计 | `internal/domain/dashboard` | 业务 | `src/plugins/dashboard` | `/dashboard` | `dashboard` | ECharts，前端辅助 `plugins/echarts` |
 | 项目管理（含回收站） | `internal/domain/project` | 业务 | `src/plugins/project` | `/projectManage` | `project` | |
 | 文件连接（Junction） | `internal/domain/filelink` | 业务 | `src/plugins/filelink` | `/fileLink` | `file-link` | 开关 `FEATURE_FILE_LINK` |
@@ -33,7 +32,6 @@
 | SSH 连接管理 | `internal/domain/sshconn` | 业务 | `src/plugins/portfwd` | `/portForward` | `ssh-conn` | 前端并入 portfwd 页 |
 | SSH 端口转发 | `internal/domain/portfwd` | 业务 | `src/plugins/portfwd` | `/portForward` | `port-fwd` | 转发规则 |
 | 数据监控（只读自省） | `internal/framework/dbmonitor` | 框架 | `src/plugins/dbmonitor` | `/databaseMonitor` | `db-monitor` | 双后端兼容 |
-| 数据库连接（基础设施） | `internal/framework/database` | 框架（插件） | （无） | （无） | （无） | 连接/重试/迁移；业务经 `config.GetDB()` 取连接，未就绪返回 nil |
 | 数据缓存 * | `internal/framework/datacache` | 框架 | `src/plugins/datacache` | `/dataCache` | `data-cache` | README 页面表漏列 |
 | 数据字典（枚举中心） | `internal/domain/dict` | 业务 | `src/plugins/datadict` | `/dataDict` | `dict-types` / `dict-data` | **命名别名：dict ↔ datadict**（两个资源前缀） |
 | 个人物品 * | `internal/domain/items` | 业务 | `src/plugins/items` | `/items` | `items` | 购入/补货/消耗/借还等；README 功能表漏列 |
@@ -45,7 +43,7 @@
 | MQTT 多节点同步 | `internal/platform/mqttsync` | 平台（插件） | `src/plugins/mqttsync` | `/mqttSync` | `mqtt-sync` | AES 加密可配 |
 | 通知推送（Toast/WxPusher） | `pkg/tools/alarm` | 工具 | （无） | （无） | （无） | 工具层，无独立模块/页面 |
 | Supabase 数据通道 | `internal/platform/supabase` | 平台（适配器） | （无） | （无） | （无） | 仅后端客户端，非插件、无路由 |
-| 系统动作入口 | `internal/domain/systemjob` | 业务 | （无） | （无） | （无） | 手动/外部触发的 HTTP 动作；内置周期任务已由各插件 `Tasks` 声明，不再经此调度 |
+| 系统周期任务 | `internal/domain/systemjob` | 业务 | （无） | （无） | （无） | 后台调度，无 UI |
 
 > `*` = README 未列出但代码真实存在。`hidden` = 不进侧边菜单但仍可访问。
 
@@ -56,11 +54,11 @@
 | 分类 | 目录 | 是否插件（有 `plugin.go` + `init` 注册） | 数量 | 成员 |
 |------|------|------------------------------------------|------|------|
 | 业务模块 | `internal/domain/<x>` | 是 | 16 | taskplan, project, envvar, filelink, quickedit, proxy, portfwd, cronjob, items, dict, sdk, polyform, standarddata, systemjob, dashboard, sshconn |
-| 框架基础设施 | `internal/framework/<x>` | 部分（database, dbmonitor, datacache 是插件，其余为基类/中间件） | 3 插件 + 15 基件 | web, router, routehub, plugin, config, crud, envelope, resp, httpx, middleware, pagination, scheduler, apilog, security, memcache, **database\***, **dbmonitor\***, **datacache\*** |
-| 平台适配器 | `internal/platform/<x>` | mqttsync, stunsync, stunpf 是插件 | 3 插件 + 2 适配器 | **mqttsync\***, **stunsync\***（仅 Tasks）, **stunpf\***（仅 Tasks）, deepseek, supabase（适配器，按需调用，不注册路由） |
+| 框架基础设施 | `internal/framework/<x>` | 部分（dbmonitor, datacache 是插件，其余为基类/中间件） | 2 插件 + 15 基件 | web, router, routehub, plugin, config, crud, envelope, resp, httpx, middleware, pagination, scheduler, apilog, security, memcache, **dbmonitor\***, **datacache\*** |
+| 平台适配器 | `internal/platform/<x>` | 仅 mqttsync | 1 插件 + 4 适配器 | **mqttsync\***（插件）, deepseek, stunpf, stunsync, supabase（适配器，按需调用，不注册路由） |
 | 宿主工具 | `pkg/tools` | 否 | 9 | alarm, db, env_var, file_link, http, port_forwarding, project_fs, shell, uuid |
 
-> 插件合计 = 16（业务）+ 3（框架）+ 3（平台）= **22**；前端插件 19（后端 `database` 与 stun 两个平台插件无页面）。
+> 插件合计 = 16（业务）+ 2（框架）+ 1（平台）= **19**，与 `AGENTS.md` 一致。
 
 ## 3. 前端结构（chaos-ui/src）
 
@@ -78,7 +76,7 @@
 
 - **命名别名**：后端 `dict` ↔ 前端 `datadict`；API 前缀进一步拆为 `dict-types` / `dict-data`（两类资源）。
 - **一对多**：`taskplan` 一个后端模块支撑 `/taskPlan` + `/pendingTask` 两个前端页；`proxy` 一个后端模块支撑 `/bookmarks` + `/browserHistory` + 天气/余额；`sshconn` + `portfwd` 两个后端模块共用前端 `/portForward` 一页。
-- **平台适配器 ≠ 都有路由**：`deepseek` / `supabase` 是按需调用客户端，**没有 `plugin.go`、不注册路由**；`mqttsync` / `stunsync` / `stunpf` 已登记为插件，其中 stun 两个只声明 `Tasks`（内置周期任务），仍不注册路由。
+- **平台适配器 ≠ 插件**：`deepseek` / `stunpf` / `stunsync` / `supabase` 是 `internal/platform` 下的按需调用客户端，**没有 `plugin.go`、不注册路由**；只有 `mqttsync` 是注册插件。别在这四个目录里找 `RegisterV1`。
 - **通知没有独立模块**：`WxPusher` / Windows Toast 实现在 `pkg/tools/alarm.go`，由其他模块调用，无前端页面。
 - **浏览器扩展**：`chaos-browser-extension/` 是独立可部署件，作为客户端直连后端 `proxy` 模块的 `/bookmarks`、`/history` 等接口；它本身不含业务后端逻辑。
 - **软依赖示例**：`taskplan` 的 AI 评分依赖 `platform/deepseek`（运行时通过 `Meta.SoftDeps` 注入，非 import 硬依赖）。

@@ -69,10 +69,4 @@ CREATE INDEX IF NOT EXISTS idx_dict_data_type ON public.dict_data (type_code);
 CREATE INDEX IF NOT EXISTS idx_dict_data_parent ON public.dict_data (parent_id);
 CREATE INDEX IF NOT EXISTS idx_dict_data_deleted ON public.dict_data (is_deleted);
 
--- 2026-10-27 内置任务回归插件：四个系统周期任务改为在各自 plugin.go 的 Tasks 中声明，
--- 由 framework/scheduler 运行，不再写入 cron_jobs 表。cron_jobs 仅保留用户自定义任务。
--- 清理历史版本写入的同名记录，避免与内置任务重复执行。
-DELETE FROM public.cron_jobs
-WHERE name IN ('STUN 端口转发同步', 'STUN 规则同步', '端口转发自愈', '任务计划扫描');
-
 

@@ -1,12 +1,9 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
-	"sort"
 
-	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/framework/web"
 )
 
@@ -37,28 +34,21 @@ func Build() ([]Registration, error) {
 		byID[r.Meta.ID] = r
 	}
 
-	// 缺失依赖 / 依赖已禁用检测（SoftDeps 不计入硬依赖）。
-	// 依赖被禁用时明确报错，避免 Kahn 入度把该边计入后误报成「循环依赖」。
+	// 缺失依赖检测（SoftDeps 不计入硬依赖）
 	for _, r := range regs {
 		if !r.Meta.IsEnabled() {
 			continue
 		}
 		for _, dep := range r.Meta.Dependencies {
-			d, ok := byID[dep]
-			if !ok {
+			if _, ok := byID[dep]; !ok {
 				return nil, fmt.Errorf("插件 %q 依赖未注册的插件 %q", r.Meta.ID, dep)
-			}
-			if !d.Meta.IsEnabled() {
-				return nil, fmt.Errorf("插件 %q 依赖的插件 %q 已禁用", r.Meta.ID, dep)
 			}
 		}
 	}
 
-	// Kahn 拓扑排序（仅启用插件参与；边为硬依赖）。
-	// 初始队列按登记顺序构建，保证同等优先级下启动顺序稳定、日志可复现。
+	// Kahn 拓扑排序（仅启用插件参与；边为硬依赖）
 	indeg := make(map[string]int)
 	adj := make(map[string][]string)
-	var queue []string
 	for _, r := range regs {
 		if !r.Meta.IsEnabled() {
 			continue
@@ -71,9 +61,10 @@ func Build() ([]Registration, error) {
 			indeg[r.Meta.ID]++
 		}
 	}
-	for _, r := range regs {
-		if r.Meta.IsEnabled() && indeg[r.Meta.ID] == 0 {
-			queue = append(queue, r.Meta.ID)
+	var queue []string
+	for id, d := range indeg {
+		if d == 0 {
+			queue = append(queue, id)
 		}
 	}
 	ordered := make([]string, 0, len(indeg))
@@ -95,7 +86,6 @@ func Build() ([]Registration, error) {
 				inCycle = append(inCycle, id)
 			}
 		}
-		sort.Strings(inCycle)
 		return nil, fmt.Errorf("检测到插件循环依赖，涉及: %v", inCycle)
 	}
 
@@ -116,41 +106,16 @@ func ModelsOf(rs []Registration) []any {
 	return models
 }
 
-// TasksOf 汇总所有插件的内置任务声明，供装配层交给 scheduler 统一运行。
-func TasksOf(rs []Registration) []scheduler.TaskSpec {
-	var tasks []scheduler.TaskSpec
-	for _, r := range rs {
-		tasks = append(tasks, r.Tasks...)
-	}
-	return tasks
-}
-
 // StartAll 按依赖拓扑序启动插件（调用非 nil 的 Start）。
-// 单个插件启动失败不阻断其它插件：错误聚合后返回，由装配层决定是否降级继续。
 func StartAll(rs []Registration) error {
-	var errs []error
 	for _, r := range rs {
 		if r.Start == nil {
 			continue
 		}
-		if err := safeStart(r); err != nil {
-			errs = append(errs, err)
-			continue
+		if err := r.Start(); err != nil {
+			return fmt.Errorf("插件 %q 启动失败: %w", r.Meta.ID, err)
 		}
 		slog.Info("插件启动完成", "id", r.Meta.ID)
-	}
-	return errors.Join(errs...)
-}
-
-// safeStart 把插件 Start 的 panic 转成 error，避免一个插件拖垮整个启动流程。
-func safeStart(r Registration) (err error) {
-	defer func() {
-		if p := recover(); p != nil {
-			err = fmt.Errorf("插件 %q 启动 panic: %v", r.Meta.ID, p)
-		}
-	}()
-	if err := r.Start(); err != nil {
-		return fmt.Errorf("插件 %q 启动失败: %w", r.Meta.ID, err)
 	}
 	return nil
 }
