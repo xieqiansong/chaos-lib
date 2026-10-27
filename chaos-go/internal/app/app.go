@@ -45,6 +45,10 @@ func Run(webFS fs.FS) error {
 
 	// 数据库连接 & 自动迁移
 	db := config.GetDB()
+	if db == nil {
+		slog.Error("数据库连接失败，无法继续启动")
+		return nil
+	}
 
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
 	// 已登记为插件的模块：proxy / taskplan / project / portfwd / envvar / filelink / sdk /
