@@ -75,17 +75,3 @@ func FindRuns(jobID int, q pagination.Query) ([]CronJobRun, int64, error) {
 	}
 	return list, total, nil
 }
-
-// CountJobs 统计未删除的任务数量（用于判断是否需写入默认任务）。
-func CountJobs() (int64, error) {
-	var count int64
-	if err := config.GetDB().Model(&CronJob{}).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
-// CreateJobs 批量写入默认任务。
-func CreateJobs(jobs []CronJob) error {
-	return config.GetDB().Create(&jobs).Error
-}

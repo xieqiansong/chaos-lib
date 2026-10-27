@@ -21,6 +21,9 @@ import (
 func SetupRouter(webFS fs.FS) http.Handler {
 	r := web.NewRouter()
 
+	// panic 兜底：单个接口异常返回统一错误信封，而不是直接断开连接。
+	r.Use(middleware.Recovery())
+
 	// 响应 gzip 压缩（替代 gin-contrib/gzip）。
 	// 接口访问日志：记录每个 /api 请求的元数据与请求/响应体，异步批量落库。
 	r.Use(apilog.Middleware())

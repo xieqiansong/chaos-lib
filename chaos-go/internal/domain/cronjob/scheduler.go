@@ -18,12 +18,19 @@ var (
 	cronInstance *cron.Cron
 	cronMu       sync.Mutex
 	entryIDs     = map[int]cron.EntryID{}
+	// loaded 表示用户任务是否已成功从数据库加载；启动期数据库不可用时为 false，
+	// 之后 database 插件就绪回调再次调用 Start 会重新加载。
+	loaded bool
 )
 
 // Start 加载所有启用的定时任务并启动调度器。
+// 幂等：已成功加载过则直接返回，避免 database 就绪回调与 Start 钩子重复重建调度器。
 func Start() {
 	cronMu.Lock()
 	defer cronMu.Unlock()
+	if cronInstance != nil && loaded {
+		return
+	}
 	if cronInstance != nil {
 		cronInstance.Stop()
 	}
@@ -31,6 +38,8 @@ func Start() {
 	jobs, err := FindEnabledJobs()
 	if err != nil {
 		slog.Error("加载定时任务失败", "err", err)
+	} else {
+		loaded = true
 	}
 	for i := range jobs {
 		addEntry(&jobs[i])
@@ -48,6 +57,7 @@ func Stop() {
 		cronInstance = nil
 	}
 	entryIDs = map[int]cron.EntryID{}
+	loaded = false
 }
 
 // SyncJob 在任务变更后重排调度（新增 / 修改 / 启停）。

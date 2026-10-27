@@ -22,13 +22,15 @@ import (
 	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/database"
 	_ "chaos-go/internal/framework/datacache"
 	_ "chaos-go/internal/framework/dbmonitor"
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/platform/mqttsync"
-	_ "chaos-go/internal/platform/mqttsync"
+	_ "chaos-go/internal/platform/stunpf"
+	_ "chaos-go/internal/platform/stunsync"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -43,34 +45,19 @@ func Run(webFS fs.FS) error {
 	config.InitLog()
 	slog.Info("日志初始化完成")
 
-	// 数据库连接 & 自动迁移。数据库不可用时不阻断启动：跳过迁移，应用以降级模式运行；
-	// 依赖数据库的接口会在请求期返回错误，后续 GetDB 会重新尝试建连。
-	db := config.GetDB()
-	if db == nil {
-		slog.Warn("数据库连接失败，跳过迁移并以降级模式启动")
-	}
-
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
 	// 已登记为插件的模块：proxy / taskplan / project / portfwd / envvar / filelink / sdk /
-	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync / dbmonitor / datacache /
-	// dashboard / sshconn / polyform（模型与 Start 在各自插件内声明）；
-	// 其余存量项逐步下沉。
+	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync / stunpf / stunsync /
+	// dbmonitor / datacache / database / dashboard / sshconn / polyform。
 	regs, err := plugin.Build()
 	if err != nil {
 		slog.Error("插件依赖校验失败", "err", err)
 		return err
 	}
 
-	if db != nil {
-		slog.Info("数据库连接成功，执行自动迁移")
-		migrateModels := plugin.ModelsOf(regs) // 插件声明的模型（含 dbmonitor 无模型、datacache 的 DataCache 等）
-		migrateModels = append(migrateModels,
-			&apilog.ApiLog{},
-		)
-		if err := config.AutoMigrate(db, migrateModels...); err != nil {
-			slog.Error("数据库迁移失败", "err", err)
-		}
-	}
+	// 数据库连接与自动迁移由 database 插件负责：连接失败只影响依赖数据库的能力，
+	// 不阻断进程启动；依赖数据库初始化的插件自行通过 database.OnReady 补做初始化。
+	database.SetModels(append(plugin.ModelsOf(regs), &apilog.ApiLog{}))
 
 	setupPprof(&cfg.Pprof)
 	slog.Info("Pprof 设置完成")
@@ -96,17 +83,15 @@ func Run(webFS fs.FS) error {
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
 
-	scheduler.Start()
-	slog.Info("后台任务启动完成")
-
-	// 插件生命周期启动（按依赖拓扑序）。taskplan / project / filelink / sdk /
-	// standarddata / envvar / quickedit / mqttsync / systemjob / dbmonitor / datacache /
-	// dashboard / sshconn / polyform 无 Start；
-	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发 cron 调度运行时。
+	// 插件生命周期启动（按依赖拓扑序）。单个插件失败只记录错误，不阻断其它插件与 HTTP 服务；
+	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发用户任务调度。
 	if err := plugin.StartAll(regs); err != nil {
-		slog.Error("插件启动失败", "err", err)
-		return err
+		slog.Error("部分插件启动失败，继续以降级模式运行", "err", err)
 	}
+
+	// 插件内置任务（代码声明，不落 cron_jobs 表）由框架调度器统一运行。
+	scheduler.StartBuiltin(plugin.TasksOf(regs))
+	slog.Info("内置任务启动完成")
 
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	r := router.SetupRouter(webFS)

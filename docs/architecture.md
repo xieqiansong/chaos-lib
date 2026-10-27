@@ -2,7 +2,7 @@
 
 > 给 AI / 协作者的一页纸心智模型：系统怎么连、请求怎么走、插件怎么转、代码怎么分层。
 > 细节规范见 `AGENTS.md`（分层契约/硬规则）、`接口规范.md`（POST+Action 信封）、`MODULE_INDEX.md`（功能→模块落点）、`README.md`（全景）。
-> 本文件与代码核对（2026-10-25）。
+> 本文件与代码核对（2026-10-27）。
 
 ## 1. 系统拓扑
 
@@ -27,26 +27,26 @@
 ## 2. 请求生命周期（POST + Action）
 
 - 统一 `POST /api/v1/{prefix}/{action}`；HTTP 状态码恒 200，业务结果走 `envelope`（`code`/`message`/`data`/`requestId`）。完整信封与错误码见 `接口规范.md`。
-- 中间件链（`internal/framework/router/router.go` 装配）：`apilog` → `envelope.Middleware()` → `AuthMiddleware()`。
+- 中间件链（`internal/framework/router/router.go` 装配）：`Recovery`（panic → 50000 信封） → `apilog` → `envelope.Middleware()` → `AuthMiddleware()`。
 - 路由挂载：`routehub.MountAllV1`（存量 v1 路由） + `plugin.MountAll`（插件路由），统一前缀 `/api/v1`；`NoRoute` 回退 `index.html`。
 - 分层调用（依赖单向向下）：`handler.go` → `service.go` → `repository.go` → `config.GetDB()`；`model.go` 可被任意层依赖。
 - 软删除：`crud.BaseModel` 嵌入后即获 `IsDeleted` flag 模式，查询/更新/删除自动追加条件；联表/子查询无 schema 时仍需手写 `is_deleted = 0`。
 
 ## 3. 插件系统（核心机制）
 
-- 每个业务模块 = 一个**插件**。`<name>/plugin.go` 的 `init()` 调 `plugin.Register(Registration{ Meta, Models, RegisterRoutes, Start, Stop })`。
+- 每个业务模块 = 一个**插件**。`<name>/plugin.go` 的 `init()` 调 `plugin.Register(Registration{ Meta, Models, RegisterRoutes, Tasks, Start, Stop })`。
 - 触发：`internal/app/app.go` 顶部用 blank import `_ "chaos-go/internal/domain/<name>"` 拉起各插件 `init()`。
 - 编排：`plugin.Build` 做拓扑排序 + 缺失/环检测（fail-fast）；硬依赖声明 `Dependencies`，循环依赖用 `Meta.SoftDeps`（接口型，运行时包级函数变量注入解环，如 `envvar↔quickedit`）。
-- 启动顺序（`app.Run`）：config → DB → blank import 各插件 → `plugin.Build` → `config.AutoMigrate`（模型在 `plugin.go` 的 `Models` 登记）→ `plugin.StartAll` → `router.SetupRouter`。
-- 后台任务：**旧 `scheduler.Register` 已废弃**。统一走插件 `Start` 钩子起 goroutine（含互斥 + panic 恢复）；需 cron 表达式/触发 HTTP·命令·系统动作的任务走 `domain/cronjob`（robfig/cron，秒级 `SecondOptional`）。
+- 启动顺序（`app.Run`）：config → blank import 各插件 → `plugin.Build` → 注入模型清单 → `plugin.StartAll`（`database` 插件负责连接 + `AutoMigrate`）→ `scheduler.StartBuiltin`（内置任务）→ `router.SetupRouter`。
+- 周期任务分两类：**内置任务**在插件 `Tasks` 声明（`scheduler.TaskSpec`，随代码发布、不落库、由 `framework/scheduler` 运行）；**用户任务**落 `cron_jobs` 表，走 `domain/cronjob`（HTTP / Shell 动作，robfig/cron 秒级 `SecondOptional`）。
 
 ## 4. 后端目录拓扑（速记）
 
 | 路径 | 角色 | 是否插件 |
 |------|------|----------|
 | `internal/domain/<x>` | 业务模块（16） | 是 |
-| `internal/framework/<x>` | 自研 web 框架 + 跨切面基件（15）；其中 `dbmonitor`/`datacache` 是插件 | 2 个是 |
-| `internal/platform/<x>` | 外部集成适配器（deepseek/stunpf/stunsync/supabase 为按需调用，**无 plugin.go**；仅 `mqttsync` 是插件） | 1 个是 |
+| `internal/framework/<x>` | 自研 web 框架 + 跨切面基件（15）+ 插件（`database`/`dbmonitor`/`datacache`） | 3 个是 |
+| `internal/platform/<x>` | 外部集成：`mqttsync`/`stunsync`/`stunpf` 是插件（stun 两个只有 Tasks，无路由）；`deepseek`/`supabase` 为按需调用 | 3 个是 |
 | `pkg/tools` | 宿主交互工具（alarm/db/env_var/file_link/http/port_forwarding/project_fs/shell/uuid），非业务 | 否 |
 | `cmd/server` | HTTP 入口，解析 webFS，调 `app.Run` | — |
 | `configs` `migrations` `deployments` `api` `scripts` `test` | 配置/SQL 基准与增量/部署/openapi 占位/脚本/测试 | — |
@@ -59,7 +59,7 @@
 - `src/plugins/registry.ts` 的 `collectRoutes()` 汇总所有插件 `routes` 进 `src/router/index.ts`；`meta.title`/`meta.icon` 驱动侧边菜单与面包屑（`hidden` 不进菜单，`fullscreen` 脱离布局）。
 - 请求统一 `src/utils/request.ts`（`action(prefix, name, data)`，不引 axios）；提示/确认走 `src/utils/message.ts`；写操作骨架走 `src/composables/useCrudAction.ts`。
 - 编辑器统一 Monaco；主题 `src/theme.ts`（`dark` 默认 / `paper` 护眼）。
-- 前端插件与后端模块 1:1（别名：`dict` ↔ `datadict`），详见 `MODULE_INDEX.md` §1。
+- 前端插件与后端模块基本 1:1（别名：`dict` ↔ `datadict`；`database` 与 stun 两个平台插件无前端页面），详见 `MODULE_INDEX.md` §1。
 
 ## 6. 配置 / 部署 / 数据 指针
 
@@ -74,6 +74,6 @@
 3. `crud.RegisterActions` 的 `Before/After` 回调只写一行转调 service，禁止内联业务逻辑。
 4. 不在事务内做不可回滚副作用（建目录/删联接点 → 移到提交后或可补偿）。
 5. 时间列须 RFC3339 带时区（`YYYY-MM-DDTHH:mm:ssZ`），否则 Go `time.Time` 反序列化报错。
-6. 平台适配器（deepseek/stunpf/stunsync/supabase）按需调用，**没有 `plugin.go`、不注册路由**，别在这几个目录找 `RegisterV1`。
+6. 平台适配器：`deepseek`/`supabase` 按需调用，**没有 `plugin.go`、不注册路由**；`stunpf`/`stunsync`/`mqttsync` 已登记为插件（stun 两个只声明 `Tasks`，仍不注册路由）。
 
 > 以上规则以 `AGENTS.md` 为权威，本表仅作速记；若冲突以代码与 `AGENTS.md` 为准。
