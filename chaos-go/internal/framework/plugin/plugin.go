@@ -15,6 +15,7 @@ package plugin
 
 import (
 	"chaos-go/internal/framework/config"
+	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/framework/web"
 )
 
@@ -36,10 +37,11 @@ func (m Meta) IsEnabled() bool { return !m.Disabled }
 
 // Registration 是一次插件登记。除 Meta 外所有字段均可为 nil（按需实现）。
 type Registration struct {
-	Meta          Meta
-	Models        []any                            // 交给 GORM AutoMigrate 的模型
-	Configure     func(cfg *config.AppConfig) error // 配置注入（如读取专属配置段）
-	RegisterRoutes func(rg *web.RouterGroup)        // 内部仍调 routehub.RegisterV1
-	Start         func() error                      // 后台任务 / 恢复期等
-	Stop          func() error
+	Meta           Meta
+	Models         []any                             // 交给 GORM AutoMigrate 的模型
+	Configure      func(cfg *config.AppConfig) error // 配置注入（如读取专属配置段）
+	RegisterRoutes func(rg *web.RouterGroup)         // 内部仍调 routehub.RegisterV1
+	Tasks          []scheduler.TaskSpec              // 插件自有的内置定时任务（代码定义，不落库）
+	Start          func() error                      // 后台任务 / 恢复期等
+	Stop           func() error
 }

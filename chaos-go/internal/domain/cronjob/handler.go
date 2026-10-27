@@ -63,12 +63,21 @@ type previewReq struct {
 }
 
 // RegisterV1 以「POST + Action」风格挂载到 /api/v1（详见《接口规范.md》）。
-// 标准 CRUD + status（启停）由通用 crud 生成；自定义动作 run / runs / preview 一并迁为 POST 动作。
+// 标准 CRUD + status（启停）由通用 crud 生成；自定义动作 run / runs / preview / builtinList 一并迁为 POST 动作。
 func RegisterV1(rg *web.RouterGroup) {
 	g := crud.RegisterActions[CronJob](rg, "cron-jobs", cronJobOpts, cronJobToggle)
 	g.POST("/run", runV1)
 	g.POST("/runs", runsV1)
 	g.POST("/preview", previewV1)
+	g.POST("/builtinList", builtinListV1)
+}
+
+// ── 内置任务（只读） ──────────────────────────────────────────────
+
+// builtinListV1 返回由插件在代码中提供的内置任务状态。
+// 这些任务不落 cron_jobs 表，因此不提供新增 / 编辑 / 删除 / 启停动作。
+func builtinListV1(c *web.Context) {
+	renv.Success(c, BuiltinTasks())
 }
 
 // ── 立即执行 ──────────────────────────────────────────────────────

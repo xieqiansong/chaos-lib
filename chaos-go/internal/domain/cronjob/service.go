@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"chaos-go/internal/framework/scheduler"
 )
 
 // preview 参数边界：请求未给或越界时回落到默认条数。
@@ -115,6 +117,12 @@ func PreviewRuns(expr string, count int) ([]time.Time, error) {
 		count = defaultPreviewCount
 	}
 	return NextRuns(expr, count)
+}
+
+// BuiltinTasks 返回插件在代码中声明的内置任务状态（只读，不落 cron_jobs 表）。
+// 内置任务与用户任务的边界：前者随代码发布、由 scheduler 运行；后者由用户在此模块创建。
+func BuiltinTasks() []scheduler.TaskStatus {
+	return scheduler.BuiltinStatuses()
 }
 
 // nextRunOf 计算任务的下次执行时间；未启用 / 已删除 / 表达式非法时为空。

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"chaos-go/internal/framework/scheduler"
 	"chaos-go/internal/framework/web"
 )
 
@@ -104,6 +105,15 @@ func ModelsOf(rs []Registration) []any {
 		models = append(models, r.Models...)
 	}
 	return models
+}
+
+// TasksOf 汇总所有插件的内置任务声明，供装配层交给 scheduler 统一运行。
+func TasksOf(rs []Registration) []scheduler.TaskSpec {
+	var tasks []scheduler.TaskSpec
+	for _, r := range rs {
+		tasks = append(tasks, r.Tasks...)
+	}
+	return tasks
 }
 
 // StartAll 按依赖拓扑序启动插件（调用非 nil 的 Start）。

@@ -34,11 +34,12 @@
 
 ## 3. 插件系统（核心机制）
 
-- 每个业务模块 = 一个**插件**。`<name>/plugin.go` 的 `init()` 调 `plugin.Register(Registration{ Meta, Models, RegisterRoutes, Start, Stop })`。
+- 每个业务模块 = 一个**插件**。`<name>/plugin.go` 的 `init()` 调 `plugin.Register(Registration{ Meta, Models, RegisterRoutes, Tasks, Start, Stop })`。
 - 触发：`internal/app/app.go` 顶部用 blank import `_ "chaos-go/internal/domain/<name>"` 拉起各插件 `init()`。
 - 编排：`plugin.Build` 做拓扑排序 + 缺失/环检测（fail-fast）；硬依赖声明 `Dependencies`，循环依赖用 `Meta.SoftDeps`（接口型，运行时包级函数变量注入解环，如 `envvar↔quickedit`）。
-- 启动顺序（`app.Run`）：config → DB → blank import 各插件 → `plugin.Build` → `config.AutoMigrate`（模型在 `plugin.go` 的 `Models` 登记）→ `plugin.StartAll` → `router.SetupRouter`。
-- 后台任务：**旧 `scheduler.Register` 已废弃**。统一走插件 `Start` 钩子起 goroutine（含互斥 + panic 恢复）；需 cron 表达式/触发 HTTP·命令·系统动作的任务走 `domain/cronjob`（robfig/cron，秒级 `SecondOptional`）。
+- 插件系统：`Registration{ Meta, Models, RegisterRoutes, Tasks, Start, Stop }`。
+- 启动顺序（`app.Run`）：config → DB → blank import 各插件 → `plugin.Build` → `config.AutoMigrate`（模型在 `plugin.go` 的 `Models` 登记）→ `plugin.StartAll` → `scheduler.StartBuiltin(plugin.TasksOf(regs))` → `router.SetupRouter`。
+- 后台任务：**内置任务**由插件在 `Tasks` 中声明（`scheduler.TaskSpec`：Name / Cron / Timeout / SkipIfBusy / Run），由 `framework/scheduler` 统一运行，不落 `cron_jobs` 表，前端定时任务页只读展示；**用户任务**（HTTP / 命令 / 系统动作，可增删改启停）走 `domain/cronjob`（robfig/cron，秒级 `SecondOptional`）。两者共用同一 cron 解析器配置。
 
 ## 4. 后端目录拓扑（速记）
 

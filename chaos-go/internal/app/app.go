@@ -22,13 +22,12 @@ import (
 	_ "chaos-go/internal/domain/taskplan" // 副作用导入：触发其 init() 登记插件
 	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
-	"chaos-go/internal/framework/database"
 	_ "chaos-go/internal/framework/datacache"
 	_ "chaos-go/internal/framework/dbmonitor"
 	"chaos-go/internal/framework/plugin"
 	"chaos-go/internal/framework/router"
 	"chaos-go/internal/framework/scheduler"
-	_ "chaos-go/internal/platform/mqttsync"
+	"chaos-go/internal/platform/mqttsync"
 	_ "chaos-go/internal/platform/stunpf"
 	_ "chaos-go/internal/platform/stunsync"
 	"context"
@@ -51,19 +50,31 @@ func Run(webFS fs.FS) error {
 	config.InitLog()
 	slog.Info("日志初始化完成")
 
+	// 数据库连接：连接失败只记录，不阻断进程启动；依赖数据库的能力在调用时自行报错。
+	db := config.GetDB()
+	if db == nil {
+		slog.Error("数据库连接失败，跳过自动迁移（依赖数据库的接口将报错）")
+	}
+
 	// 插件依赖校验：缺失依赖 / 循环依赖在此 fail-fast。
 	// 已登记为插件的模块：proxy / taskplan / project / portfwd / envvar / filelink / sdk /
-	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync / stunpf / stunsync /
-	// dbmonitor / datacache / database / dashboard / sshconn / polyform。
+	// standarddata / dict / quickedit / systemjob / cronjob / mqttsync /
+	// dbmonitor / datacache / dashboard / sshconn / polyform。
 	regs, err := plugin.Build()
 	if err != nil {
 		slog.Error("插件依赖校验失败", "err", err)
 		return err
 	}
 
-	// 数据库连接与自动迁移由 database 插件负责：连接失败只影响依赖数据库的能力，
-	// 不阻断进程启动；依赖数据库初始化的插件自行通过 database.OnReady 补做初始化。
-	database.SetModels(append(plugin.ModelsOf(regs), &apilog.ApiLog{}))
+	// 自动迁移：汇总插件声明的模型 + 框架自身的模型。
+	if db != nil {
+		migrateModels := append(plugin.ModelsOf(regs), &apilog.ApiLog{})
+		if err := config.AutoMigrate(db, migrateModels...); err != nil {
+			slog.Error("数据库迁移失败", "err", err)
+		} else {
+			slog.Info("数据库迁移完成", "models", len(migrateModels))
+		}
+	}
 
 	setupPprof(&cfg.Pprof)
 	slog.Info("Pprof 设置完成")
@@ -72,15 +83,24 @@ func Run(webFS fs.FS) error {
 	apilog.Start()
 	slog.Info("接口访问日志记录器启动完成")
 
-	// 多节点 MQTT 同步：连接由 mqttsync 插件的 Start 钩子接管（立即返回，重连在内部 goroutine），
-	// 未启用 / broker 不可达 / 数据库未就绪都不会阻塞启动。
+	// 多节点 MQTT 同步：未启用、broker 不可达、数据库不可用均不阻塞启动。
+	// Start 内部对 broker 是「连接重试 + 阻塞等待」的语义，故放到后台 goroutine，
+	// 由 paho 的 ConnectRetry 持续重连，HTTP 服务不受影响。
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("MQTT 同步启动 panic", "panic", r)
+			}
+		}()
+		mqttsync.Start()
+	}()
 
 	// 注入 quickedit env 回调（避免循环依赖）
 	quickedit.EnvReadContent = envvar.ReadVirtualContent
 	quickedit.EnvWriteContent = envvar.WriteVirtualContent
 
 	// 插件生命周期启动（按依赖拓扑序）。单个插件失败只记录错误，不阻断其它插件与 HTTP 服务；
-	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发用户任务调度，mqttsync 的 Start 触发 MQTT 连接。
+	// portfwd 的 Start 触发隧道恢复，cronjob 的 Start 触发用户任务调度。
 	if err := plugin.StartAll(regs); err != nil {
 		slog.Error("部分插件启动失败，继续以降级模式运行", "err", err)
 	}
@@ -92,8 +112,7 @@ func Run(webFS fs.FS) error {
 	slog.Info("启动 HTTP 服务", "addr", cfg.Server.GetAddress())
 	srv := &http.Server{Addr: cfg.Server.GetAddress(), Handler: router.SetupRouter(webFS)}
 
-	// 优雅退出：SIGINT / SIGTERM → 先停止接收请求，再逆序停止插件
-	//（断开 MQTT、释放端口转发监听、停止 cron 调度），最后进程退出。
+	// 优雅退出：SIGINT / SIGTERM → 先停止接收请求，再逆序调用插件的 Stop 钩子（当前无插件实现，保留为扩展点）。
 	sigCtx, stopSignal := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignal()
 
