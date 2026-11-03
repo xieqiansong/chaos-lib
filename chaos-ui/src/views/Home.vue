@@ -3,8 +3,9 @@ import {computed, onMounted, ref, watch} from 'vue'
 import {showError} from '@/utils/message'
 import {Folder, Refresh} from '@element-plus/icons-vue'
 import BookmarkMenu from '@/components/BookmarkMenu.vue'
-import {favicon, hostnameOf} from '@/utils/url'
-import {format as formatDate} from 'date-fns'
+import {favicon} from '@/utils/url'
+import {format as formatDate, formatDistanceToNow} from 'date-fns'
+import {zhCN} from 'date-fns/locale'
 import {
   type BrowserHistoryItem,
   type FrequentBookmarkItem,
@@ -82,8 +83,37 @@ const displayHistories = computed<BrowserHistoryItem[]>(() =>
     search.value ? searchHistories.value : histories.value,
 )
 
+// 列表可见：相对时间（如「5 分钟前」）；完整时间放 :title 悬浮提示
 function formatHistoryTime(t: number): string {
+  return formatDistanceToNow(new Date(t), {addSuffix: true, locale: zhCN})
+}
+
+function fullHistoryTime(t: number): string {
   return formatDate(new Date(t), 'yyyy-MM-dd HH:mm:ss')
+}
+
+// 顶部搜索命中高亮：仅做纯文本前缀匹配，并转义避免破坏 HTML
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function highlight(text: string): string {
+  const q = search.value
+  const safe = escapeHtml(text || '')
+  if (!q) return safe
+  const idx = (text || '').toLowerCase().indexOf(q)
+  if (idx === -1) return safe
+  return (
+    escapeHtml(text.slice(0, idx)) +
+    '<mark>' +
+    escapeHtml(text.slice(idx, idx + q.length)) +
+    '</mark>' +
+    escapeHtml(text.slice(idx + q.length))
+  )
 }
 
 async function loadHistory() {
@@ -189,10 +219,9 @@ onMounted(() => {
               :title="b.url"
           >
             <img class="hist-favicon" :src="favicon(b.url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
-            <span class="hist-title">{{ b.title }}</span>
-            <span class="hist-host">{{ hostnameOf(b.url) }}</span>
+            <span class="hist-title" v-html="highlight(b.title)"/>
             <span class="hist-count">{{ b.count }} 次</span>
-            <span class="hist-time">{{ formatHistoryTime(b.last) }}</span>
+            <span class="hist-time" :title="fullHistoryTime(b.last)">{{ formatHistoryTime(b.last) }}</span>
           </a>
         </div>
       </div>
@@ -221,9 +250,8 @@ onMounted(() => {
               :title="h.Url"
           >
             <img class="hist-favicon" :src="favicon(h.Url)" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"/>
-            <span class="hist-title">{{ h.Title || h.Url }}</span>
-            <span class="hist-host">{{ hostnameOf(h.Url) }}</span>
-            <span class="hist-time">{{ formatHistoryTime(h.LastVisitTime) }}</span>
+            <span class="hist-title" v-html="highlight(h.Title || h.Url)"/>
+            <span class="hist-time" :title="fullHistoryTime(h.LastVisitTime)">{{ formatHistoryTime(h.LastVisitTime) }}</span>
           </a>
         </div>
       </div>
@@ -255,6 +283,25 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 区块头作为卡片头：去掉外边距，加内边距与底边线 */
+.section-toolbar {
+  margin-bottom: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: var(--el-fill-color-extra-light);
+}
+
+/* 标题前加主色竖条，层级更分明 */
+.section-title {
+  padding-left: var(--space-05);
+  border-left: 3px solid var(--el-color-primary);
+  line-height: 1;
 }
 
 /* 书签栏：横向换行展示 */
@@ -271,22 +318,34 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: var(--space-05);
-  padding: var(--space-05) var(--space-sm);
+  padding: var(--space-05) var(--space-md);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
+  border-radius: 999px;
   background: var(--el-bg-color);
   text-decoration: none;
   color: var(--el-text-color-regular);
   font-size: var(--el-font-size-small);
   max-width: 192px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .bm-chip:hover {
   border-color: var(--el-color-primary);
   background: var(--el-fill-color-light);
   color: var(--el-text-color-primary);
+  box-shadow: var(--el-box-shadow-lighter);
+}
+
+/* 文件夹 chip：淡黄底色与网站书签区分 */
+.bm-chip-folder {
+  background: var(--el-color-warning-light-9);
+  border-color: var(--el-color-warning-light-7);
+}
+
+.bm-chip-folder:hover {
+  border-color: var(--el-color-warning);
+  background: var(--el-color-warning-light-8);
 }
 
 .bm-chip-fav {
@@ -332,70 +391,108 @@ onMounted(() => {
   z-index: 10;
 }
 
-/* 历史：单行紧凑列表（定高可滑动） */
+/* 历史：单行紧凑列表（随视口伸缩、卡片内填充） */
 .hist-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  max-height: 640px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100vh - 240px);
   overflow-y: auto;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  padding: var(--space-05);
+  padding: var(--space-05) var(--space-sm) var(--space-sm);
+}
+
+/* 自定义滚动条：细且半透明，替代默认粗条 */
+.hist-list::-webkit-scrollbar {
+  width: 6px;
+}
+.hist-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--el-border-color-hover);
+}
+.hist-list::-webkit-scrollbar-thumb:hover {
+  background: var(--el-text-color-disabled);
 }
 
 .hist-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-05) var(--space-sm);
-  border-radius: 3px;
+  padding: var(--space-sm) var(--space-md) var(--space-sm) calc(var(--space-md) + 2px);
+  border-bottom: 1px solid var(--el-border-color-extra-light);
   text-decoration: none;
   color: var(--el-text-color-regular);
   font-size: var(--el-font-size-small);
   transition: background 0.12s ease;
 }
 
+.hist-item:last-child {
+  border-bottom: none;
+}
+
+/* 左侧主色指示条：hover 时出现 */
+.hist-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
 .hist-item:hover {
   background: var(--el-fill-color-light);
-  color: var(--el-text-color-primary);
+}
+
+.hist-item:hover::before {
+  background: var(--el-color-primary);
+}
+
+.hist-item:hover .hist-title {
+  color: var(--el-color-primary);
 }
 
 .hist-favicon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .hist-title {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.hist-host {
-  flex: 1 1 0;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--el-text-color-secondary);
+.hist-title :deep(mark) {
+  background: var(--el-color-warning-light-7);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 .hist-count {
   flex-shrink: 0;
-  min-width: 3.5em;
-  text-align: right;
-  color: var(--el-text-color-secondary);
+  padding: 0 6px;
+  line-height: 16px;
+  border-radius: 8px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-size: var(--font-xs);
   font-variant-numeric: tabular-nums;
 }
 
 .hist-time {
   flex-shrink: 0;
   color: var(--el-text-color-secondary);
+  font-size: var(--font-xs);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>
