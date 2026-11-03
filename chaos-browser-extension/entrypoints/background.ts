@@ -4,6 +4,18 @@ import {saveBrowserHistoryRecently} from "./background/browser-history-backup";
 import {saveBookmarks} from "@/entrypoints/background/bookmark-backup";
 import {action} from "@/utils/request";
 
+// 诊断埋点：把 alarm 触发/结果写入 storage，避免 SW 被杀后错误丢失、无法排查。
+const ALARM_LOG_KEY = "chaos:alarmLog";
+async function logAlarm(name: string, status: "start" | "ok" | "error", detail?: string) {
+    try {
+        const stored = await browser.storage.local.get(ALARM_LOG_KEY);
+        const arr: any[] = (stored[ALARM_LOG_KEY] as any[]) || [];
+        arr.push({name, status, detail, at: Date.now()});
+        if (arr.length > 50) arr.splice(0, arr.length - 50);
+        await browser.storage.local.set({[ALARM_LOG_KEY]: arr});
+    } catch { /* 忽略存储写入异常 */ }
+}
+
 export default defineBackground(() => {
     // runtime.sendMessage 收敛为 action 模式：新契约 {module, action, data?, meta?}，旧契约 {path, payload?} 兼容。
     browser.runtime.onMessage.addListener(async (msg: any) => {
@@ -33,16 +45,20 @@ export default defineBackground(() => {
         },
     );
 
-    browser.alarms.onAlarm.addListener((alarm: { name: string; }) => {
-        if (alarm.name === 'saveBrowserHistoryRecently') {
-            return saveBrowserHistoryRecently().catch((err) => {
-                console.error("saveBrowserHistoryRecently (alarm) failed:", err);
-            });
-        }
-        if (alarm.name === 'saveBookmarks') {
-            return saveBookmarks().catch((err) => {
-                console.error("saveBookmarks (alarm) failed:", err);
-            });
+    browser.alarms.onAlarm.addListener(async (alarm: { name: string; }) => {
+        console.log("[alarm] fired:", alarm.name, new Date().toISOString());
+        await logAlarm(alarm.name, "start");
+        try {
+            if (alarm.name === 'saveBrowserHistoryRecently') {
+                await saveBrowserHistoryRecently();
+            } else if (alarm.name === 'saveBookmarks') {
+                await saveBookmarks();
+            }
+            await logAlarm(alarm.name, "ok");
+        } catch (err) {
+            const msg = String((err as Error)?.message || err);
+            console.error("[alarm] failed:", alarm.name, err);
+            await logAlarm(alarm.name, "error", msg);
         }
     });
 
