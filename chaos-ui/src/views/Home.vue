@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import {computed, onMounted, ref, watch} from 'vue'
 import {showError} from '@/utils/message'
-import {Folder, Refresh, Setting} from '@element-plus/icons-vue'
+import {Folder, Refresh} from '@element-plus/icons-vue'
 import BookmarkMenu from '@/components/BookmarkMenu.vue'
 import {favicon, hostnameOf} from '@/utils/url'
+import {format as formatDate} from 'date-fns'
 import {
-  getBrowserHistories,
-  searchBrowserHistories,
-  getFrequentBookmarks,
-  getBookmarkTree,
   type BrowserHistoryItem,
   type FrequentBookmarkItem,
+  getBookmarkTree,
+  getBrowserHistories,
+  getFrequentBookmarks,
+  searchBrowserHistories,
 } from '@/utils/api'
 
 const props = defineProps<{
@@ -78,17 +79,11 @@ const histories = ref<BrowserHistoryItem[]>([])
 const searchHistories = ref<BrowserHistoryItem[]>([])
 
 const displayHistories = computed<BrowserHistoryItem[]>(() =>
-  search.value ? searchHistories.value : histories.value,
+    search.value ? searchHistories.value : histories.value,
 )
 
-// Chrome lastVisitTime 为「自 1601-01-01 起的微秒数」，换算为 JS 时间戳（毫秒）
 function formatHistoryTime(t: number): string {
-  if (!t) return ''
-  const ms = (t - 11644473600000000) / 1000
-  const d = new Date(ms)
-  if (isNaN(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return formatDate(new Date(t), 'yyyy-MM-dd HH:mm:ss')
 }
 
 async function loadHistory() {
@@ -154,7 +149,9 @@ onMounted(() => {
             :class="{open: openFolderId === node.id}"
             @click="toggleFolder(node.id)"
         >
-          <el-icon class="bm-chip-fav"><Folder/></el-icon>
+          <el-icon class="bm-chip-fav">
+            <Folder/>
+          </el-icon>
           <span class="bm-chip-label">{{ node.title || '(无标题)' }}</span>
           <span class="bm-chip-caret">▾</span>
           <div v-if="openFolderId === node.id" class="bm-dropdown" @click.stop>
