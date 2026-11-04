@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 48Yjo12VB9FAYfENoGa79cFLuPTwltL9Xb8c9u3vH7VAbNUJ3ubbUmqJhycSDuY
+\restrict zBA77LgD3AtHISLXeIIXehPEPom5YfRIkiBuGOuEoeNNgLi7GcPrkPWstFm1aov
 
 -- Dumped from database version 17.10 (Debian 17.10-1.pgdg12+1)
 -- Dumped by pg_dump version 17.10 (Debian 17.10-1.pgdg12+1)
@@ -13,7 +13,7 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', FALSE);
+SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
@@ -38,23 +38,195 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: bookmarks; Type: TABLE; Schema: public; Owner: postgres
+-- Name: api_logs; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.bookmarks
-(
-    id         text NOT NULL,
-    parent_id  text,
-    title      text,
-    url        text,
-    is_folder  boolean,
-    sort_index bigint,
-    date_added bigint
+CREATE TABLE public.api_logs (
+                                 id bigint NOT NULL,
+                                 created_at timestamp with time zone,
+                                 updated_at timestamp with time zone,
+                                 path text,
+                                 method text,
+                                 status_code bigint,
+                                 latency_ms bigint,
+                                 client_ip text,
+                                 user_agent text,
+                                 request_body text,
+                                 response_body text,
+                                 body_size bigint,
+                                 error_msg text,
+                                 is_deleted bigint
 );
 
 
-ALTER TABLE public.bookmarks
-    OWNER TO postgres;
+ALTER TABLE public.api_logs OWNER TO postgres;
+
+--
+-- Name: api_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.api_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.api_logs_id_seq OWNER TO postgres;
+
+--
+-- Name: api_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.api_logs_id_seq OWNED BY public.api_logs.id;
+
+
+--
+-- Name: backup_job_logs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_job_logs (
+                                        id bigint NOT NULL,
+                                        created_at timestamp with time zone,
+                                        updated_at timestamp with time zone,
+                                        is_deleted bigint,
+                                        run_id bigint,
+                                        source text,
+                                        target text,
+                                        mode text,
+                                        command text,
+                                        status text,
+                                        exit_code bigint,
+                                        output text,
+                                        started_at timestamp with time zone,
+                                        finished_at timestamp with time zone
+);
+
+
+ALTER TABLE public.backup_job_logs OWNER TO postgres;
+
+--
+-- Name: backup_job_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.backup_job_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.backup_job_logs_id_seq OWNER TO postgres;
+
+--
+-- Name: backup_job_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.backup_job_logs_id_seq OWNED BY public.backup_job_logs.id;
+
+
+--
+-- Name: backup_rules; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_rules (
+                                     id bigint NOT NULL,
+                                     created_at timestamp with time zone,
+                                     updated_at timestamp with time zone,
+                                     is_deleted bigint,
+                                     name text,
+                                     path text,
+                                     mode text DEFAULT 'compress'::text,
+                                     parent_id bigint DEFAULT 0,
+                                     excludes text,
+                                     enabled boolean DEFAULT true,
+                                     sort bigint DEFAULT 0
+);
+
+
+ALTER TABLE public.backup_rules OWNER TO postgres;
+
+--
+-- Name: backup_rules_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.backup_rules_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.backup_rules_id_seq OWNER TO postgres;
+
+--
+-- Name: backup_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.backup_rules_id_seq OWNED BY public.backup_rules.id;
+
+
+--
+-- Name: backup_runs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.backup_runs (
+                                    id bigint NOT NULL,
+                                    created_at timestamp with time zone,
+                                    updated_at timestamp with time zone,
+                                    is_deleted bigint,
+                                    started_at timestamp with time zone,
+                                    finished_at timestamp with time zone,
+                                    status text,
+                                    total bigint,
+                                    success_count bigint,
+                                    failed_count bigint,
+                                    message text
+);
+
+
+ALTER TABLE public.backup_runs OWNER TO postgres;
+
+--
+-- Name: backup_runs_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.backup_runs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.backup_runs_id_seq OWNER TO postgres;
+
+--
+-- Name: backup_runs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.backup_runs_id_seq OWNED BY public.backup_runs.id;
+
+
+--
+-- Name: bookmarks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.bookmarks (
+                                  id text NOT NULL,
+                                  parent_id text,
+                                  title text,
+                                  url text,
+                                  is_folder boolean,
+                                  sort_index bigint,
+                                  date_added bigint
+);
+
+
+ALTER TABLE public.bookmarks OWNER TO postgres;
 
 --
 -- Name: TABLE bookmarks; Type: COMMENT; Schema: public; Owner: postgres
@@ -116,20 +288,18 @@ COMMENT ON COLUMN public.bookmarks.date_added IS '添加时间戳';
 -- Name: browser_histories; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.browser_histories
-(
-    id              character varying NOT NULL,
-    last_visit_time numeric,
-    title           text,
-    type_count      bigint,
-    url             text,
-    visit_count     bigint,
-    is_deleted      boolean DEFAULT FALSE
+CREATE TABLE public.browser_histories (
+                                          id character varying NOT NULL,
+                                          last_visit_time numeric,
+                                          title text,
+                                          type_count bigint,
+                                          url text,
+                                          visit_count bigint,
+                                          is_deleted smallint DEFAULT 0
 );
 
 
-ALTER TABLE public.browser_histories
-    OWNER TO postgres;
+ALTER TABLE public.browser_histories OWNER TO postgres;
 
 --
 -- Name: TABLE browser_histories; Type: COMMENT; Schema: public; Owner: postgres
@@ -191,21 +361,19 @@ COMMENT ON COLUMN public.browser_histories.is_deleted IS '软删除标记';
 -- Name: browser_history_visits; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.browser_history_visits
-(
-    id                 character varying NOT NULL,
-    history_id         text,
-    is_local           boolean,
-    referring_visit_id text,
-    transition         text,
-    visit_id           text,
-    visit_time         numeric,
-    is_deleted         boolean DEFAULT FALSE
+CREATE TABLE public.browser_history_visits (
+                                               id character varying NOT NULL,
+                                               history_id text,
+                                               is_local boolean,
+                                               referring_visit_id text,
+                                               transition text,
+                                               visit_id text,
+                                               visit_time numeric,
+                                               is_deleted smallint DEFAULT 0
 );
 
 
-ALTER TABLE public.browser_history_visits
-    OWNER TO postgres;
+ALTER TABLE public.browser_history_visits OWNER TO postgres;
 
 --
 -- Name: TABLE browser_history_visits; Type: COMMENT; Schema: public; Owner: postgres
@@ -274,21 +442,19 @@ COMMENT ON COLUMN public.browser_history_visits.is_deleted IS '软删除标记';
 -- Name: cron_job_runs; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.cron_job_runs
-(
-    id          bigint NOT NULL,
-    job_id      bigint,
-    started_at  timestamp with time zone,
-    finished_at timestamp with time zone,
-    success     boolean,
-    output      text,
-    error       text,
-    created_at  timestamp with time zone
+CREATE TABLE public.cron_job_runs (
+                                      id bigint NOT NULL,
+                                      job_id bigint,
+                                      started_at timestamp with time zone,
+                                      finished_at timestamp with time zone,
+                                      success boolean,
+                                      output text,
+                                      error text,
+                                      created_at timestamp with time zone
 );
 
 
-ALTER TABLE public.cron_job_runs
-    OWNER TO postgres;
+ALTER TABLE public.cron_job_runs OWNER TO postgres;
 
 --
 -- Name: TABLE cron_job_runs; Type: COMMENT; Schema: public; Owner: postgres
@@ -378,25 +544,23 @@ ALTER SEQUENCE public.cron_job_runs_id_seq OWNED BY public.cron_job_runs.id;
 -- Name: cron_jobs; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.cron_jobs
-(
-    id            bigint NOT NULL,
-    name          text,
-    cron_expr     text,
-    action_type   text,
-    action_config text,
-    enabled       boolean,
-    timeout_sec   bigint,
-    last_run_at   timestamp with time zone,
-    last_status   text,
-    is_deleted    boolean DEFAULT FALSE,
-    created_at    timestamp with time zone,
-    updated_at    timestamp with time zone
+CREATE TABLE public.cron_jobs (
+                                  id bigint NOT NULL,
+                                  name text,
+                                  cron_expr text,
+                                  action_type text,
+                                  action_config text,
+                                  enabled boolean,
+                                  timeout_sec bigint,
+                                  last_run_at timestamp with time zone,
+                                  last_status text,
+                                  is_deleted bigint,
+                                  created_at timestamp with time zone,
+                                  updated_at timestamp with time zone
 );
 
 
-ALTER TABLE public.cron_jobs
-    OWNER TO postgres;
+ALTER TABLE public.cron_jobs OWNER TO postgres;
 
 --
 -- Name: TABLE cron_jobs; Type: COMMENT; Schema: public; Owner: postgres
@@ -514,25 +678,23 @@ ALTER SEQUENCE public.cron_jobs_id_seq OWNED BY public.cron_jobs.id;
 -- Name: data_caches; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.data_caches
-(
-    id          bigint NOT NULL,
-    created_at  timestamp with time zone,
-    updated_at  timestamp with time zone,
-    is_deleted  boolean DEFAULT FALSE,
-    category    text,
-    key         text,
-    value       bytea,
-    expire_at   timestamp with time zone,
-    compression text,
-    data_type   text,
-    value_len   bigint  DEFAULT 0,
-    value_md5   text
+CREATE TABLE public.data_caches (
+                                    id bigint NOT NULL,
+                                    created_at timestamp with time zone,
+                                    updated_at timestamp with time zone,
+                                    is_deleted bigint,
+                                    category text,
+                                    key text,
+                                    value bytea,
+                                    expire_at timestamp with time zone,
+                                    compression text,
+                                    data_type text,
+                                    value_len bigint DEFAULT 0,
+                                    value_md5 text
 );
 
 
-ALTER TABLE public.data_caches
-    OWNER TO postgres;
+ALTER TABLE public.data_caches OWNER TO postgres;
 
 --
 -- Name: TABLE data_caches; Type: COMMENT; Schema: public; Owner: postgres
@@ -647,25 +809,106 @@ ALTER SEQUENCE public.data_caches_id_seq OWNED BY public.data_caches.id;
 
 
 --
--- Name: file_links; Type: TABLE; Schema: public; Owner: postgres
+-- Name: dict_data; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.file_links
-(
-    id          integer NOT NULL,
-    source_path text,
-    target_path text,
-    status      boolean,
-    remark      text,
-    is_deleted  boolean DEFAULT FALSE,
-    sort        bigint  DEFAULT 0,
-    created_at  timestamp with time zone,
-    updated_at  timestamp with time zone
+CREATE TABLE public.dict_data (
+                                  id bigint NOT NULL,
+                                  created_at timestamp with time zone,
+                                  updated_at timestamp with time zone,
+                                  is_deleted bigint,
+                                  type_code character varying(64) NOT NULL,
+                                  label character varying(100) NOT NULL,
+                                  value character varying(100) NOT NULL,
+                                  parent_id bigint DEFAULT 0,
+                                  sort bigint DEFAULT 0,
+                                  status boolean DEFAULT true,
+                                  remark character varying(255),
+                                  ext text
 );
 
 
-ALTER TABLE public.file_links
-    OWNER TO postgres;
+ALTER TABLE public.dict_data OWNER TO postgres;
+
+--
+-- Name: dict_data_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.dict_data_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.dict_data_id_seq OWNER TO postgres;
+
+--
+-- Name: dict_data_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.dict_data_id_seq OWNED BY public.dict_data.id;
+
+
+--
+-- Name: dict_type; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.dict_type (
+                                  id bigint NOT NULL,
+                                  created_at timestamp with time zone,
+                                  updated_at timestamp with time zone,
+                                  is_deleted bigint,
+                                  name character varying(50) NOT NULL,
+                                  code character varying(64) NOT NULL,
+                                  status boolean DEFAULT true,
+                                  sort bigint DEFAULT 0,
+                                  remark character varying(255)
+);
+
+
+ALTER TABLE public.dict_type OWNER TO postgres;
+
+--
+-- Name: dict_type_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.dict_type_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.dict_type_id_seq OWNER TO postgres;
+
+--
+-- Name: dict_type_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.dict_type_id_seq OWNED BY public.dict_type.id;
+
+
+--
+-- Name: file_links; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.file_links (
+                                   id integer NOT NULL,
+                                   source_path text,
+                                   target_path text,
+                                   status boolean,
+                                   remark text,
+                                   is_deleted bigint,
+                                   sort bigint DEFAULT 0,
+                                   created_at timestamp with time zone,
+                                   updated_at timestamp with time zone
+);
+
+
+ALTER TABLE public.file_links OWNER TO postgres;
 
 --
 -- Name: TABLE file_links; Type: COMMENT; Schema: public; Owner: postgres
@@ -741,36 +984,175 @@ COMMENT ON COLUMN public.file_links.updated_at IS '更新时间';
 -- Name: file_link_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.file_links
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.file_link_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.file_links ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.file_link_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: item_assemblies; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.item_assemblies (
+                                        id bigint NOT NULL,
+                                        created_at timestamp with time zone,
+                                        updated_at timestamp with time zone,
+                                        is_deleted bigint,
+                                        host_id bigint,
+                                        component_id bigint,
+                                        slot text,
+                                        quantity numeric DEFAULT 1,
+                                        installed_at timestamp with time zone,
+                                        removed_at timestamp with time zone,
+                                        install_note text,
+                                        remove_note text
+);
+
+
+ALTER TABLE public.item_assemblies OWNER TO postgres;
+
+--
+-- Name: item_assembly_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.item_assembly_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.item_assembly_id_seq OWNER TO postgres;
+
+--
+-- Name: item_assembly_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.item_assembly_id_seq OWNED BY public.item_assemblies.id;
+
+
+--
+-- Name: items; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.items (
+                              id bigint NOT NULL,
+                              created_at timestamp with time zone,
+                              updated_at timestamp with time zone,
+                              is_deleted bigint,
+                              name text,
+                              category_id bigint,
+                              location_id bigint,
+                              item_type bigint DEFAULT 1,
+                              brand text,
+                              model text,
+                              spec text,
+                              color text,
+                              quantity numeric DEFAULT 1,
+                              unit text DEFAULT '个'::text,
+                              min_quantity numeric,
+                              status text DEFAULT 'in_use'::text,
+                              serial_no text,
+                              purchase_date timestamp with time zone,
+                              purchase_price numeric,
+                              purchase_channel text,
+                              warranty_end timestamp with time zone,
+                              expire_date timestamp with time zone,
+                              last_replenish_date timestamp with time zone,
+                              last_replenish_qty numeric,
+                              tags text,
+                              cover_image text,
+                              remark text
+);
+
+
+ALTER TABLE public.items OWNER TO postgres;
+
+--
+-- Name: item_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.item_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.item_id_seq OWNER TO postgres;
+
+--
+-- Name: item_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.item_id_seq OWNED BY public.items.id;
+
+
+--
+-- Name: item_records; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.item_records (
+                                     id bigint NOT NULL,
+                                     created_at timestamp with time zone,
+                                     updated_at timestamp with time zone,
+                                     is_deleted bigint,
+                                     item_id bigint,
+                                     record_type text,
+                                     quantity numeric,
+                                     amount numeric,
+                                     record_date timestamp with time zone,
+                                     note text
+);
+
+
+ALTER TABLE public.item_records OWNER TO postgres;
+
+--
+-- Name: item_record_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.item_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.item_record_id_seq OWNER TO postgres;
+
+--
+-- Name: item_record_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.item_record_id_seq OWNED BY public.item_records.id;
 
 
 --
 -- Name: mqtt_sync_messages; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.mqtt_sync_messages
-(
-    id         bigint NOT NULL,
-    msg_id     character varying(64),
-    node_id    character varying(64),
-    channel    character varying(64),
-    payload    text,
-    created_at timestamp with time zone,
-    is_deleted boolean DEFAULT FALSE,
-    updated_at timestamp with time zone
+CREATE TABLE public.mqtt_sync_messages (
+                                           id bigint NOT NULL,
+                                           msg_id character varying(64),
+                                           node_id character varying(64),
+                                           channel character varying(64),
+                                           payload text,
+                                           created_at timestamp with time zone,
+                                           is_deleted bigint,
+                                           updated_at timestamp with time zone
 );
 
 
-ALTER TABLE public.mqtt_sync_messages
-    OWNER TO postgres;
+ALTER TABLE public.mqtt_sync_messages OWNER TO postgres;
 
 --
 -- Name: TABLE mqtt_sync_messages; Type: COMMENT; Schema: public; Owner: postgres
@@ -860,16 +1242,14 @@ ALTER SEQUENCE public.mqtt_sync_messages_id_seq OWNED BY public.mqtt_sync_messag
 -- Name: mqtt_sync_nodes; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.mqtt_sync_nodes
-(
-    id         bigint NOT NULL,
-    node_id    character varying(64),
-    created_at timestamp with time zone
+CREATE TABLE public.mqtt_sync_nodes (
+                                        id bigint NOT NULL,
+                                        node_id character varying(64),
+                                        created_at timestamp with time zone
 );
 
 
-ALTER TABLE public.mqtt_sync_nodes
-    OWNER TO postgres;
+ALTER TABLE public.mqtt_sync_nodes OWNER TO postgres;
 
 --
 -- Name: TABLE mqtt_sync_nodes; Type: COMMENT; Schema: public; Owner: postgres
@@ -921,26 +1301,161 @@ ALTER SEQUENCE public.mqtt_sync_nodes_id_seq OWNED BY public.mqtt_sync_nodes.id;
 
 
 --
--- Name: nowcoder_questions; Type: TABLE; Schema: public; Owner: postgres
+-- Name: note_links; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.nowcoder_questions
-(
-    question_id    bigint                                 NOT NULL,
-    uuid           text                                   NOT NULL,
-    title          text                                   NOT NULL,
-    difficulty     integer,
-    exam_count     integer,
-    knowledge      text,
-    company_name   text,
-    last_exam_time text,
-    created_at     timestamp with time zone DEFAULT NOW() NOT NULL,
-    qtype          integer                  DEFAULT 0     NOT NULL
+CREATE TABLE public.note_links (
+                                   id bigint NOT NULL,
+                                   created_at timestamp with time zone,
+                                   updated_at timestamp with time zone,
+                                   is_deleted bigint,
+                                   source_id bigint,
+                                   target_ref text,
+                                   resolved boolean
 );
 
 
-ALTER TABLE public.nowcoder_questions
-    OWNER TO postgres;
+ALTER TABLE public.note_links OWNER TO postgres;
+
+--
+-- Name: note_links_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.note_links_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.note_links_id_seq OWNER TO postgres;
+
+--
+-- Name: note_links_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.note_links_id_seq OWNED BY public.note_links.id;
+
+
+--
+-- Name: note_tag_rels; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.note_tag_rels (
+                                      note_id bigint NOT NULL,
+                                      tag_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.note_tag_rels OWNER TO postgres;
+
+--
+-- Name: note_tags; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.note_tags (
+                                  id bigint NOT NULL,
+                                  created_at timestamp with time zone,
+                                  updated_at timestamp with time zone,
+                                  is_deleted bigint,
+                                  name text
+);
+
+
+ALTER TABLE public.note_tags OWNER TO postgres;
+
+--
+-- Name: note_tags_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.note_tags_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.note_tags_id_seq OWNER TO postgres;
+
+--
+-- Name: note_tags_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.note_tags_id_seq OWNED BY public.note_tags.id;
+
+
+--
+-- Name: notes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.notes (
+                              id bigint NOT NULL,
+                              created_at timestamp with time zone,
+                              updated_at timestamp with time zone,
+                              is_deleted bigint,
+                              vault_id bigint,
+                              rel_path text,
+                              parent_rel text,
+                              name text,
+                              title text,
+                              summary text,
+                              search_text text,
+                              format text,
+                              size_bytes bigint,
+                              content_hash text,
+                              disk_m_time timestamp with time zone,
+                              disk_missing boolean,
+                              starred boolean,
+                              word_count bigint,
+                              tag_names text,
+                              indexed_at timestamp with time zone
+);
+
+
+ALTER TABLE public.notes OWNER TO postgres;
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.notes_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.notes_id_seq OWNER TO postgres;
+
+--
+-- Name: notes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.notes_id_seq OWNED BY public.notes.id;
+
+
+--
+-- Name: nowcoder_questions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.nowcoder_questions (
+                                           question_id bigint NOT NULL,
+                                           uuid text NOT NULL,
+                                           title text NOT NULL,
+                                           difficulty integer,
+                                           exam_count integer,
+                                           knowledge text,
+                                           company_name text,
+                                           last_exam_time text,
+                                           created_at timestamp with time zone DEFAULT now() NOT NULL,
+                                           qtype integer DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE public.nowcoder_questions OWNER TO postgres;
 
 --
 -- Name: TABLE nowcoder_questions; Type: COMMENT; Schema: public; Owner: postgres
@@ -1023,27 +1538,25 @@ COMMENT ON COLUMN public.nowcoder_questions.qtype IS '题目类型';
 -- Name: port_forwarding; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.port_forwarding
-(
-    id                integer NOT NULL,
-    name              text,
-    port              bigint,
-    target_host       text,
-    target_port       bigint,
-    status            boolean,
-    is_deleted        boolean DEFAULT FALSE,
-    ssh_connection_id bigint,
-    remark            text,
-    direction         text,
-    bind_address      text,
-    created_at        timestamp with time zone,
-    updated_at        timestamp with time zone,
-    last_error        text
+CREATE TABLE public.port_forwarding (
+                                        id integer NOT NULL,
+                                        name text,
+                                        port bigint,
+                                        target_host text,
+                                        target_port bigint,
+                                        status boolean,
+                                        is_deleted bigint,
+                                        ssh_connection_id bigint,
+                                        remark text,
+                                        direction text,
+                                        bind_address text,
+                                        created_at timestamp with time zone,
+                                        updated_at timestamp with time zone,
+                                        last_error text
 );
 
 
-ALTER TABLE public.port_forwarding
-    OWNER TO postgres;
+ALTER TABLE public.port_forwarding OWNER TO postgres;
 
 --
 -- Name: TABLE port_forwarding; Type: COMMENT; Schema: public; Owner: postgres
@@ -1154,37 +1667,34 @@ COMMENT ON COLUMN public.port_forwarding.last_error IS '上次错误信息';
 -- Name: port_forwarding_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.port_forwarding
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.port_forwarding_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.port_forwarding ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.port_forwarding_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: project_groups; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.project_groups
-(
-    id             integer NOT NULL,
-    name           text,
-    absolute_path  text,
-    remark         text,
-    created_at     timestamp with time zone,
-    updated_at     timestamp with time zone,
-    is_deleted     boolean DEFAULT FALSE,
-    order_num      bigint  DEFAULT 0,
-    is_recycle_bin boolean DEFAULT FALSE
+CREATE TABLE public.project_groups (
+                                       id integer NOT NULL,
+                                       name text,
+                                       absolute_path text,
+                                       remark text,
+                                       created_at timestamp with time zone,
+                                       updated_at timestamp with time zone,
+                                       is_deleted bigint,
+                                       order_num bigint DEFAULT 0,
+                                       is_recycle_bin boolean DEFAULT false
 );
 
 
-ALTER TABLE public.project_groups
-    OWNER TO postgres;
+ALTER TABLE public.project_groups OWNER TO postgres;
 
 --
 -- Name: TABLE project_groups; Type: COMMENT; Schema: public; Owner: postgres
@@ -1260,39 +1770,36 @@ COMMENT ON COLUMN public.project_groups.is_recycle_bin IS '是否为回收站';
 -- Name: project_groups_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.project_groups
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.project_groups_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.project_groups ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.project_groups_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: projects; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.projects
-(
-    id               integer NOT NULL,
-    group_id         bigint,
-    name             text,
-    absolute_path    text,
-    relative_path    text,
-    git_url          text,
-    remark           text,
-    last_accessed_at timestamp with time zone,
-    created_at       timestamp with time zone,
-    updated_at       timestamp with time zone,
-    is_deleted       boolean DEFAULT FALSE
+CREATE TABLE public.projects (
+                                 id integer NOT NULL,
+                                 group_id bigint,
+                                 name text,
+                                 absolute_path text,
+                                 relative_path text,
+                                 git_url text,
+                                 remark text,
+                                 last_accessed_at timestamp with time zone,
+                                 created_at timestamp with time zone,
+                                 updated_at timestamp with time zone,
+                                 is_deleted bigint
 );
 
 
-ALTER TABLE public.projects
-    OWNER TO postgres;
+ALTER TABLE public.projects OWNER TO postgres;
 
 --
 -- Name: TABLE projects; Type: COMMENT; Schema: public; Owner: postgres
@@ -1382,35 +1889,32 @@ COMMENT ON COLUMN public.projects.is_deleted IS '软删除标记';
 -- Name: projects_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.projects
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.projects_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.projects ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.projects_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: quick_edit_files; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.quick_edit_files
-(
-    id         integer NOT NULL,
-    name       text,
-    file_path  text,
-    remark     text,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    is_deleted boolean                  DEFAULT FALSE
+CREATE TABLE public.quick_edit_files (
+                                         id integer NOT NULL,
+                                         name text,
+                                         file_path text,
+                                         remark text,
+                                         created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                                         updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                                         is_deleted smallint DEFAULT 0
 );
 
 
-ALTER TABLE public.quick_edit_files
-    OWNER TO postgres;
+ALTER TABLE public.quick_edit_files OWNER TO postgres;
 
 --
 -- Name: TABLE quick_edit_files; Type: COMMENT; Schema: public; Owner: postgres
@@ -1472,34 +1976,31 @@ COMMENT ON COLUMN public.quick_edit_files.is_deleted IS '软删除标记';
 -- Name: quick_edit_files_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.quick_edit_files
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.quick_edit_files_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.quick_edit_files ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.quick_edit_files_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: quick_edit_snapshots; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.quick_edit_snapshots
-(
-    id         integer NOT NULL,
-    file_id    bigint,
-    content    text,
-    size_bytes bigint,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    is_deleted boolean                  DEFAULT FALSE
+CREATE TABLE public.quick_edit_snapshots (
+                                             id integer NOT NULL,
+                                             file_id bigint,
+                                             content text,
+                                             size_bytes bigint,
+                                             created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                                             is_deleted smallint DEFAULT 0
 );
 
 
-ALTER TABLE public.quick_edit_snapshots
-    OWNER TO postgres;
+ALTER TABLE public.quick_edit_snapshots OWNER TO postgres;
 
 --
 -- Name: TABLE quick_edit_snapshots; Type: COMMENT; Schema: public; Owner: postgres
@@ -1554,35 +2055,32 @@ COMMENT ON COLUMN public.quick_edit_snapshots.is_deleted IS '软删除标记';
 -- Name: quick_edit_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.quick_edit_snapshots
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.quick_edit_snapshots_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.quick_edit_snapshots ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.quick_edit_snapshots_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: sdk_sources; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.sdk_sources
-(
-    id         integer NOT NULL,
-    name       text,
-    sources    jsonb,
-    current    text,
-    enabled    boolean DEFAULT TRUE,
-    note       text,
-    is_deleted boolean DEFAULT FALSE
+CREATE TABLE public.sdk_sources (
+                                    id integer NOT NULL,
+                                    name text,
+                                    sources jsonb,
+                                    current text,
+                                    enabled boolean DEFAULT true,
+                                    note text,
+                                    is_deleted bigint
 );
 
 
-ALTER TABLE public.sdk_sources
-    OWNER TO postgres;
+ALTER TABLE public.sdk_sources OWNER TO postgres;
 
 --
 -- Name: TABLE sdk_sources; Type: COMMENT; Schema: public; Owner: postgres
@@ -1644,41 +2142,38 @@ COMMENT ON COLUMN public.sdk_sources.is_deleted IS '软删除标记';
 -- Name: sdk_sources_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.sdk_sources
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.sdk_sources_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.sdk_sources ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.sdk_sources_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: ssh_connections; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.ssh_connections
-(
-    id          bigint NOT NULL,
-    name        text,
-    host        text,
-    port        bigint,
-    username    text,
-    auth_type   text,
-    password    text,
-    private_key text,
-    passphrase  text,
-    remark      text,
-    created_at  timestamp with time zone,
-    updated_at  timestamp with time zone,
-    is_deleted  boolean DEFAULT FALSE
+CREATE TABLE public.ssh_connections (
+                                        id bigint NOT NULL,
+                                        name text,
+                                        host text,
+                                        port bigint,
+                                        username text,
+                                        auth_type text,
+                                        password text,
+                                        private_key text,
+                                        passphrase text,
+                                        remark text,
+                                        created_at timestamp with time zone,
+                                        updated_at timestamp with time zone,
+                                        is_deleted bigint
 );
 
 
-ALTER TABLE public.ssh_connections
-    OWNER TO postgres;
+ALTER TABLE public.ssh_connections OWNER TO postgres;
 
 --
 -- Name: TABLE ssh_connections; Type: COMMENT; Schema: public; Owner: postgres
@@ -1803,27 +2298,25 @@ ALTER SEQUENCE public.ssh_connections_id_seq OWNED BY public.ssh_connections.id;
 -- Name: standard_datas; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.standard_datas
-(
-    id           bigint NOT NULL,
-    created_at   timestamp with time zone,
-    updated_at   timestamp with time zone,
-    is_deleted   boolean DEFAULT FALSE,
-    name         text,
-    code         text,
-    description  text,
-    category     text,
-    quantity     bigint,
-    price        numeric,
-    enabled      boolean,
-    config       text,
-    effective_at timestamp with time zone,
-    sort         bigint  DEFAULT 0
+CREATE TABLE public.standard_datas (
+                                       id bigint NOT NULL,
+                                       created_at timestamp with time zone,
+                                       updated_at timestamp with time zone,
+                                       is_deleted bigint,
+                                       name text,
+                                       code text,
+                                       description text,
+                                       category text,
+                                       quantity bigint,
+                                       price numeric,
+                                       enabled boolean,
+                                       config text,
+                                       effective_at timestamp with time zone,
+                                       sort bigint DEFAULT 0
 );
 
 
-ALTER TABLE public.standard_datas
-    OWNER TO postgres;
+ALTER TABLE public.standard_datas OWNER TO postgres;
 
 --
 -- Name: TABLE standard_datas; Type: COMMENT; Schema: public; Owner: postgres
@@ -1955,34 +2448,32 @@ ALTER SEQUENCE public.standard_datas_id_seq OWNED BY public.standard_datas.id;
 -- Name: task_plan_old; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.task_plan_old
-(
-    id               character varying(36)                                      NOT NULL,
-    pid              character varying(36)                                      NOT NULL,
-    name             character varying(100)                                     NOT NULL,
-    code             character varying(100)                                     NOT NULL,
-    type             character varying(32) DEFAULT 'DEFAULT'::character varying NOT NULL,
-    priority         integer               DEFAULT 0                            NOT NULL,
-    remarks          text,
-    sort_code        integer               DEFAULT 0                            NOT NULL,
-    start_time       timestamp without time zone,
-    end_time         timestamp without time zone,
-    status           character varying(32) DEFAULT 'DEFAULT'::character varying NOT NULL,
-    complete_time    timestamp without time zone,
-    url_link         character varying(512),
-    create_by        character varying(36),
-    update_by        character varying(36),
-    create_date      timestamp without time zone,
-    update_date      timestamp without time zone,
-    data_status      integer               DEFAULT 0                            NOT NULL,
-    proficiency      integer               DEFAULT 0                            NOT NULL,
-    last_review_time timestamp without time zone,
-    review_record    text
+CREATE TABLE public.task_plan_old (
+                                      id character varying(36) NOT NULL,
+                                      pid character varying(36) NOT NULL,
+                                      name character varying(100) NOT NULL,
+                                      code character varying(100) NOT NULL,
+                                      type character varying(32) DEFAULT 'DEFAULT'::character varying NOT NULL,
+                                      priority integer DEFAULT 0 NOT NULL,
+                                      remarks text,
+                                      sort_code integer DEFAULT 0 NOT NULL,
+                                      start_time timestamp without time zone,
+                                      end_time timestamp without time zone,
+                                      status character varying(32) DEFAULT 'DEFAULT'::character varying NOT NULL,
+                                      complete_time timestamp without time zone,
+                                      url_link character varying(512),
+                                      create_by character varying(36),
+                                      update_by character varying(36),
+                                      create_date timestamp without time zone,
+                                      update_date timestamp without time zone,
+                                      data_status integer DEFAULT 0 NOT NULL,
+                                      proficiency integer DEFAULT 0 NOT NULL,
+                                      last_review_time timestamp without time zone,
+                                      review_record text
 );
 
 
-ALTER TABLE public.task_plan_old
-    OWNER TO postgres;
+ALTER TABLE public.task_plan_old OWNER TO postgres;
 
 --
 -- Name: TABLE task_plan_old; Type: COMMENT; Schema: public; Owner: postgres
@@ -2142,44 +2633,42 @@ COMMENT ON COLUMN public.task_plan_old.review_record IS '复习记录';
 -- Name: task_plans; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.task_plans
-(
-    id                  integer NOT NULL,
-    parent_id           bigint,
-    name                text,
-    status              text                     DEFAULT 'created'::character varying,
-    plan_type           text                     DEFAULT 'todo'::character varying,
-    cron_expr           text,
-    fsrs_stability      numeric                  DEFAULT 0,
-    fsrs_difficulty     numeric                  DEFAULT 0,
-    fsrs_reps           bigint                   DEFAULT 0,
-    fsrs_lapses         bigint                   DEFAULT 0,
-    fsrs_last_review_at timestamp with time zone,
-    remark              text,
-    link                text,
-    created_at          timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at          timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    is_deleted          boolean                  DEFAULT FALSE,
-    order_num           integer                  DEFAULT 0,
-    priority            integer                  DEFAULT 5,
-    fsrs_state          integer                  DEFAULT 0,
-    fsrs_learning_steps integer                  DEFAULT 0,
-    content_size        bigint,
-    is_suspended        boolean                  DEFAULT FALSE,
-    code                text,
-    interval_days       bigint,
-    interval_hour       bigint,
-    interval_minute     bigint,
-    task_count          bigint                   DEFAULT 0,
-    completed_count     bigint                   DEFAULT 0,
-    total_study_time    bigint                   DEFAULT 0,
-    last_completed_at   timestamp with time zone,
-    raw_link            text
+CREATE TABLE public.task_plans (
+                                   id integer NOT NULL,
+                                   parent_id bigint,
+                                   name text,
+                                   status text DEFAULT 'created'::character varying,
+                                   plan_type text DEFAULT 'todo'::character varying,
+                                   cron_expr text,
+                                   fsrs_stability numeric DEFAULT 0,
+                                   fsrs_difficulty numeric DEFAULT 0,
+                                   fsrs_reps bigint DEFAULT 0,
+                                   fsrs_lapses bigint DEFAULT 0,
+                                   fsrs_last_review_at timestamp with time zone,
+                                   remark text,
+                                   link text,
+                                   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                                   updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                                   is_deleted bigint,
+                                   order_num bigint DEFAULT 0,
+                                   priority bigint DEFAULT 5,
+                                   fsrs_state bigint DEFAULT 0,
+                                   fsrs_learning_steps bigint DEFAULT 0,
+                                   content_size bigint,
+                                   is_suspended boolean DEFAULT false,
+                                   code text,
+                                   interval_days bigint,
+                                   interval_hour bigint,
+                                   interval_minute bigint,
+                                   task_count bigint DEFAULT 0,
+                                   completed_count bigint DEFAULT 0,
+                                   total_study_time bigint DEFAULT 0,
+                                   last_completed_at timestamp with time zone,
+                                   raw_link text
 );
 
 
-ALTER TABLE public.task_plans
-    OWNER TO postgres;
+ALTER TABLE public.task_plans OWNER TO postgres;
 
 --
 -- Name: TABLE task_plans; Type: COMMENT; Schema: public; Owner: postgres
@@ -2409,40 +2898,37 @@ COMMENT ON COLUMN public.task_plans.raw_link IS '原始链接';
 -- Name: task_plans_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.task_plans
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.task_plans_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.task_plans ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.task_plans_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
 -- Name: tasks; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.tasks
-(
-    id             integer NOT NULL,
-    plan_id        bigint,
-    status         text                     DEFAULT 'pending'::text,
-    started_at     timestamp with time zone,
-    completed_at   timestamp with time zone,
-    deadline       timestamp with time zone,
-    remark         text,
-    created_at     timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    is_deleted     boolean                  DEFAULT FALSE,
-    scheduled_date timestamp with time zone,
-    rating         bigint,
-    updated_at     timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.tasks (
+                              id integer NOT NULL,
+                              plan_id bigint,
+                              status text DEFAULT 'pending'::text,
+                              started_at timestamp with time zone,
+                              completed_at timestamp with time zone,
+                              deadline timestamp with time zone,
+                              remark text,
+                              created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+                              is_deleted bigint,
+                              scheduled_date timestamp with time zone,
+                              rating bigint,
+                              updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
-ALTER TABLE public.tasks
-    OWNER TO postgres;
+ALTER TABLE public.tasks OWNER TO postgres;
 
 --
 -- Name: TABLE tasks; Type: COMMENT; Schema: public; Owner: postgres
@@ -2539,71 +3025,179 @@ COMMENT ON COLUMN public.tasks.updated_at IS '更新时间';
 -- Name: tasks_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.tasks
-    ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
-        SEQUENCE NAME public.tasks_id_seq
-        START WITH 1
-        INCREMENT BY 1
-        NO MINVALUE
-        NO MAXVALUE
-        CACHE 1
-        );
+ALTER TABLE public.tasks ALTER COLUMN id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.tasks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: api_logs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_logs ALTER COLUMN id SET DEFAULT nextval('public.api_logs_id_seq'::regclass);
+
+
+--
+-- Name: backup_job_logs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_job_logs ALTER COLUMN id SET DEFAULT nextval('public.backup_job_logs_id_seq'::regclass);
+
+
+--
+-- Name: backup_rules id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_rules ALTER COLUMN id SET DEFAULT nextval('public.backup_rules_id_seq'::regclass);
+
+
+--
+-- Name: backup_runs id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_runs ALTER COLUMN id SET DEFAULT nextval('public.backup_runs_id_seq'::regclass);
 
 
 --
 -- Name: cron_job_runs id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.cron_job_runs
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.cron_job_runs_id_seq'::regclass);
+ALTER TABLE ONLY public.cron_job_runs ALTER COLUMN id SET DEFAULT nextval('public.cron_job_runs_id_seq'::regclass);
 
 
 --
 -- Name: cron_jobs id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.cron_jobs
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.cron_jobs_id_seq'::regclass);
+ALTER TABLE ONLY public.cron_jobs ALTER COLUMN id SET DEFAULT nextval('public.cron_jobs_id_seq'::regclass);
 
 
 --
 -- Name: data_caches id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.data_caches
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.data_caches_id_seq'::regclass);
+ALTER TABLE ONLY public.data_caches ALTER COLUMN id SET DEFAULT nextval('public.data_caches_id_seq'::regclass);
+
+
+--
+-- Name: dict_data id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dict_data ALTER COLUMN id SET DEFAULT nextval('public.dict_data_id_seq'::regclass);
+
+
+--
+-- Name: dict_type id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dict_type ALTER COLUMN id SET DEFAULT nextval('public.dict_type_id_seq'::regclass);
+
+
+--
+-- Name: item_assemblies id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.item_assemblies ALTER COLUMN id SET DEFAULT nextval('public.item_assembly_id_seq'::regclass);
+
+
+--
+-- Name: item_records id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.item_records ALTER COLUMN id SET DEFAULT nextval('public.item_record_id_seq'::regclass);
+
+
+--
+-- Name: items id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.items ALTER COLUMN id SET DEFAULT nextval('public.item_id_seq'::regclass);
 
 
 --
 -- Name: mqtt_sync_messages id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.mqtt_sync_messages
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.mqtt_sync_messages_id_seq'::regclass);
+ALTER TABLE ONLY public.mqtt_sync_messages ALTER COLUMN id SET DEFAULT nextval('public.mqtt_sync_messages_id_seq'::regclass);
 
 
 --
 -- Name: mqtt_sync_nodes id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.mqtt_sync_nodes
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.mqtt_sync_nodes_id_seq'::regclass);
+ALTER TABLE ONLY public.mqtt_sync_nodes ALTER COLUMN id SET DEFAULT nextval('public.mqtt_sync_nodes_id_seq'::regclass);
+
+
+--
+-- Name: note_links id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.note_links ALTER COLUMN id SET DEFAULT nextval('public.note_links_id_seq'::regclass);
+
+
+--
+-- Name: note_tags id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.note_tags ALTER COLUMN id SET DEFAULT nextval('public.note_tags_id_seq'::regclass);
+
+
+--
+-- Name: notes id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notes ALTER COLUMN id SET DEFAULT nextval('public.notes_id_seq'::regclass);
 
 
 --
 -- Name: ssh_connections id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.ssh_connections
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.ssh_connections_id_seq'::regclass);
+ALTER TABLE ONLY public.ssh_connections ALTER COLUMN id SET DEFAULT nextval('public.ssh_connections_id_seq'::regclass);
 
 
 --
 -- Name: standard_datas id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.standard_datas
-    ALTER COLUMN id SET DEFAULT NEXTVAL('public.standard_datas_id_seq'::regclass);
+ALTER TABLE ONLY public.standard_datas ALTER COLUMN id SET DEFAULT nextval('public.standard_datas_id_seq'::regclass);
+
+
+--
+-- Name: api_logs api_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.api_logs
+    ADD CONSTRAINT api_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: backup_job_logs backup_job_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_job_logs
+    ADD CONSTRAINT backup_job_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: backup_rules backup_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_rules
+    ADD CONSTRAINT backup_rules_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: backup_runs backup_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.backup_runs
+    ADD CONSTRAINT backup_runs_pkey PRIMARY KEY (id);
 
 
 --
@@ -2655,11 +3249,51 @@ ALTER TABLE ONLY public.data_caches
 
 
 --
+-- Name: dict_data dict_data_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dict_data
+    ADD CONSTRAINT dict_data_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dict_type dict_type_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dict_type
+    ADD CONSTRAINT dict_type_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: file_links file_link_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.file_links
     ADD CONSTRAINT file_link_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_assemblies item_assembly_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.item_assemblies
+    ADD CONSTRAINT item_assembly_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: items item_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.items
+    ADD CONSTRAINT item_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: item_records item_record_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.item_records
+    ADD CONSTRAINT item_record_pkey PRIMARY KEY (id);
 
 
 --
@@ -2676,6 +3310,38 @@ ALTER TABLE ONLY public.mqtt_sync_messages
 
 ALTER TABLE ONLY public.mqtt_sync_nodes
     ADD CONSTRAINT mqtt_sync_nodes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: note_links note_links_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.note_links
+    ADD CONSTRAINT note_links_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: note_tag_rels note_tag_rels_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.note_tag_rels
+    ADD CONSTRAINT note_tag_rels_pkey PRIMARY KEY (note_id, tag_id);
+
+
+--
+-- Name: note_tags note_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.note_tags
+    ADD CONSTRAINT note_tags_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notes notes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notes
+    ADD CONSTRAINT notes_pkey PRIMARY KEY (id);
 
 
 --
@@ -2783,10 +3449,38 @@ ALTER TABLE ONLY public.task_plan_old
 
 
 --
+-- Name: idx_dict_data_type_code; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dict_data_type_code ON public.dict_data USING btree (type_code);
+
+
+--
+-- Name: idx_dict_type_code; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dict_type_code ON public.dict_type USING btree (code);
+
+
+--
 -- Name: idx_history_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_history_id ON public.browser_history_visits USING btree (history_id);
+
+
+--
+-- Name: idx_item_serial_no; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_item_serial_no ON public.items USING btree (serial_no);
+
+
+--
+-- Name: idx_items_serial_no; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_items_serial_no ON public.items USING btree (serial_no);
 
 
 --
@@ -2801,6 +3495,41 @@ CREATE UNIQUE INDEX idx_mqtt_sync_messages_msg_id ON public.mqtt_sync_messages U
 --
 
 CREATE UNIQUE INDEX idx_mqtt_sync_nodes_node_id ON public.mqtt_sync_nodes USING btree (node_id);
+
+
+--
+-- Name: idx_note_parent; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_note_parent ON public.notes USING btree (parent_rel);
+
+
+--
+-- Name: idx_note_starred; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_note_starred ON public.notes USING btree (starred);
+
+
+--
+-- Name: idx_note_tags_name; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_note_tags_name ON public.note_tags USING btree (name);
+
+
+--
+-- Name: idx_note_title; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_note_title ON public.notes USING btree (title);
+
+
+--
+-- Name: idx_note_vault_path; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_note_vault_path ON public.notes USING btree (vault_id, rel_path);
 
 
 --
@@ -2821,7 +3550,7 @@ CREATE UNIQUE INDEX idx_project_groups_path ON public.project_groups USING btree
 -- Name: idx_project_groups_recycle; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE UNIQUE INDEX idx_project_groups_recycle ON public.project_groups USING btree (is_recycle_bin) WHERE (is_recycle_bin = TRUE);
+CREATE UNIQUE INDEX idx_project_groups_recycle ON public.project_groups USING btree (is_recycle_bin) WHERE (is_recycle_bin = true);
 
 
 --
@@ -2899,7 +3628,7 @@ CREATE INDEX idx_tasks_queue ON public.tasks USING btree (status, deadline);
 --
 
 ALTER TABLE ONLY public.projects
-    ADD CONSTRAINT projects_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.project_groups (id) ON DELETE RESTRICT;
+    ADD CONSTRAINT projects_group_id_fkey FOREIGN KEY (group_id) REFERENCES public.project_groups(id) ON DELETE RESTRICT;
 
 
 --
@@ -2907,7 +3636,7 @@ ALTER TABLE ONLY public.projects
 --
 
 ALTER TABLE ONLY public.quick_edit_snapshots
-    ADD CONSTRAINT quick_edit_snapshots_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.quick_edit_files (id) ON DELETE CASCADE;
+    ADD CONSTRAINT quick_edit_snapshots_file_id_fkey FOREIGN KEY (file_id) REFERENCES public.quick_edit_files(id) ON DELETE CASCADE;
 
 
 --
@@ -2915,7 +3644,7 @@ ALTER TABLE ONLY public.quick_edit_snapshots
 --
 
 ALTER TABLE ONLY public.task_plans
-    ADD CONSTRAINT task_plans_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.task_plans (id) ON DELETE SET NULL;
+    ADD CONSTRAINT task_plans_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.task_plans(id) ON DELETE SET NULL;
 
 
 --
@@ -2923,12 +3652,12 @@ ALTER TABLE ONLY public.task_plans
 --
 
 ALTER TABLE ONLY public.tasks
-    ADD CONSTRAINT tasks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.task_plans (id) ON DELETE CASCADE;
+    ADD CONSTRAINT tasks_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.task_plans(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 48Yjo12VB9FAYfENoGa79cFLuPTwltL9Xb8c9u3vH7VAbNUJ3ubbUmqJhycSDuY
+\unrestrict zBA77LgD3AtHISLXeIIXehPEPom5YfRIkiBuGOuEoeNNgLi7GcPrkPWstFm1aov
 
