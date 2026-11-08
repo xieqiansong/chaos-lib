@@ -19,10 +19,34 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
+const (
+	watchdogInterval = 10 * time.Second
+	maxReconnectWait = 30 * time.Second
+	opWaitTimeout    = 10 * time.Second
+	connectStuckTTL  = 60 * time.Second
+	stuckOfflineTTL  = 2 * time.Minute
+)
+
+type connManager struct {
+	mu         sync.RWMutex
+	client     mqtt.Client
+	generation uint64
+
+	tokenMu      sync.Mutex
+	connectToken mqtt.Token
+	connectAt    time.Time
+
+	subMu       sync.Mutex
+	subscribed  bool
+	subscribing bool
+
+	// offlineSince 仅由 watchdog 协程读写
+	offlineSince time.Time
+}
+
 var (
-	client      mqtt.Client
-	connectedMu sync.RWMutex
-	connected   bool
+	connMgr      = &connManager{}
+	watchdogOnce sync.Once
 
 	nodeMu      sync.RWMutex
 	localNodeID string
@@ -39,15 +63,20 @@ func NodeID() string {
 }
 
 func IsConnected() bool {
-	connectedMu.RLock()
-	defer connectedMu.RUnlock()
-	return connected
+	c := connMgr.current()
+	return c != nil && c.IsConnectionOpen()
 }
 
-func setConnected(v bool) {
-	connectedMu.Lock()
-	connected = v
-	connectedMu.Unlock()
+func (m *connManager) current() mqtt.Client {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.client
+}
+
+func (m *connManager) isCurrent(gen uint64) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.generation == gen
 }
 
 type envelope struct {
@@ -172,7 +201,9 @@ func loadNodeID() error {
 	if err != nil {
 		return err
 	}
+	nodeMu.Lock()
 	localNodeID = id
+	nodeMu.Unlock()
 	return nil
 }
 
@@ -182,19 +213,24 @@ func Start() {
 		slog.Info("MQTT 同步未启用")
 		return
 	}
-	if err := loadNodeID(); err != nil {
-		slog.Warn("MQTT 加载节点标识失败，跳过启动", "err", err)
-		return
-	}
 	initCrypto(cfg)
+	if err := loadNodeID(); err != nil {
+		slog.Warn("MQTT 加载节点标识失败，后台会重试", "err", err)
+	}
+	slog.Info("MQTT 正在连接 broker（失败会在后台重试）")
+	watchdogOnce.Do(func() { go connMgr.run() })
+}
 
-	prefix := normalizePrefix(cfg.Prefix)
+func buildOptions(cfg config.MqttConfig, gen uint64) *mqtt.ClientOptions {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(cfg.Broker)
 	opts.SetClientID(clientID(cfg))
 	opts.SetAutoReconnect(true)
-	opts.SetConnectRetry(true)
-	opts.SetConnectRetryInterval(5 * time.Second)
+	// paho 默认最大重连间隔 10 分钟且逐次指数退避，网络恢复后仍可能长时间不重试
+	opts.SetMaxReconnectInterval(maxReconnectWait)
+	// 首次连接重试交给 watchdog：ConnectRetry 会让 Connect token 一直不完成，
+	// 且 connecting 状态下发生连接丢失时 paho 不会启动自动重连
+	opts.SetConnectRetry(false)
 	opts.SetKeepAlive(30 * time.Second)
 	opts.SetPingTimeout(10 * time.Second)
 	if cfg.Username != "" {
@@ -202,26 +238,184 @@ func Start() {
 		opts.SetPassword(cfg.Password)
 	}
 	opts.SetDefaultPublishHandler(onMessage)
-	opts.SetOnConnectHandler(func(_ mqtt.Client) {
-		setConnected(true)
-
-		if token := client.Subscribe(prefix+"#", 1, nil); token.Wait() && token.Error() != nil {
-			slog.Warn("MQTT 订阅失败", "topic", prefix+"#", "err", token.Error())
+	opts.SetOnConnectHandler(func(c mqtt.Client) {
+		if !connMgr.isCurrent(gen) {
 			return
 		}
-		slog.Info("MQTT 已连接并订阅", "prefix", prefix, "node", NodeID())
+		connMgr.resetSubscription()
+		slog.Info("MQTT 已连接")
+		connMgr.ensureSubscribed(c)
 	})
 	opts.SetConnectionLostHandler(func(_ mqtt.Client, err error) {
-		setConnected(false)
+		if !connMgr.isCurrent(gen) {
+			return
+		}
+		connMgr.resetSubscription()
 		slog.Warn("MQTT 连接丢失", "err", err)
 	})
+	return opts
+}
 
-	client = mqtt.NewClient(opts)
-	slog.Info("MQTT 正在连接 broker（失败会在后台重试）", "broker", cfg.Broker)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		setConnected(false)
-		slog.Warn("MQTT 连接失败（应用继续运行，本地功能不受影响）", "broker", cfg.Broker, "err", token.Error())
+func (m *connManager) install() (mqtt.Client, mqtt.Client, uint64) {
+	cfg := config.GetConfig().Mqtt
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.generation++
+	gen := m.generation
+	old := m.client
+	c := mqtt.NewClient(buildOptions(cfg, gen))
+	m.client = c
+	return old, c, gen
+}
+
+func (m *connManager) tryConnect(c mqtt.Client) {
+	m.tokenMu.Lock()
+	defer m.tokenMu.Unlock()
+	if m.connectToken != nil {
+		select {
+		case <-m.connectToken.Done():
+		default:
+			return
+		}
+	}
+	m.connectToken = c.Connect()
+	m.connectAt = time.Now()
+}
+
+func (m *connManager) clearConnectToken() {
+	m.tokenMu.Lock()
+	m.connectToken = nil
+	m.tokenMu.Unlock()
+}
+
+func (m *connManager) resetSubscription() {
+	m.subMu.Lock()
+	m.subscribed = false
+	m.subMu.Unlock()
+}
+
+func (m *connManager) ensureSubscribed(c mqtt.Client) {
+	m.subMu.Lock()
+	if m.subscribed || m.subscribing {
+		m.subMu.Unlock()
 		return
+	}
+	m.subscribing = true
+	m.subMu.Unlock()
+
+	go func() {
+		token := c.Subscribe(Prefix()+"#", 1, nil)
+		ok := token.WaitTimeout(opWaitTimeout)
+		err := token.Error()
+		if m.current() != c {
+			m.subMu.Lock()
+			m.subscribing = false
+			m.subMu.Unlock()
+			return
+		}
+
+		m.subMu.Lock()
+		m.subscribing = false
+		if ok && err == nil {
+			m.subscribed = true
+		}
+		m.subMu.Unlock()
+
+		switch {
+		case !ok:
+			slog.Warn("MQTT 订阅超时，稍后重试")
+		case err != nil:
+			slog.Warn("MQTT 订阅失败，稍后重试", "err", err)
+		default:
+			slog.Info("MQTT 已订阅")
+		}
+	}()
+}
+
+func (m *connManager) rebuild(reason string) {
+	old, c, gen := m.install()
+	m.resetSubscription()
+	m.clearConnectToken()
+	m.offlineSince = time.Now()
+	if old == nil {
+		slog.Info("MQTT 客户端已初始化", "generation", gen)
+	} else {
+		// 停止旧客户端的后台重连，避免相同 ClientID 互相挤下线；
+		// Disconnect 可能因旧协程卡住而阻塞，放到后台执行
+		go old.Disconnect(0)
+		slog.Warn("MQTT 客户端已重建", "reason", reason, "generation", gen)
+	}
+	m.tryConnect(c)
+}
+
+func (m *connManager) run() {
+	m.tick()
+	ticker := time.NewTicker(watchdogInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		m.tick()
+	}
+}
+
+func (m *connManager) tick() {
+	if NodeID() == "" {
+		if err := loadNodeID(); err != nil {
+			slog.Warn("MQTT 节点标识未就绪，等待重试", "err", err)
+			return
+		}
+		m.rebuild("节点标识就绪")
+		return
+	}
+
+	c := m.current()
+	if c == nil {
+		m.rebuild("客户端未初始化")
+		return
+	}
+
+	if c.IsConnectionOpen() {
+		if !m.offlineSince.IsZero() {
+			slog.Info("MQTT 连接已恢复", "offline", time.Since(m.offlineSince).Round(time.Second).String())
+			m.offlineSince = time.Time{}
+		}
+		m.clearConnectToken()
+		m.ensureSubscribed(c)
+		return
+	}
+
+	if m.offlineSince.IsZero() {
+		m.offlineSince = time.Now()
+	}
+
+	m.tokenMu.Lock()
+	tok, tokAt := m.connectToken, m.connectAt
+	m.tokenMu.Unlock()
+	if tok != nil {
+		select {
+		case <-tok.Done():
+			if err := tok.Error(); err != nil {
+				slog.Debug("MQTT 连接尝试失败，稍后重试", "err", err)
+			}
+			m.clearConnectToken()
+		default:
+			if time.Since(tokAt) < connectStuckTTL {
+				return
+			}
+			slog.Warn("MQTT 连接尝试长时间无响应，重建客户端")
+			m.rebuild("连接尝试超时")
+			return
+		}
+	}
+
+	if !c.IsConnected() {
+		// paho 已放弃自动重连（disconnected），主动再发起一次连接
+		m.tryConnect(c)
+		return
+	}
+	// paho 仍处于 connecting/reconnecting，但迟迟没有恢复
+	if time.Since(m.offlineSince) > stuckOfflineTTL {
+		slog.Warn("MQTT 自动重连长时间未恢复，重建客户端")
+		m.rebuild("自动重连超时")
 	}
 }
 
@@ -262,7 +456,8 @@ func onMessage(_ mqtt.Client, msg mqtt.Message) {
 }
 
 func Publish(m wireMessage) error {
-	if client == nil || !client.IsConnected() {
+	c := connMgr.current()
+	if c == nil || !c.IsConnectionOpen() {
 		return ErrNotConnected
 	}
 	prefix := normalizePrefix(config.GetConfig().Mqtt.Prefix)
@@ -279,8 +474,10 @@ func Publish(m wireMessage) error {
 			payload = enc
 		}
 	}
-	token := client.Publish(topic, 1, false, payload)
-	token.Wait()
+	token := c.Publish(topic, 1, false, payload)
+	if !token.WaitTimeout(opWaitTimeout) {
+		return errors.New("mqttsync: publish timeout")
+	}
 	return token.Error()
 }
 
