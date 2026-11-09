@@ -2,11 +2,13 @@
 
 自托管的个人工具箱：Go 后端（自研 Web 框架 + GORM）+ Vue 3 前端，覆盖任务与间隔复习、项目管理、环境变量、文件连接、快捷编辑、SDK 版本切换、SSH 端口转发等日常开发场景。前端构建产物外置为 exe 同目录的 `ui/`，后端启动时从 `CHAOS_UI_DIR` 或 `./ui` 读取，默认使用 PostgreSQL（也可切 SQLite）。
 
+> **文档分工（单一事实源）**：`AGENTS.md` 是硬性规则权威；`docs/MODULE_INDEX.md` 是「功能 → 后端模块 → 前端插件 → 路由」的唯一落点索引；`docs/architecture.md` 只讲架构机制；`chaos-go/configs/config.example.yaml` 与 `chaos-go/CONFIG.md` 是配置字段权威。本 README 只做全景介绍与快速上手，不重复维护模块清单。文档之间冲突时，以代码和上述权威文件为准。
+
 ## 功能一览
 
 - **📋 任务管理**：待办 / 定时（cron）/ 间隔复习三种任务计划，父子任务树，优先级、延期、逾期检测与统计
 - **🕒 定时任务**：基于 `robfig/cron/v3` 的**独立 cron job 模块**，按表达式在后台触发 HTTP/Webhook 或命令动作并记录运行日志；原内置周期任务（任务计划扫描、端口转发自愈、STUN 同步）已并入此模块，可在「定时任务」页面配置
-- **📖 FSRS 间隔复习**：基于官方 `go-fsrs` 实现，按遗忘曲线计算下次最佳复习时间，支持 AI 评分辅助（`internal/taskplan/fsrs.go` 只做任务计划与卡片的转换）
+- **📖 FSRS 间隔复习**：基于官方 `go-fsrs` 实现，按遗忘曲线计算下次最佳复习时间，支持 AI 评分辅助（`internal/domain/taskplan/fsrs.go` 只做任务计划与卡片的转换）
 - **📊 看板**：任务概览、每日 / 活跃 / 贡献统计（ECharts）
 - **📁 项目管理**：按 ProjectGroup / Project 组织本地项目，记录 Git URL 与访问时间；移动（同卷 rename / 跨卷 copy）、访问、删除
 - **🔗 文件连接**：管理 Windows 目录联接（Junction），创建 / 删除 / 切换 / 状态检测（功能开关 `FEATURE_FILE_LINK`）
@@ -23,6 +25,8 @@
 - **📡 数据采集与代理**：浏览器历史记录采集、DeepSeek 余额查询、百度天气代理
 - **🖥️ 界面能力**：终端风格布局、命令面板（Ctrl+K）、主题切换（dark / paper 护眼）、全屏手机看板（`/board`）
 - **☁️ Supabase 数据通道**：基于 PostgREST 的云端读写客户端（表名白名单、凭据仅走 `apikey` 头、更新删除强制带过滤），不对外暴露 HTTP 路由
+
+> 完整功能清单与模块落点（含个人物品、标准数据、数据缓存等）见 [`docs/MODULE_INDEX.md`](docs/MODULE_INDEX.md) §1。
 
 ## 截图展示
 
@@ -74,7 +78,7 @@
 
 ## 快速开始
 
-准备工作：Go 1.26+、pnpm。
+准备工作：Go 1.27+（见 `chaos-go/go.mod`）、pnpm。
 
 ### 后端
 
@@ -104,7 +108,7 @@ pnpm build      # 构建到 dist/
 
 ### 一键部署（Windows）
 
-`scripts/chaos.deploy.ps1`：并行构建前端（`chaos-ui`）与浏览器扩展（`chaos-browser-extension`）→ 前端产物拷到 exe 同目录 `ui/`、扩展产物拷到 `D:\data\chaos\chrome-mv3` → `go build` 输出二进制 → `nssm restart chaos` 重启服务。
+`scripts/chaos.deploy.ps1`：并行构建前端（`chaos-ui`）与浏览器扩展（`chaos-browser-extension`）→ 前端产物拷到 exe 同目录 `ui/`、扩展产物拷到部署目录下的 `chrome-mv3/` → `go build` 输出二进制 → `nssm restart chaos` 重启服务。具体输出目录以脚本内的配置为准。
 
 ## 配置
 
@@ -137,63 +141,40 @@ pnpm build      # 构建到 dist/
 | `CONFIG_FILE`（环境变量） | 覆盖配置文件路径（缺省 `configs/config.yaml`） | - |
 | `CHAOS_UI_DIR`（环境变量） | 前端静态资源目录覆盖（缺省读 exe 同目录 `ui/`） | - |
 
-启动时从运行目录加载 `configs/config.yaml`（`CONFIG_FILE` 可覆盖路径；缺失或解析失败回退内置默认值）；更多配置项见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md) 与 `chaos-go/configs/config.example.yaml`。
+启动时从运行目录加载 `configs/config.yaml`（`CONFIG_FILE` 可覆盖路径；缺失或解析失败回退内置默认值）。**本表只列常用项，完整字段与默认值以 `chaos-go/configs/config.example.yaml` 为准**，逐项说明见 [`chaos-go/CONFIG.md`](chaos-go/CONFIG.md)。敏感值只写 `configs/config.yaml` 或 `.env`（均已被 `.gitignore` 忽略）。
 
 ## 项目结构
 
 ```
 chaos-lib/
-├── chaos-go/                    # Go 后端（module chaos-go）
-│   ├── cmd/server/              # HTTP 服务入口：解析 webFS（CHAOS_UI_DIR 或 exe 同目录 ui/），调 app.Run
+├── chaos-go/                    # Go 后端（module chaos-go，Go 1.27）
+│   ├── cmd/                    # server / migrate / natter / tcp_over_websockets 等入口与辅助工具
 │   ├── internal/
-│   │   ├── app/                 # 组合根：编排启动（config → DB → 插件 Build → 迁移 → 启动钩子 → 路由）
-│   │   ├── domain/              # 业务模块（共 16 个，均为插件：handler/service/repository/model/plugin）
-│   │   │   ├── taskplan/        # 任务计划 + 任务 + FSRS
-│   │   │   ├── project/         # 项目管理 + 回收站
-│   │   │   ├── envvar/          # 环境变量 + TOML 快照
-│   │   │   ├── filelink/        # Windows Junction
-│   │   │   ├── quickedit/       # 文件快照 / 回滚
-│   │   │   ├── proxy/           # SDK 切换 / 浏览器历史 / 天气 / 余额
-│   │   │   ├── portfwd/         # SSH 连接 + 端口转发
-│   │   │   ├── cronjob/         # 定时任务（robfig/cron）
-│   │   │   ├── items/           # 个人物品（购入 / 补货 / 消耗 / 装配 / 借还 / 维修 / 盘点）
-│   │   │   ├── dict/            # 数据字典（枚举中心）
-│   │   │   ├── sdk/             # SDK 版本切换
-│   │   │   ├── polyform/        # 格式转换
-│   │   │   ├── standarddata/    # 标准数据
-│   │   │   ├── systemjob/       # 系统周期任务
-│   │   │   ├── dashboard/       # 看板统计
-│   │   │   └── sshconn/         # SSH 连接
-│   │   ├── framework/           # 自研 web 框架 + 跨切面基础设施
-│   │   │   ├── web/             # gin 兼容薄封装（替代 gin）
-│   │   │   ├── router/          # SetupRouter 装配（/api/v1）
-│   │   │   ├── routehub/        # 存量 v1 路由登记中心
-│   │   │   ├── plugin/          # 插件注册与依赖编排
-│   │   │   ├── config/          # 配置加载 / DB 单例 / 日志
-│   │   │   ├── crud/            # 通用 CRUD 基线（POST + Action）
-│   │   │   ├── envelope/ resp/ httpx/ middleware/ pagination/  # 信封 / 响应 / 错误映射 / 鉴权 / 分页
-│   │   │   └── scheduler/ apilog/ security/ dbmonitor/ datacache/ memcache/
-│   │   ├── platform/           # 外部集成适配器：deepseek / stunpf / stunsync / mqttsync / supabase
-│   │   └── pkg/tools/           # 跨平台宿主交互工具（非业务）
-│   ├── web/                     # 前端构建产物放置目录（运行期解析为 webFS）
-│   ├── configs/                 # config.yaml（运行时，勿提交）+ config.example.yaml（模板）
-│   ├── migrations/              # PostgreSQL 基准快照 / 种子 / 增量变更 / supabase 建表
+│   │   ├── app/                 # 组合根：config → DB → 插件 Build → 迁移 → 启动钩子 → 路由
+│   │   ├── domain/              # 业务插件（16 个；3 个空壳仅 plugin.go，见 MODULE_INDEX §5）
+│   │   ├── framework/           # 自研 web 框架 + 跨切面基件（16 个，其中 2 个注册为插件）
+│   │   └── platform/            # 外部集成（5 个，其中 3 个注册为插件；stunpf/stunsync 只声明内置周期任务）
+│   ├── pkg/tools/               # 跨平台宿主交互工具（非业务，与 internal/ 平级）
+│   ├── configs/                 # config.yaml（运行时，勿提交）+ config.example.yaml（模板 / 字段权威）
+│   ├── migrations/              # PostgreSQL 基准快照（禁止修改）/ 种子 / 增量变更 / supabase 建表
 │   ├── deployments/             # Dockerfile + docker-compose.yml
-│   ├── api/                     # openapi 规范占位
-│   ├── scripts/ test/           # 占位
-├── chaos-ui/                    # Vue 3 + TypeScript 前端（pnpm workspace）
+│   └── api/                     # openapi.yaml（占位，冻结）
+├── chaos-ui/                    # Vue 3 + TypeScript 前端（独立 pnpm 工程）
 │   └── src/
-│       ├── plugins/             # 业务插件（与后端插件一一对应）：api.ts + .vue + 插件登记
-│       ├── views/               # 应用级页面（首页 / 测试例子 / 全屏看板）
-│       ├── components/          # DataTable 等通用组件
-│       ├── composables/        # useRestApi / useCrudAction
-│       ├── utils/               # request / message
+│       ├── plugins/             # 前端插件（19 个）：api.ts + .vue + index.ts；5 个存量插件未拆 api.ts（MODULE_INDEX §5）
+│       ├── views/               # 应用级页面（3 个路由页 + 全局搜索浮层）
+│       ├── components/          # 通用组件（DataTable 等，含存量业务组件）
+│       ├── composables/         # useRestApi / useCrudAction 等
+│       ├── utils/               # request / message 等（新接口不放这里）
 │       ├── router/              # appRoutes + collectRoutes 汇总插件路由
 │       └── theme.ts             # 主题（dark / paper）
-├── chaos-browser-extension/     # 浏览器扩展（书签 / 历史直连本机）
-├── scripts/chaos.deploy.ps1     # 一键构建 + 部署
-└── docs/screenshots/            # 界面截图
+├── chaos-browser-extension/    # WXT 浏览器扩展（书签 / 历史直连本机）
+├── docs/                        # architecture.md / MODULE_INDEX.md / 接口规范.md / screenshots
+├── scripts/                    # chaos.deploy.ps1（一键构建部署）+ termux.build.chaos.sh
+└── AGENTS.md                    # 硬性代码规则（权威）
 ```
+
+> 模块名、路由与 API 前缀的完整清单见 [`docs/MODULE_INDEX.md`](docs/MODULE_INDEX.md)，本树不重复枚举。前端静态资源不放在 `chaos-go/` 内：构建产物 `chaos-ui/dist/` 由部署脚本拷到 exe 同目录 `ui/`。
 
 ## 前端页面
 
@@ -215,11 +196,16 @@ chaos-lib/
 | `/bookmarks` | 书签管理 | 浏览器书签树：新建 / 修改 / 删除 / 拖拽排序（需扩展直连 ID） |
 | `/polyform` | 格式转换 | JSON / YAML / CSV / XML / INI / CBOR / Java / Go 互转（polyform-tools） |
 | `/mqttSync` | MQTT同步 | 多节点消息广播：状态 / 发送 / 接收 / 按 topic 删除 |
+| `/items` | 个人物品 | 购入 / 补货 / 消耗 / 装配 / 借还 / 维修 / 盘点 |
+| `/standardData` | 标准数据 | 标准数据维护 |
+| `/dataCache` | 数据缓存 | 缓存条目（Category / Key / Value）管理与统计 |
+| `/sshConn` | SSH连接 | SSH 连接凭据管理（响应脱敏），转发规则见 `/portForward` |
 | `/browserHistory` | 历史记录 | 浏览器历史（隐藏，Web 端仅占位） |
+| `/task` | — | 兼容旧地址，重定向到 `/taskPlan`（隐藏） |
 | `/example` | 测试例子 | 组件示例（隐藏） |
 | `/board` | 全屏看板 | 手机端时钟 + 天气（隐藏、全屏） |
 
-路由表 `chaos-ui/src/router/index.ts` 的 `meta.title` / `meta.icon` 是侧边菜单与面包屑的唯一数据源，新增页面只需追加路由。
+业务路由由各插件 `index.ts` 声明，经 `chaos-ui/src/plugins/registry.ts` 的 `collectRoutes()` 汇总进 `chaos-ui/src/router/index.ts`；`meta.title` / `meta.icon` 是侧边菜单与面包屑的唯一数据源，新增页面只需在插件内追加路由。`src/views/Search.vue` 是命令面板用的全局搜索浮层，由 `App.vue` 直接引用，不进路由表。完整路由、模块落点与已知偏离见 [`docs/MODULE_INDEX.md`](docs/MODULE_INDEX.md)。
 
 ## 参考
 

@@ -1,77 +1,30 @@
 # chaos-go
 
-`chaos` 项目的 Go 后端服务（基于 gin）。提供任务计划、文件连接、SSH 端口转发、MQTT 多节点同步、定时任务、接口访问日志、项目管理等能力。
+`chaos` 项目的 Go 后端服务：自研 Web 框架（`net/http` 封装，**不依赖 gin**）+ GORM，提供任务计划、文件连接、SSH 端口转发、MQTT 多节点同步、定时任务、接口访问日志、项目管理等能力。
+
+> 模块清单、路由与 API 前缀以 [`docs/MODULE_INDEX.md`](../docs/MODULE_INDEX.md) 为唯一事实源；架构机制见 [`docs/architecture.md`](../docs/architecture.md)；硬性规则见 [`AGENTS.md`](../AGENTS.md)。本文件只列后端入口、顶层目录与构建命令，不重复维护模块清单。
 
 ## 目录结构
 
-目标布局见 [`Go Web项目结构.md`](./Go%20Web项目结构.md)。
-
 ```
 chaos-go/
-├── api/
-│   └── openapi.yaml          # OpenAPI 定义
-├── cmd/
-│   ├── server/
-│   │   └── main.go           # HTTP 服务入口
-│   ├── tcp_over_websockets/  # 辅助工具：TCP over WebSocket
-│   └── test/                 # 辅助命令行工具
-├── configs/
-│   ├── config.example.yaml   # 配置模板（入库）
-│   └── config.yaml           # 真实配置（含密钥，被 .gitignore 忽略）
-├── deployments/
-│   ├── Dockerfile
-│   └── docker-compose.yml    # Docker 部署
-├── internal/                 # 私有代码，按「框架 / 平台 / 业务」分层
-│   ├── framework/            # 框架与基础设施（不依赖任何业务包）
-│   │   ├── resp/             # 统一响应信封
-│   │   ├── pagination/       # 分页
-│   │   ├── httpx/            # HTTP 工具
-│   │   ├── routehub/         # 路由登记中心
-│   │   ├── router/           # 路由装配
-│   │   ├── config/           # 配置加载（config.go / loader.go / testing_hook.go）
-│   │   ├── apilog/           # 接口访问日志
-│   │   ├── datacache/        # 数据缓存
-│   │   ├── memcache/         # 内存缓存
-│   │   ├── dbmonitor/        # 数据库监控
-│   │   ├── scheduler/        # 调度器
-│   │   └── crud/             # 通用 CRUD
-│   ├── platform/             # 外部系统集成适配器（无业务概念）
-│   │   ├── deepseek/         # DeepSeek 集成
-│   │   ├── supabase/         # Supabase 集成
-│   │   ├── mqttsync/         # MQTT 多节点同步
-│   │   ├── stunsync/         # STUN 同步
-│   │   └── stunpf/           # STUN 端口转发
-│   ├── domain/               # 业务领域模块
-│   │   ├── taskplan/         # 任务计划
-│   │   ├── project/          # 项目管理
-│   │   ├── portfwd/          # SSH 端口转发
-│   │   ├── filelink/         # 文件连接
-│   │   ├── quickedit/        # 快速编辑
-│   │   ├── proxy/            # 代理
-│   │   ├── cronjob/          # 定时任务
-│   │   ├── envvar/           # 环境变量管理
-│   │   ├── sdk/              # 内部 SDK
-│   │   ├── standarddata/     # 标准数据
-│   │   └── systemjob/        # 系统任务
-│   └── app/                  # 应用装配根（composition root）
-├── migrations/               # 数据库 schema（原 sql/）
-│   ├── chaos_postgres_schema.sql
-│   ├── chaos_postgres_update.sql
-│   └── supabase_schema.sql
-├── pkg/
-│   └── tools/                # 可被外部复用的工具库
-├── scripts/                  # 脚本
-├── test/
-│   └── integration/          # 集成测试
-├── web/
-│   ├── static/               # 静态资源
-│   └── templates/            # 模板
-├── CONFIG.md
-├── go.mod
-├── go.sum
+├── cmd/                    # 可执行入口：server（HTTP）、migrate，以及 natter / tcp_over_websockets 等辅助工具
+├── internal/
+│   ├── app/                # 组合根：config → DB → 插件 Build → 迁移 → 启动钩子 → 路由
+│   ├── domain/             # 16 个业务插件（handler / service / repository / model / plugin）
+│   ├── framework/          # 自研 Web 框架与跨切面基件（16 个，其中 2 个注册为插件）
+│   └── platform/          # 5 个外部集成（其中 3 个注册为插件）
+├── pkg/tools/              # 跨平台宿主交互工具（非业务）
+├── configs/                # config.example.yaml（模板 / 字段权威）+ config.yaml（运行时，已忽略）
+├── migrations/             # chaos_postgres_schema.sql（冻结快照，禁止修改）/ _seed / _update / supabase_schema
+├── deployments/            # Dockerfile + docker-compose.yml
+├── api/                    # openapi.yaml（占位，冻结）
+├── CONFIG.md               # 配置字段说明
 ├── Makefile
-└── README.md
+└── go.mod / go.sum         # module chaos-go，Go 1.27
 ```
+
+> 模块名与落点见 `docs/MODULE_INDEX.md`。`config.GetDB()` 只允许出现在 `repository.go`；新增模型登记到 `plugin.go` 的 `Models`，由 `config.AutoMigrate` 迁移，详见 `AGENTS.md`。前端静态资源不放在本工程内。
 
 ## 配置
 
@@ -84,3 +37,5 @@ make build   # 编译到 bin/server
 make run     # 直接运行
 make test    # 跑测试
 ```
+
+提交前须 `go build ./...` 无错；改动后端逻辑后跑 `go test ./...`（见 `AGENTS.md`）。前端产物由根仓库 `scripts/chaos.deploy.ps1` 构建并拷到 exe 同目录 `ui/`，运行时由 `CHAOS_UI_DIR` 或 `./ui` 解析。

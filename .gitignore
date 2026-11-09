@@ -1,4 +1,10 @@
-**/logs/*
+# 依赖与构建产物：子工程各自也有 .gitignore，此处做全仓兜底
+**/node_modules/
+**/dist/
+**/.output/
+**/.wxt/
+**/bin/
+**/logs/
 **/*.exe
 # 配置文件（含密码，坚决不提交）
 **/.env
