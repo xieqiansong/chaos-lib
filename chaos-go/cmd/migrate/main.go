@@ -23,7 +23,6 @@ import (
 	"chaos-go/internal/domain/sdk"
 	"chaos-go/internal/domain/standarddata"
 	"chaos-go/internal/domain/taskplan"
-	"chaos-go/internal/framework/apilog"
 	"chaos-go/internal/framework/config"
 	"chaos-go/internal/framework/datacache"
 	"chaos-go/internal/platform/mqttsync"
@@ -49,7 +48,7 @@ var models = []interface{}{
 	&cronjob.CronJobRun{},
 	&standarddata.StandardData{},
 	&datacache.DataCache{},
-	&apilog.ApiLog{},
+	// api_logs 跳过：Postgres 里含大量软删除数据 + reflect slice 导致 GORM 加不上 soft_delete 过滤，UNIQUE 冲突
 }
 
 func main() {
@@ -168,8 +167,7 @@ func migrateOne(src, dst *gorm.DB, model interface{}, batchSize int, truncate bo
 	name := tableName(dst, model)
 
 	if truncate {
-
-		if err := dst.Unscoped().Where("1 = 1").Delete(model).Error; err != nil {
+		if err := dst.Exec("DELETE FROM " + name).Error; err != nil {
 			return fmt.Errorf("清空目标表失败: %w", err)
 		}
 	}
@@ -181,7 +179,7 @@ func migrateOne(src, dst *gorm.DB, model interface{}, batchSize int, truncate bo
 		slicePtr := reflect.New(sliceType)
 		sliceI := slicePtr.Interface()
 
-		res := src.Unscoped().Limit(batchSize).Offset(offset).Find(sliceI)
+		res := src.Limit(batchSize).Offset(offset).Find(sliceI)
 		if res.Error != nil {
 			return fmt.Errorf("读取源表失败: %w", res.Error)
 		}

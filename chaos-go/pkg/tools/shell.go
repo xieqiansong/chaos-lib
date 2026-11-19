@@ -36,7 +36,13 @@ func RunPowershell(ctx context.Context, script string, opt ShellOpt) (*ShellResu
 	if runtime.GOOS != "windows" {
 		bin = "pwsh"
 	}
-	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script}
+	// 注入 UTF-8 编码设置，防止 Windows PowerShell 5.1 默认 GBK 输出导致中文乱码
+	// - $OutputEncoding：控制 PowerShell 管道输出给外部程序的编码
+	// - [Console]::OutputEncoding / InputEncoding：控制控制台 I/O 编码
+	// 注意：脚本之间用分号连接，因为 -Command 只接受一条命令字符串
+	utf8Prefix := `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8; `
+	fullScript := utf8Prefix + script
+	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", fullScript}
 	return run(ctx, bin, args, opt)
 }
 
