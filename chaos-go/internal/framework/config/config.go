@@ -46,8 +46,14 @@ func privateConnectDB() (*gorm.DB, error) {
 
 		sqlDB.SetMaxOpenConns(1)
 		sqlDB.SetMaxIdleConns(1)
-		if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
-			slog.Warn("设置 SQLite WAL 模式失败", "err", err)
+		// WAL 模式在 Windows pm2/fork 环境下容易因临时文件锁失败；
+		// DELETE 模式兼容更好，单写场景下性能差异可忽略
+		if _, err := sqlDB.Exec("PRAGMA journal_mode=DELETE"); err != nil {
+			slog.Warn("设置 SQLite journal_mode 失败", "err", err)
+		}
+		// 临时表放内存，避免在受限环境下打开 %TEMP% 目录的临时文件失败
+		if _, err := sqlDB.Exec("PRAGMA temp_store=MEMORY"); err != nil {
+			slog.Warn("设置 SQLite temp_store 失败", "err", err)
 		}
 		if _, err := sqlDB.Exec("PRAGMA foreign_keys=ON"); err != nil {
 			slog.Warn("开启 SQLite 外键失败", "err", err)
