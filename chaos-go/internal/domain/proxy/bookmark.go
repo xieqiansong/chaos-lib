@@ -8,8 +8,17 @@ import (
 	"chaos-go/internal/framework/web"
 	"sort"
 
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// ilikeOp 返回当前方言支持的大小写不敏感 LIKE 操作符：PostgreSQL 用 ILIKE，SQLite 的 LIKE 默认不区分大小写。
+func ilikeOp(db *gorm.DB) string {
+	if db.Dialector.Name() == "postgres" {
+		return "ILIKE"
+	}
+	return "LIKE"
+}
 
 type Bookmark struct {
 	ID        string `gorm:"primaryKey"`
@@ -71,7 +80,8 @@ func GetFrequentBookmarks(c *web.Context) {
 
 	if search != "" {
 		like := "%" + search + "%"
-		base = base.Where("b.title ILIKE ? OR b.url ILIKE ?", like, like)
+		op := ilikeOp(config.GetDB())
+		base = base.Where("b.title "+op+" ? OR b.url "+op+" ?", like, like)
 	}
 	base = base.Order("h.visit_count DESC, h.last_visit_time DESC")
 

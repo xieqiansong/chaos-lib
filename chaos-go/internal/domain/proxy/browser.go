@@ -39,7 +39,8 @@ func GetBrowserHistories(c *web.Context) {
 	base := config.GetDB().Model(&BrowserHistory{})
 	if search != "" {
 		like := "%" + search + "%"
-		base = base.Where("title ILIKE ? OR url ILIKE ?", like, like)
+		op := ilikeOp(config.GetDB())
+		base = base.Where("title "+op+" ? OR url "+op+" ?", like, like)
 	}
 	base = base.Order("last_visit_time DESC")
 
