@@ -124,7 +124,7 @@ if ($extCopyExit -ge 8) {
 
 # ── 重启服务 ──────────────────────────────────────────────────────────
 $restartSw = [System.Diagnostics.Stopwatch]::StartNew()
-nssm restart chaos
+pm2 restart chaos-go
 $restartSeconds = [math]::Round($restartSw.Elapsed.TotalSeconds, 1)
 
 $totalSeconds = [math]::Round($totalSw.Elapsed.TotalSeconds, 1)
@@ -133,10 +133,10 @@ Write-Host ""
 Write-Host "── 部署计时 ────────────────────────────"
 Write-Host ("  前端构建 (pnpm install+build): {0,6}s" -f $uiSeconds)
 Write-Host ("  后端构建 (go build):           {0,6}s" -f $goSeconds)
-Write-Host ("  复制前端产物 (dist→ui):        {0,6}s" -f $copySeconds)
+Write-Host ("  复制前端 (dist→ui):            {0,6}s" -f $copySeconds)
 Write-Host ("  扩展构建 (pnpm install+build): {0,6}s" -f $extSeconds)
-Write-Host ("  复制扩展产物 (chrome-mv3):     {0,6}s" -f $extCopySeconds)
-Write-Host ("  重启服务 (nssm restart):       {0,6}s" -f $restartSeconds)
+Write-Host ("  复制扩展 (chrome-mv3):         {0,6}s" -f $extCopySeconds)
+Write-Host ("  重启服务 (pm2 restart):        {0,6}s" -f $restartSeconds)
 Write-Host ("  总体耗时:                      {0,6}s" -f $totalSeconds)
 Write-Host "────────────────────────────────────────"
 Write-Host "✅ 部署完成: $outputPath + $uiOutputDir + $extOutputDir"
