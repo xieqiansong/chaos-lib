@@ -1,27 +1,62 @@
 package mqttsync
 
 import (
-	"chaos-go/pkg/tools"
 	"log/slog"
+	"time"
 
 	"chaos-go/internal/framework/config"
+	"chaos-go/pkg/tools"
 )
 
-func saveMessage(m wireMessage) (MqttSyncMessage, error) {
+// UpsertMessage 按 node_id + channel + payload 三元组查找：
+//   - 已存在 → count+1，更新 msg_id 和 updated_at，返回 (记录, false, nil)
+//   - 不存在 → 新建一条 count=1 的记录，返回 (记录, true, nil)
+func UpsertMessage(nodeID, channel, payload, msgID string) (MqttSyncMessage, bool, error) {
 	db := config.GetDB()
 	if db == nil {
-		return MqttSyncMessage{}, ErrDBUnavailable
-	}
-	rec := MqttSyncMessage{
-		MsgID:   m.ID,
-		NodeID:  m.NodeID,
-		Channel: m.Channel,
-		Payload: m.Payload,
+		return MqttSyncMessage{}, false, ErrDBUnavailable
 	}
 
-	err := db.Where(MqttSyncMessage{MsgID: m.ID}).
-		Attrs(MqttSyncMessage{NodeID: m.NodeID, Channel: m.Channel, Payload: m.Payload}).
-		FirstOrCreate(&rec).Error
+	var rec MqttSyncMessage
+	now := time.Now()
+
+	// 先查同 node + channel + payload 是否已存在
+	err := db.Where("node_id = ? AND channel = ? AND payload = ? AND is_deleted = 0",
+		nodeID, channel, payload).First(&rec).Error
+
+	if err == nil {
+		// 已存在：count++，更新 msg_id 和时间
+		err = db.Model(&rec).Updates(map[string]any{
+			"msg_id":    msgID,
+			"count":     rec.Count + 1,
+			"updated_at": now,
+		}).Error
+		if err != nil {
+			return MqttSyncMessage{}, false, err
+		}
+		rec.MsgID = msgID
+		rec.Count++
+		rec.UpdatedAt = now
+		return rec, false, nil
+	}
+
+	// 不存在：新建
+	rec = MqttSyncMessage{
+		MsgID:   msgID,
+		NodeID:  nodeID,
+		Channel: channel,
+		Payload: payload,
+		Count:   1,
+	}
+	if err := db.Create(&rec).Error; err != nil {
+		return MqttSyncMessage{}, false, err
+	}
+	return rec, true, nil
+}
+
+// saveMessage 供对端消息落库使用，复用 UpsertMessage 去重逻辑
+func saveMessage(m wireMessage) (MqttSyncMessage, error) {
+	rec, _, err := UpsertMessage(m.NodeID, m.Channel, m.Payload, m.ID)
 	return rec, err
 }
 
@@ -45,7 +80,7 @@ func ListLatestPerChannelLike(prefix string) ([]MqttSyncMessage, error) {
 	var msgs []MqttSyncMessage
 	if err := db.
 		Where("id IN (?)", sub).
-		Order("created_at DESC").
+		Order("updated_at DESC").
 		Find(&msgs).Error; err != nil {
 		return nil, err
 	}

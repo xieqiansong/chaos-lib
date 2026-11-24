@@ -18,9 +18,10 @@ const defaultChannel = "broadcast"
 type MqttSyncMessage struct {
 	crud.BaseModel
 	MsgID   string `gorm:"uniqueIndex;size:64" json:"MsgID"`
-	NodeID  string `gorm:"size:64" json:"NodeID"`
-	Channel string `gorm:"size:64" json:"Channel"`
+	NodeID  string `gorm:"size:64;index" json:"NodeID"`
+	Channel string `gorm:"size:64;index" json:"Channel"`
 	Payload string `gorm:"type:text" json:"Payload"`
+	Count   int    `gorm:"default:1" json:"Count"`
 }
 
 type MqttSyncNode struct {

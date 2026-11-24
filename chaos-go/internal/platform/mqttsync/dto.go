@@ -8,6 +8,7 @@ type MessageDTO struct {
 	NodeID    string    `json:"NodeID"`
 	Channel   string    `json:"Channel"`
 	Payload   string    `json:"Payload"`
+	Count     int       `json:"Count"`
 	IsSelf    bool      `json:"IsSelf"`
 	CreatedAt time.Time `json:"CreatedAt"`
 	UpdatedAt time.Time `json:"UpdatedAt"`
@@ -29,6 +30,7 @@ func toDTO(m MqttSyncMessage) MessageDTO {
 		NodeID:    m.NodeID,
 		Channel:   m.Channel,
 		Payload:   m.Payload,
+		Count:     m.Count,
 		IsSelf:    m.NodeID != "" && m.NodeID == NodeID(),
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
