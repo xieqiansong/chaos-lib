@@ -1,4 +1,4 @@
-import {subDays} from 'date-fns';
+import {subDays, subHours} from 'date-fns';
 import {action} from "@/utils/request";
 
 
@@ -10,9 +10,9 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
     return result;
 }
 
-async function extracted(days: number) {
+async function save(hours: number) {
     try {
-        const startTime = subDays(new Date(), days).getTime();
+        const startTime = subHours(new Date(), hours).getTime();
         const maxResults = 50000; // 上限避免内存与 getVisits 调用量失控
         const batchSize = 256;
 
@@ -49,15 +49,20 @@ async function extracted(days: number) {
 
 // 必须 async + 全程 await，否则 MV3 service worker 会提前被杀。
 const saveBrowserHistory = async () => {
-    await extracted(365);
+    await save(365 * 24);
 }
 
 const saveBrowserHistoryRecently = async () => {
-    await extracted(7);
+    await save(7 * 24);
+}
+
+const saveBrowserHistoryInstant = async () => {
+    await save(1);
 }
 
 
 export {
     saveBrowserHistory,
-    saveBrowserHistoryRecently
+    saveBrowserHistoryRecently,
+    saveBrowserHistoryInstant
 }

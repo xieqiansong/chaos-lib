@@ -1,11 +1,12 @@
 // @ts-ignore
 import browser from "webextension-polyfill";
-import {saveBrowserHistoryRecently} from "./background/browser-history-backup";
+import {saveBrowserHistoryRecently, saveBrowserHistoryInstant} from "./background/browser-history-backup";
 import {saveBookmarks} from "@/entrypoints/background/bookmark-backup";
 import {action} from "@/utils/request";
 
 // 诊断埋点：把 alarm 触发/结果写入 storage，避免 SW 被杀后错误丢失、无法排查。
 const ALARM_LOG_KEY = "chaos:alarmLog";
+
 async function logAlarm(name: string, status: "start" | "ok" | "error", detail?: string) {
     try {
         const stored = await browser.storage.local.get(ALARM_LOG_KEY);
@@ -13,7 +14,8 @@ async function logAlarm(name: string, status: "start" | "ok" | "error", detail?:
         arr.push({name, status, detail, at: Date.now()});
         if (arr.length > 50) arr.splice(0, arr.length - 50);
         await browser.storage.local.set({[ALARM_LOG_KEY]: arr});
-    } catch { /* 忽略存储写入异常 */ }
+    } catch { /* 忽略存储写入异常 */
+    }
 }
 
 export default defineBackground(() => {
@@ -51,6 +53,8 @@ export default defineBackground(() => {
         try {
             if (alarm.name === 'saveBrowserHistoryRecently') {
                 await saveBrowserHistoryRecently();
+            } else if (alarm.name === 'saveBrowserHistoryInstant') {
+                await saveBrowserHistoryInstant();
             } else if (alarm.name === 'saveBookmarks') {
                 await saveBookmarks();
             }
@@ -62,23 +66,14 @@ export default defineBackground(() => {
         }
     });
 
-    // 备份书签树
-    saveBookmarks().catch((err) => {
-        console.error("saveBookmarks (startup) failed:", err);
-    });
-    browser.alarms.create('saveBookmarks', {
-        delayInMinutes: 0,
-        periodInMinutes: 1,
-    });
-
     // 备份最近7天的浏览器历史记录
     saveBrowserHistoryRecently().catch((err) => {
         console.error("saveBrowserHistoryRecently (startup) failed:", err);
     });
-    browser.alarms.create('saveBrowserHistoryRecently', {
-        delayInMinutes: 0,
-        periodInMinutes: 1,
-    });
+
+    browser.alarms.create('saveBookmarks', {delayInMinutes: 0, periodInMinutes: 1});
+    browser.alarms.create('saveBrowserHistoryInstant', {delayInMinutes: 0, periodInMinutes: 1});
+    browser.alarms.create('saveBrowserHistoryRecently', {delayInMinutes: 0, periodInMinutes: 60});
 });
 
 // 执行指令并返回结果；调用方（网页经 externally_connectable）负责 sendResponse。
