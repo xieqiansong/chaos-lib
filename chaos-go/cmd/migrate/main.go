@@ -43,7 +43,6 @@ var models = []interface{}{
 	&quickedit.QuickEditSnapshot{},
 	&sdk.SdkSource{},
 	&mqttsync.MqttSyncMessage{},
-	&mqttsync.MqttSyncNode{},
 	&cronjob.CronJob{},
 	&cronjob.CronJobRun{},
 	&standarddata.StandardData{},

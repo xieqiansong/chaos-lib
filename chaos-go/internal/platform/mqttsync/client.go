@@ -196,15 +196,17 @@ func normalizePrefix(p string) string {
 	return p
 }
 
-func loadNodeID() error {
-	id, err := GetOrCreateNodeID()
-	if err != nil {
-		return err
+func loadNodeID() {
+	var id string
+	if cfgID := config.GetConfig().Mqtt.NodeID; cfgID != "" {
+		id = cfgID
+	} else {
+		id = tools.UUID()
+		slog.Warn("MQTT node_id 未配置，已生成随机值（重启会变），建议在 config.yaml 固定", "nodeID", id)
 	}
 	nodeMu.Lock()
 	localNodeID = id
 	nodeMu.Unlock()
-	return nil
 }
 
 func Start() {
@@ -214,9 +216,7 @@ func Start() {
 		return
 	}
 	initCrypto(cfg)
-	if err := loadNodeID(); err != nil {
-		slog.Warn("MQTT 加载节点标识失败，后台会重试", "err", err)
-	}
+	loadNodeID()
 	slog.Info("MQTT 正在连接 broker（失败会在后台重试）")
 	watchdogOnce.Do(func() { go connMgr.run() })
 }
@@ -359,10 +359,7 @@ func (m *connManager) run() {
 
 func (m *connManager) tick() {
 	if NodeID() == "" {
-		if err := loadNodeID(); err != nil {
-			slog.Warn("MQTT 节点标识未就绪，等待重试", "err", err)
-			return
-		}
+		loadNodeID()
 		m.rebuild("节点标识就绪")
 		return
 	}

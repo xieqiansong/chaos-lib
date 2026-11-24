@@ -1,11 +1,9 @@
 package mqttsync
 
 import (
-	"log/slog"
 	"time"
 
 	"chaos-go/internal/framework/config"
-	"chaos-go/pkg/tools"
 )
 
 // UpsertMessage 按 node_id + channel + payload 三元组查找：
@@ -95,22 +93,4 @@ func DeleteChannelByName(name string) (int64, error) {
 
 	res := db.Where("channel = ?", name).Delete(&MqttSyncMessage{})
 	return res.RowsAffected, res.Error
-}
-
-func GetOrCreateNodeID() (string, error) {
-	db := config.GetDB()
-	if db == nil {
-		return "", ErrDBUnavailable
-	}
-	var node MqttSyncNode
-	err := db.Order("id ASC").First(&node).Error
-	if err == nil && node.NodeID != "" {
-		return node.NodeID, nil
-	}
-	id := tools.UUID()
-	rec := MqttSyncNode{NodeID: id}
-	if err2 := db.Create(&rec).Error; err2 != nil {
-		slog.Warn("MQTT 节点标识持久化失败，使用内存态", "err", err2)
-	}
-	return id, nil
 }

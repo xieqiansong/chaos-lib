@@ -13,7 +13,7 @@ func init() {
 			Version:      "1.0.0",
 			Dependencies: nil,
 		},
-		Models: []any{&MqttSyncMessage{}, &MqttSyncNode{}},
+		Models: []any{&MqttSyncMessage{}},
 		RegisterRoutes: func(rg *web.RouterGroup) {
 			RegisterV1(rg)
 		},

@@ -97,6 +97,7 @@ type MqttConfig struct {
 	Enabled    bool   `yaml:"enabled"`
 	Broker     string `yaml:"broker"`
 	Prefix     string `yaml:"prefix"`
+	NodeID     string `yaml:"node_id"`
 	ClientID   string `yaml:"client_id"`
 	Username   string `yaml:"username"`
 	Password   string `yaml:"password"`

@@ -2,7 +2,6 @@ package mqttsync
 
 import (
 	"errors"
-	"time"
 
 	"chaos-go/internal/framework/crud"
 )
@@ -22,12 +21,6 @@ type MqttSyncMessage struct {
 	Channel string `gorm:"size:64;index" json:"Channel"`
 	Payload string `gorm:"type:text" json:"Payload"`
 	Count   int    `gorm:"default:1" json:"Count"`
-}
-
-type MqttSyncNode struct {
-	ID        uint      `gorm:"primaryKey"`
-	NodeID    string    `gorm:"uniqueIndex;size:64" json:"NodeID"`
-	CreatedAt time.Time `json:"-"`
 }
 
 func (MqttSyncMessage) TableName() string { return "mqtt_sync_messages" }

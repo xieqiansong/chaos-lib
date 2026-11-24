@@ -60,6 +60,7 @@ mqtt:
   enabled: false
   broker: "tcp://broker.emqx.io:1883"   # 公共 broker：broker.emqx.io / test.mosquitto.org
   prefix: "test/"                        # 集群公共主题前缀
+  node_id: ""                            # 节点唯一标识（建议固定；留空则启动时随机生成，重启会变）
   client_id: ""                          # 留空则缺省 chaos-<nodeID>
   username: ""                           # 公共 broker 多为匿名，留空
   password: ""
