@@ -21,9 +21,10 @@ let timer: number | undefined
 const columns: DataTableColumn[] = [
   {field: 'Channel', title: '主题', minWidth: 140, searchable: true},
   {field: 'NodeID', title: '节点', width: 170, searchable: true},
-  {field: 'IsSelf', title: '来源', width: 170, formatter: (row: any) => (row.IsSelf ? '本机' : '对端'),},
+  {field: 'IsSelf', title: '来源', width: 80, formatter: (row: any) => (row.IsSelf ? '本机' : '对端'),},
   {field: 'Payload', title: '内容', minWidth: 280, showOverflowTooltip: true},
-  {field: 'CreatedAt', title: '时间', width: 170, type: 'datetime'},
+  {field: 'Count', title: '次数', width: 80, align: 'center'},
+  {field: 'UpdatedAt', title: '最近更新', width: 170, type: 'datetime'},
   {field: '__actions', title: '操作', width: 140, type: 'actions', fixed: 'right'},
 ]
 
@@ -159,7 +160,7 @@ async function removeChannel() {
         title="消息"
         row-key="ID"
         :enabled-actions="[CRUD_ACTION.VIEW, CRUD_ACTION.EDIT, CRUD_ACTION.DELETE]"
-        :default-sort="{field: 'created_at', order: 'descending'}"
+        :default-sort="{field: 'updated_at', order: 'descending'}"
     >
       <!-- 平铺广播表单：新建即广播并记录到本地消息表；主题同时作为「删除该主题消息」的目标 -->
       <template #toolbar>
